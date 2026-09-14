@@ -68,8 +68,11 @@ function discussionPanel(controller) {
   return `<section class="discussion-panel" data-no-translate data-controller="${controller}">${discussionRoulette(view)}<h2>${title}</h2>${active||view.status==='paused'?`<strong class="discussion-speaker">${view.mode==='turns'?escapeHtml(nameOf(view.speakerId)):discussionText('الجميع يشارك','Everyone can speak')}</strong><div class="discussion-clock" role="timer" aria-label="${discussionText('الوقت المتبقي','Time remaining')}">${formatDiscussionTime(view.remainingMs)}</div>${view.mode==='turns'?`<p class="discussion-order">${Math.min(view.index+1,view.order.length)} / ${view.order.length}</p>${discussionQueue(view)}`:''}`:`<p>${view.complete?discussionText('جاهزين للتصويت بعد اكتمال اختيارات الأدوار.','Ready to vote once role actions are complete.'):controller?discussionText('ابدأ النقاش قبل التصويت. البوتات لا تأخذ أدوار كلام.','Start discussion before voting. Bots do not take speaking turns.'):discussionText('انتظر المضيف لبدء النقاش.','Wait for the host to start discussion.')}</p>`}${controller&&view.status==='waiting'?roundDurationControl(view):''}<div class="actions center">${controller&&view.status==='waiting'?`<button class="btn green" onclick="discussionAction('startDiscussion')">${discussionText('بدء النقاش','Start discussion')}</button>`:''}${canPass?`<button class="btn" onclick="discussionAction('passDiscussion')">${discussionText('تخطي','PASS')}</button>`:''}${controller&&(active||view.status==='paused')?`<button class="btn" onclick="discussionAction('controlDiscussion','${active?'pause':'resume'}')">${active?discussionText('⏸️ إيقاف وقت الكلام','⏸️ Pause speaking timer'):discussionText('▶️ استكمال وقت الكلام','▶️ Resume speaking timer')}</button><button class="btn" onclick="discussionAction('controlDiscussion','reset')">${discussionText('↻ إعادة وقت المتحدث','↻ Restart current timer')}</button>`:''}${controller&&active?`<button class="btn" onclick="finishDiscussionEarly()">${discussionText('إنهاء النقاش','End discussion')}</button>`:''}</div></section>`;
 }
 function formatDiscussionTime(milliseconds) {
-  const seconds = Math.max(0, Math.ceil(milliseconds / 1000));
+  const seconds = discussionSeconds(milliseconds);
   return `${Math.floor(seconds/60)}:${String(seconds%60).padStart(2,'0')}`;
+}
+function discussionSeconds(milliseconds) {
+  return Math.max(0, Math.ceil((Number(milliseconds)||0) / 1000));
 }
 function updateDiscussionClocks() {
   if (!game) return;
@@ -85,9 +88,20 @@ function updateDiscussionClocks() {
     }
   }
   const clock = document.querySelectorAll('.discussion-clock');
-  for(const el of clock){ el.textContent = formatDiscussionTime(view.remainingMs); el.classList.toggle('urgent',view.remainingMs<=10000); }
+  const seconds = typeof discussionSeconds==='function'?discussionSeconds(view.remainingMs):Math.max(0, Math.ceil((view.remainingMs||0)/1000));
+  for(const el of clock){
+    el.classList.toggle('urgent',seconds<=10);
+    if(el.dataset.count==='seconds')el.textContent=`${seconds} ${discussionText('ثانية','seconds')}`;
+    else el.textContent=formatDiscussionTime(view.remainingMs);
+  }
   const vote = document.querySelector('[data-discussion-vote]');
   if (vote) vote.disabled = !(view.complete && ((game.lawyerReady && game.jailerReady) || phaseTimeExpired()));
+  for(const el of document.querySelectorAll('.speak-next')){
+    const nextId=el.dataset.speakNext;
+    el.textContent=el.dataset.speakLast==='1'
+      ? discussionText(`هذا آخر دور — باقي ${seconds} ثانية`,`This is the last turn — ${seconds} seconds left`)
+      : discussionText(`التالي: ${nameOf(nextId)} — بعد ${seconds} ثانية`,`Next: ${nameOf(nextId)} — in ${seconds} seconds`);
+  }
   if(typeof syncSpeakTurn==='function')syncSpeakTurn(view);
 }
 async function discussionAction(action, operation) {

@@ -1059,7 +1059,8 @@ body.app-shell h1,body.app-shell h2,body.app-shell h3{font-weight:800}
 .speak-turn{margin:0 0 14px;padding:16px;border:2px solid #c9a227;border-radius:14px;background:#1a2218;text-align:center}
 .speak-turn h2{margin:0 0 8px;color:#f0ca7c}
 .speak-turn p{margin:0 0 12px;font-size:16px;line-height:1.55}
-.speak-turn .discussion-clock{font-size:28px;font-weight:900;margin:0 0 12px;color:#f5f1e8}
+.speak-turn .speak-now,.speak-turn .speak-next{margin:0 0 8px;font-size:17px;font-weight:800;line-height:1.5}
+.speak-turn .speak-next{color:#f0ca7c}
 .square-home .choice-stack,.square-home .verdict-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 body.has-player-dock:has(.dock-play) .journey-hint{display:none}
 .player-dock .dock-play:not(.dock-card-play) .card{margin:0;padding:0;border:0;background:transparent;box-shadow:none}

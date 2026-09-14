@@ -1588,9 +1588,34 @@ function mySpeakTurn(){
   return view.speakerId===playerId;
 }
 function speakTurnHtml(){
-  if(!mySpeakTurn())return '';
-  const view=clientDiscussion();
-  return `<section class="speak-turn" data-no-translate><h2>${discussionText('دورك في النقاش','Your turn to speak')}</h2><p>${discussionText('تكلم الآن. إذا خلصت أو ما تبي تكمل، اضغط تخطي.','Speak now. If you are done or do not want to continue, tap Skip.')}</p><div class="discussion-clock" role="timer">${formatDiscussionTime(view.remainingMs)}</div><button class="btn gold wide" type="button" onclick="discussionAction('passDiscussion')">⏭️ ${discussionText('تخطي','Skip')}</button></section>`;
+  return discussionBoardHtml(true);
+}
+function discussionBoardHtml(mineOnly=false){
+  if(!['day','trial'].includes(game?.phase))return '';
+  const view=typeof clientDiscussion==='function'?clientDiscussion():{};
+  if(typeof openingDrawActive==='function'&&openingDrawActive(view)){
+    return mineOnly?'':`<section class="speak-turn" data-no-translate><p>${discussionText('قرعة المتحدث جارية…','Speaker draw in progress…')}</p></section>`;
+  }
+  if(view.mode==='group'&&view.status==='active'){
+    const seconds=discussionSeconds(view.remainingMs);
+    return mineOnly?'':`<section class="speak-turn" data-no-translate><h2>${discussionText('الجميع يتكلم','Everyone can speak')}</h2><div class="discussion-clock" data-count="seconds" role="timer">${seconds} ${discussionText('ثانية','seconds')}</div></section>`;
+  }
+  if(view.mode!=='turns'||!view.speakerId||!['active','paused'].includes(view.status))return '';
+  const mine=game.me?.alive&&view.speakerId===playerId;
+  if(mineOnly&&!mine)return '';
+  const seconds=discussionSeconds(view.remainingMs);
+  const nextId=view.order?.[view.index+1];
+  const nextLine=nextId
+    ? discussionText(`التالي: ${nameOf(nextId)} — بعد ${seconds} ثانية`, `Next: ${nameOf(nextId)} — in ${seconds} seconds`)
+    : discussionText(`هذا آخر دور — باقي ${seconds} ثانية` , `This is the last turn — ${seconds} seconds left`);
+  const skip=mine?`<button class="btn gold wide" type="button" onclick="discussionAction('passDiscussion')">⏭️ ${discussionText('تخطي','Skip')}</button>`:'';
+  return `<section class="speak-turn${mine?' is-mine':''}" data-no-translate>
+    <h2>${mine?discussionText('دورك في النقاش','Your turn to speak'):discussionText('النقاش','Discussion')}</h2>
+    <p class="speak-now"><b>${discussionText('يتكلم الآن','Speaking now')}</b> ${escapeHtml(nameOf(view.speakerId))}</p>
+    <div class="discussion-clock" data-count="seconds" role="timer">${seconds} ${discussionText('ثانية','seconds')}</div>
+    <p class="speak-next" data-speak-next="${escapeHtml(nextId||'')}" data-speak-last="${nextId?'0':'1'}">${escapeHtml(nextLine)}</p>
+    ${skip}
+  </section>`;
 }
 function nowTaskHtml(){
   const hint=typeof playerTaskHint==='function'?playerTaskHint():'';
@@ -1609,13 +1634,7 @@ function syncSpeakTurn(view){
   try{renderPlayer();}finally{speakSyncBusy=false;}
 }
 function squarePanelHtml(voteBody=''){
-  const view=typeof clientDiscussion==='function'?clientDiscussion():{status:'off'};
-  let speaker='';
-  if(['day','trial'].includes(game.phase)){
-    if(typeof openingDrawActive==='function'&&openingDrawActive(view))speaker=`<p class="square-line">${discussionText('قرعة المتحدث جارية…','Speaker draw in progress…')}</p>`;
-    else if(view.mode==='turns'&&view.speakerId)speaker=`<p class="square-line"><b>${discussionText('المتحدث','Speaking')}</b> ${escapeHtml(nameOf(view.speakerId))}${view.remainingMs?` · ${formatDiscussionTime(view.remainingMs)}`:''}</p>`;
-    else if(view.mode==='group'&&view.status==='active')speaker=`<p class="square-line">${discussionText('الجميع يتكلم','Everyone can speak')}</p>`;
-  }
+  const talk=discussionBoardHtml(false);
   const causes={
     mafia_kill:['اغتالته المافيا','Killed by Mafia'], vote_eliminated:['استُبعد بالتصويت','Voted out'], trial_guilty:['أُدين بالحكم','Voted guilty'],
     vigilante_kill:['طلقة القناص','Sniper shot'], serial_kill:['اغتيال القاتل المتسلسل','Serial Killer'], witch_poison:['سم الساحرة','Witch poison'],
@@ -1627,7 +1646,7 @@ function squarePanelHtml(voteBody=''){
   const news=String(game.lastEvent||'').split(',').filter(Boolean).map(e=>`<p>${squareEventLine(e)}</p>`).join('');
   const announce=news?`<div class="square-block"><h3>${discussionText('الإعلان','Announcements')}</h3>${news}</div>`:'';
   const vote=voteBody?`<div class="square-block"><h3>${discussionText('التصويت','Vote')}</h3>${voteBody}</div>`:'';
-  return [speakTurnHtml(),nowTaskHtml(),speaker&&`<div class="square-block">${speaker}</div>`,announce,dead,vote].filter(Boolean).join('')||`<p class="muted">${discussionText('ما فيه خبر الحين.','Nothing to show yet.')}</p>`;
+  return [talk,nowTaskHtml(),announce,dead,vote].filter(Boolean).join('')||`<p class="muted">${discussionText('ما فيه خبر الحين.','Nothing to show yet.')}</p>`;
 }
 function wrapCyclePlay(cycle, actionHtml) {
   const isDay = cycle === 'day';
