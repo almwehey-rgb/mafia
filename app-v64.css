@@ -1036,7 +1036,11 @@ body.app-shell h1,body.app-shell h2,body.app-shell h3{font-weight:800}
 .role-act-title{margin:0 0 8px;font-size:16px;color:#e8c37a;text-align:center}
 .phase-play>.role-presentation{margin-bottom:8px}
 .player-dock{position:fixed;inset-inline:0;bottom:0;z-index:60;display:flex;flex-direction:column;gap:6px;padding:8px 10px max(10px,env(safe-area-inset-bottom));border-top:1px solid #80663f88;background:#0c0e0df5;backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px)}
-.player-dock .dock-play{max-height:28dvh;overflow:auto;padding:10px;border-radius:14px;background:#121614;border:1px solid #80663f66}
+.player-dock .dock-play{max-height:28dvh;overflow:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;padding:10px;border-radius:14px;background:#121614;border:1px solid #80663f66}
+.player-dock .dock-play:has(.pick),.player-dock .dock-play:has(.choice-stack){max-height:min(58dvh,calc(100dvh - 140px))}
+.player-dock .choice-stack,.player-dock .verdict-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:0;max-height:none}
+.player-dock .choice-stack .pick,.player-dock .verdict-grid .pick,.player-dock .pick{min-height:44px;width:100%;padding:8px 6px;font-size:15px;font-weight:700}
+.player-dock .pick.skip{grid-column:1/-1}
 .player-dock .dock-play.dock-card-play{max-height:38dvh;display:grid;place-items:center}
 .player-dock .dock-play h3{margin:10px 0 6px;font-size:14px;color:#e8c37a;text-align:center}
 .player-dock .dock-play:not(.dock-card-play) .card{margin:0;padding:0;border:0;background:transparent;box-shadow:none}
