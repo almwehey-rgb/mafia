@@ -1256,7 +1256,7 @@ function mountPlayerTools(){
   }else if(tab==='vote'){
     play=`<section class="dock-play"><h2 class="role-act-title" data-no-translate>${discussionText('التصويت','Vote')}</h2>${pendingDockPlay.voteBody||`<p class="muted">${discussionText('ما فيه نتيجة تصويت بعد.','No vote result yet.')}</p>`}</section>`;
   }else if(tab==='card'){
-    play=`<section class="dock-play dock-card-play">${personalRoleCard(false,{reveal:true})}</section>`;
+    play=`<section class="dock-play dock-card-play">${personalRoleCard(true,{reveal:true})}</section>`;
   }
   const chatOn=canChat?' dock-chat-on':'';
   const on=name=>tab===name?' is-on':'';

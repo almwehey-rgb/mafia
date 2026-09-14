@@ -1063,3 +1063,16 @@ body.light .player-dock .dock-play{background:#fff8ea;border-color:#b19767}
   .player-dock{inset-inline:auto;left:50%;transform:translateX(-50%);width:min(560px,100%);border-radius:16px 16px 0 0}
 }
 
+@media(max-width:700px){
+  body.showing-role .shell{max-width:100%!important;padding:max(10px,env(safe-area-inset-top)) 14px max(12px,env(safe-area-inset-bottom))!important}
+  body.showing-role .phase-bar{display:none!important}
+  body.showing-role .role-reveal-only{width:100%;max-width:360px;margin-inline:auto;min-height:calc(100dvh - 24px);height:calc(100dvh - 24px);grid-template-rows:minmax(0,1fr) 52px;gap:12px;padding:0}
+  body.showing-role .role-reveal-only .role-presentation{min-height:0;height:100%;width:100%;display:grid;place-items:center;align-self:stretch}
+  body.showing-role .role-reader.turning-role,body.showing-role .role-reader.turning-role.personal-role-card{width:auto!important;height:100%!important;max-height:100%!important;max-width:100%!important;aspect-ratio:2/3;margin:0 auto}
+  body.showing-role .turning-role.kids-role-card{aspect-ratio:394/661!important}
+  body.showing-role .reveal-ack{position:static}
+  .player-dock .dock-card-play{padding:8px;overflow:hidden}
+  .player-dock .dock-card-play .role-presentation{width:auto;max-width:100%;margin:0}
+  .player-dock .dock-card-play .turning-role{width:auto;height:min(32dvh,260px);max-width:100%;aspect-ratio:2/3;margin:0 auto}
+}
+
