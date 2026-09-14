@@ -639,8 +639,11 @@ body.light .role-identity h2{color:#735019}body.light .role-identity>span{backgr
 /* Keep actions within reach during play; the initial secret reveal stays large. */
 .role-presentation:has(.personal-role-card.compact){max-width:280px}
 .personal-role-card.compact .role-rules-header h2{font-size:23px}
-body:has(.player-tools) .shell{padding-bottom:110px}
-.player-tools{bottom:max(16px,env(safe-area-inset-bottom));right:max(16px,env(safe-area-inset-right))}
+body:has(.player-tools) .shell{padding-bottom:max(24px,env(safe-area-inset-bottom))}
+.player-tools{width:min(520px,100%);margin:8px auto 0;border:0;background:transparent}
+.player-tools>summary{cursor:pointer;list-style:none;min-height:40px;padding:8px 12px;text-align:center;font-size:14px;color:#c9b48a}
+.player-tools>summary::-webkit-details-marker{display:none}
+.player-tools-list{display:flex;flex-wrap:wrap;justify-content:center;gap:8px;padding:0 0 8px}
 .sheet-card{padding-bottom:max(20px,env(safe-area-inset-bottom));scroll-padding-block:20px}
 .player>span,.leader-row>span,.toolbar>div,.season-card>*{min-width:0;overflow-wrap:anywhere}
 .accused-name{font-size:clamp(32px,7vw,76px);line-height:1.5;overflow-wrap:anywhere}

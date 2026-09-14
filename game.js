@@ -1216,7 +1216,7 @@ syncVisibleViewport();
 function mountPlayerTools(){
   if(!game?.me?.alive||['lobby','reveal','finished'].includes(game.phase)||document.querySelector('.player-tools'))return;
   const canChat=game.phase==='night'&&(game.me.jailed||game.me.role==='jailer'||game.me.role==='mafia'||game.me.role==='mafia_boss');
-  const tools=document.createElement('div');tools.className='player-tools';tools.innerHTML=`${game.me.isHost?`<button type="button" onclick="toggleDelegatedHost()">👑 ${discussionText('تحكم','Host')}</button>`:''}<button type="button" onclick="openWill()">📜 ${discussionText('وصية','Will')}</button>${canChat?`<button type="button" data-chat-button onclick="openChat()">💬 ${discussionText('محادثة','Chat')}${chatHasUnread()?' 🔴':''}</button>`:''}<button type="button" onclick="openReport()">🚩 ${discussionText('بلاغ','Report')}</button>`;document.querySelector('#app').appendChild(tools);
+  const tools=document.createElement('details');tools.className='player-tools';tools.innerHTML=`<summary>${discussionText('أدوات','Tools')}${canChat&&chatHasUnread()?' 🔴':''}</summary><div class="player-tools-list">${game.me.isHost?`<button type="button" onclick="toggleDelegatedHost()">👑 ${discussionText('تحكم','Host')}</button>`:''}<button type="button" onclick="openWill()">📜 ${discussionText('وصية','Will')}</button>${canChat?`<button type="button" data-chat-button onclick="openChat()">💬 ${discussionText('محادثة','Chat')}${chatHasUnread()?' 🔴':''}</button>`:''}<button type="button" onclick="openReport()">🚩 ${discussionText('بلاغ','Report')}</button></div>`;document.querySelector('#app').appendChild(tools);
 }
 function toggleDelegatedHost(){delegatedHostMode=!delegatedHostMode;document.querySelector('.player-tools')?.remove();delegatedHostMode?renderHost():renderPlayer()}
 let sheetReturnFocus=null;
@@ -1672,8 +1672,9 @@ async function submitDiscipline(target,action) {
 let hostProgressObserver;
 function mountHostProgress() {
   hostProgressObserver?.disconnect();
+  if (game?.phase !== 'lobby') return;
   const app = document.querySelector('#app');
-  const lobby = game?.phase === 'lobby';
+  const lobby = true;
   const actions = {reveal:'beginNight',night:'resolveNight',day:'startVote',nomination:'resolveVote',trial:'advanceVerdict',verdict:'resolveVote',vote:'resolveVote',paused:'togglePause'};
   const handler = lobby ? (setupStep < 3 ? 'setSetupStep(' + (setupStep + 1) + ')' : 'startGame()') : actions[game?.phase] ? "hostAction('" + actions[game.phase] + "')" : '';
   const scope = app.querySelector(lobby ? '.setup-card' : '.hero');
