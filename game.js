@@ -1252,7 +1252,7 @@ function mountPlayerTools(){
   const tab=pendingDockPlay.tab;
   let play='';
   if(tab==='ability'){
-    play=`<section class="dock-play">${pendingDockPlay.abilityTitle?`<h2 class="role-act-title" data-no-translate>${pendingDockPlay.abilityTitle}</h2>`:''}${pendingDockPlay.abilityBody||`<p class="muted">${discussionText('ما فيه إجراء الحين.','No action right now.')}</p>`}</section>`;
+    play=`<section class="dock-play">${nowTaskHtml()}${pendingDockPlay.abilityTitle?`<h2 class="role-act-title" data-no-translate>${pendingDockPlay.abilityTitle}</h2>`:''}${pendingDockPlay.abilityBody||`<p class="muted">${discussionText('ما فيه إجراء الحين.','No action right now.')}</p>`}</section>`;
   }else if(tab==='square'){
     play=`<section class="dock-play"><h2 class="role-act-title" data-no-translate>${discussionText('الساحة','Square')}</h2>${pendingDockPlay.squareBody||`<p class="muted">${discussionText('ما فيه خبر الحين.','Nothing to show yet.')}</p>`}</section>`;
   }else if(tab==='card'){
@@ -1550,6 +1550,11 @@ function squareEventLine(event){
   if(event==='escort_blocked')return discussionText('المعطّل عطّل قدرة لاعب هذه الليلة.','The Escort blocked a player tonight.');
   return eventLabel(event);
 }
+function nowTaskHtml(){
+  const hint=typeof playerTaskHint==='function'?playerTaskHint():'';
+  if(!hint)return '';
+  return `<div class="square-block square-now"><h3>${discussionText('المطلوب الآن','Now')}</h3><p>${escapeHtml(hint)}</p></div>`;
+}
 function squarePanelHtml(voteBody=''){
   const view=typeof clientDiscussion==='function'?clientDiscussion():{status:'off'};
   let speaker='';
@@ -1569,7 +1574,7 @@ function squarePanelHtml(voteBody=''){
   const news=String(game.lastEvent||'').split(',').filter(Boolean).map(e=>`<p>${squareEventLine(e)}</p>`).join('');
   const announce=news?`<div class="square-block"><h3>${discussionText('الإعلان','Announcements')}</h3>${news}</div>`:'';
   const vote=voteBody?`<div class="square-block"><h3>${discussionText('التصويت','Vote')}</h3>${voteBody}</div>`:'';
-  return [speaker&&`<div class="square-block">${speaker}</div>`,announce,dead,vote].filter(Boolean).join('')||`<p class="muted">${discussionText('ما فيه خبر الحين.','Nothing to show yet.')}</p>`;
+  return [nowTaskHtml(),speaker&&`<div class="square-block">${speaker}</div>`,announce,dead,vote].filter(Boolean).join('')||`<p class="muted">${discussionText('ما فيه خبر الحين.','Nothing to show yet.')}</p>`;
 }
 function wrapCyclePlay(cycle, actionHtml) {
   const isDay = cycle === 'day';
