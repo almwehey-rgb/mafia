@@ -1638,6 +1638,15 @@ function syncSpeakTurn(view){
   try{renderPlayer();}finally{speakSyncBusy=false;}
 }
 function squarePanelHtml(voteBody=''){
+  const view=typeof clientDiscussion==='function'?clientDiscussion():{};
+  const voting=['nomination','vote','verdict'].includes(game.phase);
+  const discussDone=game.phase==='day'&&(view.complete||view.status==='done');
+  if(voting||discussDone){
+    const title=game.phase==='nomination'?discussionText('الترشيح','Nomination'):game.phase==='verdict'?discussionText('الحكم','Verdict'):discussionText('التصويت','Voting');
+    const waiting=`<p class="pick-hint is-set">${discussionText('النقاش انتهى. انتظر بدء التصويت.','Discussion is over. Wait for voting to start.')}</p>`;
+    const vote=voteBody||(discussDone&&!voting?waiting:'');
+    return `${nowTaskHtml()}<div class="square-block vote-home"><h3>${title}</h3>${vote}</div>`;
+  }
   const talk=discussionBoardHtml(false);
   const causes={
     mafia_kill:['اغتالته المافيا','Killed by Mafia'], vote_eliminated:['استُبعد بالتصويت','Voted out'], trial_guilty:['أُدين بالحكم','Voted guilty'],
@@ -1664,10 +1673,11 @@ function wrapCyclePlay(cycle, actionHtml) {
   const voteNeed=['nomination','vote','verdict','trial'].includes(game.phase);
   const abilityTitle=speak?discussionText('دورك في النقاش','Your turn to speak'):(voteNeed?(detectHits.length?discussionText('نتيجة الفحص','Investigation result'):discussionText('قدرتي','Ability')):(roleActTitle()||discussionText('قدرتي','Ability')));
   const abilityBody=[speak,voteNeed?detect:[detect,extra,action].filter(Boolean).join('')].filter(Boolean).join('');
-  const voteBody=voteNeed?[action,votes].filter(Boolean).join(''):votes;
+  const voteBody=voteNeed?[action,votes].filter(Boolean).join(''):'';
   const squareBody=squarePanelHtml(voteBody);
   const view=typeof clientDiscussion==='function'?clientDiscussion():{};
-  const auto=speak||detectHits.length||dockHasAction(voteNeed?detect:[extra,action].join(''))?'ability':'none';
+  const votingHome=['nomination','vote','verdict'].includes(game.phase)||(isDay&&(view.complete||view.status==='done'));
+  const auto=votingHome?'none':(speak||detectHits.length||dockHasAction(voteNeed?detect:[extra,action].join(''))?'ability':'none');
   const key=[game.matchId,game.round,game.phase,detectHits.length,!!game.voteSummary,(game.lastDeaths||[]).join(','),view.speakerId||'',speak].join('|');
   if(key!==dockAutoKey){dockAutoKey=key;pendingDockPlay.tab=auto;}
   if(pendingDockPlay.tab==='square'||pendingDockPlay.tab==='vote')pendingDockPlay.tab='none';

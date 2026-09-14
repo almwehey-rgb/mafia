@@ -1,4 +1,4 @@
-const CACHE = 'mafia-e14ux62';
+const CACHE = 'mafia-e14ux63';
 self.addEventListener('install', event => {
   event.waitUntil(caches.open(CACHE).then(cache => Promise.all(['/','/index.html','/game.html'].map(path => cache.add(path).catch(() => {})))));
   self.skipWaiting();
