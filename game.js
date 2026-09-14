@@ -51,6 +51,19 @@ const IMPACT_DEATH=new Set(['mafia_kill','serial_kill','witch_poison','jailer_ex
 const IMPACT_SAVE=new Set(['doctor_saved','jail_saved','witch_saved','lawyer_saved']);
 let lastImpactSig='';
 let impactArmed=false;
+let impactCloseTimer=0;
+let impactPulseTimer=0;
+function closeDeathImpact(){
+  clearTimeout(impactCloseTimer);
+  clearInterval(impactPulseTimer);
+  impactCloseTimer=0;
+  impactPulseTimer=0;
+  impactArmed=false;
+  document.getElementById('deathImpact')?.remove();
+  document.documentElement.classList.remove('impact-death','impact-save');
+  document.body.classList.remove('impact-death','impact-save');
+  if(navigator.vibrate)navigator.vibrate(0);
+}
 function deathIdList(){
   let raw=game?.lastDeaths;
   if(typeof raw==='string'){
@@ -62,21 +75,25 @@ function deathIdList(){
 function samePlayer(a,b){return String(a||'')!==''&&String(a)===String(b);}
 function playImpact(kind){
   const death=kind==='death';
+  closeDeathImpact();
   impactArmed=death;
-  const pulse=()=>{if(navigator.vibrate)navigator.vibrate(death?[100,50,180,50,320,70,480,80,260]:[50,40,90,40,140,50,220]);};
+  const pulse=()=>{if(navigator.vibrate)navigator.vibrate(death?[80,40,160,40,240,50,360]:[50,40,90,40,140,50,220]);};
   pulse();
-  if(death)setTimeout(pulse,120);
-  const root=document.documentElement;
-  root.classList.remove('impact-death','impact-save');
-  document.body.classList.remove('impact-death','impact-save');
-  void document.body.offsetWidth;
-  root.classList.add(death?'impact-death':'impact-save');
-  document.body.classList.add(death?'impact-death':'impact-save');
-  setTimeout(()=>{
-    root.classList.remove('impact-death','impact-save');
-    document.body.classList.remove('impact-death','impact-save');
-    impactArmed=false;
-  },1400);
+  if(death){
+    impactPulseTimer=setInterval(pulse,450);
+    const overlay=document.createElement('button');
+    overlay.id='deathImpact';
+    overlay.type='button';
+    overlay.className='death-impact';
+    overlay.setAttribute('aria-label',discussionText('اضغط للخروج','Tap to dismiss'));
+    overlay.innerHTML=`<b>${discussionText('خرجت من المباراة','You are out')}</b><span>${discussionText('اضغط للخروج','Tap to dismiss')}</span>`;
+    overlay.addEventListener('click',closeDeathImpact);
+    document.body.appendChild(overlay);
+    impactCloseTimer=setTimeout(closeDeathImpact,2000);
+  }else{
+    document.body.classList.add('impact-save');
+    impactCloseTimer=setTimeout(closeDeathImpact,900);
+  }
   if(!soundEnabled)return;
   try{
     const context=new (window.AudioContext || window.webkitAudioContext)();
