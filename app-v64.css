@@ -1035,6 +1035,9 @@ body.app-shell h1,body.app-shell h2,body.app-shell h3{font-weight:800}
 .phase-play>.role-presentation{margin-bottom:8px}
 .player-dock{position:fixed;inset-inline:0;bottom:0;z-index:60;display:flex;flex-direction:column;gap:6px;padding:8px 10px max(10px,env(safe-area-inset-bottom));border-top:1px solid #80663f88;background:#0c0e0df5;backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px)}
 .player-dock .dock-play{max-height:34dvh;overflow:auto;padding:10px;border-radius:14px;background:#121614;border:1px solid #80663f66}
+.player-dock .dock-play[open]{max-height:48dvh}
+.player-dock .dock-play>summary{cursor:pointer;list-style:none}
+.player-dock .dock-play>summary::-webkit-details-marker{display:none}
 .player-dock .dock-play h2:not(.role-act-title),.player-dock .dock-play .role-title{display:none}
 .player-dock .dock-play h3{margin:10px 0 6px;font-size:14px;color:#e8c37a;text-align:center}
 .player-dock .dock-play .card{margin:0;padding:0;border:0;background:transparent;box-shadow:none}

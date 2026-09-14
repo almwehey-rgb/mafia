@@ -1200,7 +1200,7 @@ function renderPlayerContent() {
   if (!me) { $('#app').innerHTML = '<div class="card hero"><h2>فقدنا جلسة اللاعب</h2><button class="btn" onclick="home()">دخول من جديد</button></div>'; return; }
   if (!me.alive) { delegatedHostMode=false; if(document.querySelector('.game-sheet'))closeSheet(); renderSpectator(); return; }
   setTimeout(mountPlayerTools, 0);
-  if (game.phase === 'paused') { pendingDockPlay={title:'',body:''}; $('#app').innerHTML = `${phaseBar()}<div class="card hero"><div class="role-title">⏸️ المباراة متوقفة</div><p>المضيف سيكمل المباراة من المرحلة نفسها.</p>${me.isHost?`<button class="btn gold wide" type="button" onclick="returnToLobby()">${discussionText('إيقاف والرجوع للوبي','Stop and return to lobby')}</button>`:''}</div>`; return; }
+  if (game.phase === 'paused') { pendingDockPlay={title:'',body:'',open:false}; $('#app').innerHTML = `${phaseBar()}<div class="card hero"><div class="role-title">⏸️ المباراة متوقفة</div><p>المضيف سيكمل المباراة من المرحلة نفسها.</p>${me.isHost?`<button class="btn gold wide" type="button" onclick="returnToLobby()">${discussionText('إيقاف والرجوع للوبي','Stop and return to lobby')}</button>`:''}</div>`; return; }
   if (game.phase === 'finished') {
     $('#app').innerHTML = `${phaseBar()}<div class="card hero"><div class="role-title">${winnerTitle()}</div><p>${discussionText('دورك','Your role')}: ${roleLabel(me.role)}</p><p class="muted">${me.isHost ? discussionText('افتح تحكم المضيف لإعادة المباراة.','Open host controls to play again.') : discussionText('انتظر المضيف لإعادة المباراة.','Wait for the host to play again.')}</p></div>`;
     return;
@@ -1230,7 +1230,7 @@ function dockChatLabel(){
   if(game?.me?.jailed||game?.me?.role==='jailer')return discussionText('محادثة السجن','Jail chat');
   return discussionText('محادثة المافيا','Mafia chat');
 }
-let pendingDockPlay={title:'',body:''};
+let pendingDockPlay={title:'',body:'',open:false};
 function extractDockAction(html){
   const box=document.createElement('div');
   box.innerHTML=html||'';
@@ -1243,7 +1243,7 @@ function mountPlayerTools(){
   const canChat=chatAllowed();
   const unread=canChat&&chatHasUnread();
   const host=game.me.isHost?`<button type="button" class="dock-item" onclick="toggleDelegatedHost()"><span class="dock-icon">👑</span><span>${discussionText('تحكم','Host')}</span></button>`:'';
-  const play=pendingDockPlay.body?`<section class="dock-play">${pendingDockPlay.title?`<h2 class="role-act-title" data-no-translate>${pendingDockPlay.title}</h2>`:''}${pendingDockPlay.body}</section>`:'';
+  const play=pendingDockPlay.body?`<details class="dock-play"${pendingDockPlay.open?' open':''}><summary class="role-act-title" data-no-translate>${pendingDockPlay.title||discussionText('الإجراء','Action')}</summary>${pendingDockPlay.body}</details>`:'';
   const chat=canChat?`<button type="button" class="dock-chat" data-chat-button onclick="openChat()">${unread?'🔴 ':''}💬 ${dockChatLabel()}</button>`:'';
   const dock=document.createElement('nav');
   dock.className='player-dock';
@@ -1518,7 +1518,8 @@ function wrapCyclePlay(cycle, actionHtml) {
   const action=extractDockAction(actionHtml);
   const votes=voteSummaryCard();
   const heading=title||(votes?discussionText('نتيجة التصويت','Vote result'):'');
-  pendingDockPlay={title:heading,body:[detect,extra,action,votes].filter(Boolean).join('')};
+  const voteNeed=['nomination','vote','verdict','trial'].includes(game.phase);
+  pendingDockPlay={title:heading,body:[detect,extra,action,votes].filter(Boolean).join(''),open:voteNeed||!!votes};
   return `${phaseBar()}<div class="phase-play ${cycle}-play">${personalRoleCard(true)}${isDay?morningBriefPanel():''}${talkBlock}</div>`;
 }
 function morningBriefPanel(embedded=false) {
