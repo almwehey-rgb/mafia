@@ -92,27 +92,33 @@ function playImpact(kind){
   }catch{}
 }
 function impactSelfId(){return String(playerId||game?.me?.id||'');}
-function iWasEliminated(prevAlive){
+function announcementEvents(){
+  const raw=typeof publicNewsEvents==='function'?publicNewsEvents():String(game?.lastEvent||'').split(',');
+  return raw.map((e)=>String(e||'').trim()).filter(Boolean);
+}
+function announcementNamesMe(){
   const me=impactSelfId();
-  if(!me)return prevAlive===true&&game.me?.alive===false;
-  if(deathIdList().some((id)=>samePlayer(id,me)))return true;
-  if(samePlayer(game.lastEliminated,me))return true;
-  if((game.eliminations||[]).some((p)=>samePlayer(p.id,me)))return true;
-  return prevAlive===true && game.me?.alive===false;
+  const myName=String(game?.me?.name||'');
+  if(me&&deathIdList().some((id)=>samePlayer(id,me)))return true;
+  if(me&&samePlayer(game?.lastEliminated,me))return true;
+  return (game?.eliminations||[]).some((p)=>samePlayer(p.id,me)||(myName&&String(p.name||'')===myName));
+}
+function announcementHtml(){
+  const news=announcementEvents().map((e)=>`<p class="${/_saved$/.test(e)?'square-save':''}">${squareEventLine(e)}</p>`).join('');
+  if(!news)return '';
+  return `<section class="card public-announcement" id="publicAnnouncement" role="status" data-no-translate><h2>${discussionText('الإعلان','Announcements')}</h2>${news}</section>`;
 }
 function maybeImpact(prevAlive){
-  if(!game?.lastEvent && prevAlive!==true)return;
-  const sig=`${game.matchId||game.code}|${game.round}|${game.lastEvent}|${game.lastSaved}|${deathIdList().join(',')}|${game.lastEliminated||''}|${game.me?.alive}`;
+  const events=announcementEvents();
+  if(!events.length && prevAlive!==true)return;
+  const sig=`${game.matchId||game.code}|${game.round}|${events.join(',')}|${deathIdList().join(',')}|${game.lastSaved||''}`;
   if(sig===lastImpactSig)return;
   const first=!lastImpactSig;
   lastImpactSig=sig;
-  const events=String(game.lastEvent||'').split(',').map((e)=>e.trim()).filter(Boolean);
   const deathNews=events.some((e)=>IMPACT_DEATH.has(e));
-  const saveNews=events.some((e)=>IMPACT_SAVE.has(e))||(typeof publicNewsEvents==='function'&&publicNewsEvents().some((e)=>IMPACT_SAVE.has(e)));
-  const victim=iWasEliminated(prevAlive);
-  const diedNow=victim&&(deathNews||prevAlive===true&&game.me?.alive===false);
-  if(first&&!diedNow)return;
-  if(diedNow)playImpact('death');
+  const saveNews=events.some((e)=>IMPACT_SAVE.has(e));
+  const named=announcementNamesMe()||prevAlive===true&&game.me?.alive===false;
+  if(deathNews&&named)playImpact('death');
   else if(saveNews&&!first)playImpact('save');
 }
 function phaseIcon(phase = game?.phase) { return ({ lobby: '🎴', reveal: '👁️', night: '🌙', day: '☀️', nomination: '☝️', trial: '⚖️', verdict: '🔨', vote: '🗳️', paused: '⏸️', finished: '🏆' })[phase] || '🎭'; }
@@ -768,7 +774,7 @@ async function joinSpectator() {
 function renderSpectatorContent() {
   removePlayerChrome();
   setRoomTag(`👁️ ${game.code}`);
-  $('#app').innerHTML = `${phaseBar()}<div class="grid"><div class="card hero"><div class="role-title">${phaseIcon()}</div><h1>${phaseName()}</h1><p class="muted" data-no-translate>${discussionText(game.me?.alive===false?'خرجت من المباراة. تتابع فقط، بدون كلام أو تصويت أو قدرات.':'متابعة الأحداث العامة فقط، بدون كشف الأدوار السرية.','Watch public events only. No talking, voting or role actions.')}</p>${game.phase==='finished'?`<h2>${winnerTitle()}</h2>`:''}${eventCards()}${game.phase==='day'?discussionPanel(false):''}</div><div class="card"><h2>اللاعبون (${game.players.length})</h2><div class="players">${playerList()}</div></div></div>`;
+  $('#app').innerHTML = `${phaseBar()}${announcementHtml()}<div class="grid"><div class="card hero"><div class="role-title">${phaseIcon()}</div><h1>${phaseName()}</h1><p class="muted" data-no-translate>${discussionText(game.me?.alive===false?'خرجت من المباراة. تتابع فقط، بدون كلام أو تصويت أو قدرات.':'متابعة الأحداث العامة فقط، بدون كشف الأدوار السرية.','Watch public events only. No talking, voting or role actions.')}</p>${game.phase==='finished'?`<h2>${winnerTitle()}</h2>`:''}${eventCards()}${game.phase==='day'?discussionPanel(false):''}</div><div class="card"><h2>اللاعبون (${game.players.length})</h2><div class="players">${playerList()}</div></div></div>`;
 }
 function startSpectatorPolling(){clearTimeout(pollTimer);pollFails=0;const epoch=++pollingEpoch;const tick=async()=>{const started=Date.now();try{const next=await api({action:'spectatorState',code:game.code,id:spectatorId,spectatorToken});if(epoch!==pollingEpoch)return;pollFails=0;const changed=renderStateKey(next)!==renderStateKey(game);const prevAlive=game?.me?.alive;game=next;setReconnect(false);if(changed)renderSpectator();maybeImpact(prevAlive);}catch{if(epoch===pollingEpoch){pollFails++;if(pollFails>=2)setReconnect(true)}}finally{if(epoch===pollingEpoch)pollTimer=setTimeout(tick,Math.max(200,900-(Date.now()-started)))}};pollTimer=setTimeout(tick,200)}
 function replacementForm() {
@@ -1740,7 +1746,7 @@ function squarePanelHtml(voteBody=''){
   const deathRows=(game.eliminations||[]).map(p=>{const label=causes[p.reason]||causes.eliminated;return `<p>☠️ <b>${escapeHtml(p.name)}</b> — ${discussionText(...label)}</p>`;}).join('')
     ||(game.lastDeaths||[]).map(id=>`<p>☠️ ${escapeHtml(nameOf(id))}</p>`).join('');
   const dead=`<div class="square-block"><h3>${discussionText('من مات','Who died')}</h3>${deathRows||`<p>${discussionText('لم يمت أحد','Nobody died')}</p>`}</div>`;
-  const news=publicNewsEvents().map((e)=>`<p class="${/_saved$/.test(e)?'square-save':''}">${squareEventLine(e)}</p>`).join('');
+  const news=announcementEvents().map((e)=>`<p class="${/_saved$/.test(e)?'square-save':''}">${squareEventLine(e)}</p>`).join('');
   const announce=news?`<div class="square-block"><h3>${discussionText('الإعلان','Announcements')}</h3>${news}</div>`:'';
   const vote=voteBody?`<div class="square-block"><h3>${discussionText('التصويت','Vote')}</h3>${voteBody}</div>`:'';
   return [talk,waiting,nowTaskHtml(),announce,dead,vote].filter(Boolean).join('')||`<p class="muted">${discussionText('ما فيه خبر الحين.','Nothing to show yet.')}</p>`;

@@ -1098,6 +1098,10 @@ body.has-player-dock:has(.dock-play) .journey-hint{display:none}
 .player-dock .dock-item.has-unread .dock-badge{display:block;animation:dock-unread 1.2s ease-in-out infinite}
 .player-dock .dock-item:disabled{opacity:.45}
 @keyframes dock-unread{50%{transform:scale(1.25);box-shadow:0 0 0 2px #0c0e0d,0 0 8px #e23d4a}}
+.public-announcement{margin:0 0 12px;padding:16px;border:2px solid #c9a227;background:#1a2218}
+.public-announcement h2{margin:0 0 8px;color:#f0ca7c;font-size:18px}
+.public-announcement p{margin:0 0 6px;font-size:18px;font-weight:800;line-height:1.55}
+.public-announcement p:last-child{margin:0}
 html.impact-death,html.impact-save,body.impact-death,body.impact-save{animation:impact-shake .95s cubic-bezier(.36,.07,.19,.97) both}
 html.impact-death::before,html.impact-save::before,body.impact-death::before,body.impact-save::before{content:'';position:fixed;inset:0;z-index:240;pointer-events:none;animation:impact-flash .95s ease-out both}
 body.impact-death::before{background:radial-gradient(circle at center,transparent 30%,#7a102288 100%)}
