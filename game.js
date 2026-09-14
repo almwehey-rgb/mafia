@@ -1055,7 +1055,7 @@ function renderHostContent() {
     $('#app').innerHTML = `${phaseBar()}<div class="grid"><section class="card hero phase-play vote-play"><div class="role-title">🗳️ ${discussionText('التصويت السري','Secret vote')}</div><div class="counter">${game.voteCount} / ${alive}</div><p>${discussionText('كل لاعب يصوّت سرًا على جواله.','Everyone votes secretly on their phone.')}</p><button class="btn red wide" ${game.voteCount < alive && !phaseTimeExpired() ? 'disabled' : ''} data-timeout-action="resolveVote" onclick="hostAction('resolveVote')">${discussionText('كشف النتيجة','Reveal result')}</button></section><div class="card"><h2>${discussionText('اللاعبون','Players')}</h2><div class="players">${playerList(false)}</div></div></div>`;
     return;
   }
-  $('#app').innerHTML = `${phaseBar()}<div class="grid"><div class="card hero"><div class="role-title">${winnerTitle()}</div><div class="players final-roles">${game.players.map((player) => `<div class="player"><span>${escapeHtml(player.name)} — ${roleLabel(player.role)}</span></div>`).join('')}</div><div class="actions center"><button class="btn red" onclick="startGame()">🔄 إعادة مباراة</button><button class="btn" onclick="returnToLobby()">👥 العودة للردهة وتغيير اللاعبين</button><button class="btn" onclick="shareResult()">↗ مشاركة النتيجة</button><button class="btn" onclick="home()">الرئيسية</button></div></div><div class="card"><h2>سجل المباراة</h2><div class="timeline">${historyCards()||'<p class="muted">ستظهر أحداث المباراة هنا.</p>'}</div></div></div>`;
+    $('#app').innerHTML = `${phaseBar()}<div class="grid"><div class="card hero"><div class="role-title">${winnerTitle()}</div><div class="players final-roles">${game.players.map((player) => `<div class="player"><span>${escapeHtml(player.name)} — ${roleLabel(player.role)}</span></div>`).join('')}</div><div class="actions center"><button class="btn gold wide" onclick="returnToLobby()">👥 ${discussionText('الرجوع للوبي وتغيير اللاعبين','Return to lobby and change players')}</button><button class="btn red" onclick="startGame()">🔄 ${discussionText('إعادة مباراة بنفس اللاعبين','Rematch with the same players')}</button><button class="btn" onclick="shareResult()">↗ ${discussionText('مشاركة النتيجة','Share result')}</button><button class="btn" onclick="home()">${discussionText('الرئيسية','Home')}</button></div></div><div class="card"><h2>${discussionText('سجل المباراة','Match log')}</h2><div class="timeline">${historyCards()||`<p class="muted">${discussionText('ستظهر أحداث المباراة هنا.','Match events will appear here.')}</p>`}</div></div></div>`;
 }
 function winnerTitle() {
   if (game.winner === 'draw') return discussionText('⚖️ تعادل — لم يبقَ أحد حيًا','⚖️ Draw — no survivors');
@@ -1111,10 +1111,12 @@ async function leaveRoomConfirmed() {
   } finally { lifecycleRequestPending = false; }
 }
 async function returnToLobby() {
-  if (lifecycleRequestPending || game?.phase !== 'finished') return;
+  if (lifecycleRequestPending || !game || game.phase === 'lobby') return;
+  const midMatch = game.phase !== 'finished';
+  if (midMatch && !confirm(discussionText('إيقاف القيم والرجوع للوبي؟ تقدر تدخل أو تطلع لاعبين وبعدين تبدأ قيم جديد.','Stop the match and return to the lobby? You can add or remove players, then start a new game.'))) return;
   lifecycleRequestPending = true;
   try {
-    const next = await withBusy('جاري تجهيز ردهة الانتظار…', () => api({
+    const next = await withBusy(discussionText('جاري الرجوع للوبي…','Returning to lobby…'), () => api({
       action:'returnToLobby', code:game.code, lifecycleVersion:game.lifecycleVersion,
       hostToken, id:playerId, playerToken
     }));
@@ -1122,9 +1124,10 @@ async function returnToLobby() {
     localHistory = [];
     localStorage.removeItem(`mafia-history-${game.code}`);
     setupStep = 1;
+    closeSheet();
     renderHost();
   } catch (error) {
-    notice(error.code === 'STALE_GAME' ? 'تغيّرت حالة الغرفة. انتظر تحديث الشاشة.' : 'تعذر الرجوع للردهة، حاول مجددًا.');
+    notice(error.code === 'STALE_GAME' ? discussionText('تغيّرت حالة الغرفة. انتظر تحديث الشاشة.','The room state changed. Wait for the screen to update.') : discussionText('تعذر الرجوع للوبي، حاول مجددًا.','Could not return to the lobby. Try again.'));
   } finally { lifecycleRequestPending = false; }
 }
 async function startGame() {
@@ -1601,7 +1604,7 @@ function setupSummary(roles, showCounts = true){
   return `<section class="setup-summary"><h2 data-no-translate>${discussionText('ملخص المباراة قبل التوزيع','Review before dealing')}</h2><p data-no-translate>${discussionText('اللاعبون','Players')}: <b>${game.players.length}</b> · ${discussionText('مهلة المرحلة','Phase time')}: <b>${phaseDuration}</b> ${discussionText('ثانية','seconds')}</p>${showCounts ? `<ul>${counts.filter(([,count])=>count>0).map(([role,count])=>`<li>${roleLabel(role)} <b>× ${count}</b></li>`).join('')}</ul>` : ''}<p data-no-translate>${discussionText('بعد التوزيع يقرأ الجميع أدوارهم ويؤكدونها، ثم تبدأ الليلة الأولى للمحقق فقط.','After dealing, everyone reads and confirms their role. The first night is for detectives only.')}</p></section>`;
 }
 function showMatchTools(){
-  openSheet(discussionText('إدارة المباراة','Game management'),`<div data-no-translate><button class="btn wide" onclick="showModeration()">${discussionText('اللاعبون والبلاغات','Players and reports')}</button><section class="danger-zone"><h3>${discussionText('إنهاء نهائي','End permanently')}</h3><p>${discussionText('للاستراحة استخدم الإيقاف المؤقت. الإنهاء ينهي المباراة الحالية.','Use Pause for a break. Ending closes the current match.')}</p><button class="btn danger wide" onclick="endGame()">${discussionText('إنهاء المباراة','End match')}</button></section></div>`);
+  openSheet(discussionText('إدارة المباراة','Game management'),`<div data-no-translate><button class="btn gold wide" onclick="returnToLobby()">${discussionText('إيقاف والرجوع للوبي','Stop and return to lobby')}</button><p class="muted">${discussionText('وقف القيم، يدخل أو يطلع أحد، وبعدين تبدأ قيم جديد بنفس الغرفة.','Stop the match, add or remove players, then start a new game in the same room.')}</p><button class="btn wide" onclick="showModeration()">${discussionText('اللاعبون والبلاغات','Players and reports')}</button><section class="danger-zone"><h3>${discussionText('إنهاء نهائي','End permanently')}</h3><p>${discussionText('للاستراحة استخدم الإيقاف المؤقت. الإنهاء ينهي المباراة الحالية بدون رجوع للوبي.','Use Pause for a break. Ending closes this match without returning to the lobby.')}</p><button class="btn danger wide" onclick="endGame()">${discussionText('إنهاء المباراة','End match')}</button></section></div>`);
 }
 function controllerTaskHint() {
   const messages = {
