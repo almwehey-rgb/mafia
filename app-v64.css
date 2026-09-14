@@ -587,7 +587,7 @@ body.light .flip-card .role-team,body.light .flip-card .personal-card-properties
 .role-reveal-only .personal-role-card,.role-reveal-only .reveal-card{width:100%;max-width:none;margin:0}
 .role-reveal-only .btn{width:100%}
 .role-reveal-only .role-allies{width:100%;margin:0 0 8px;padding:10px 12px;border-radius:14px;font-size:15px}
-.role-reveal-only .role-turn-hint{font-size:12px;padding:6px 8px}
+.role-reveal-only .role-turn-hint{font-size:clamp(18px,7cqw,26px);padding:36px 12px 18px}
 @media(max-width:700px){
   .role-reveal-only .turning-role .role-turn-inner,.role-reveal-only .personal-role-card .flip-inner{min-height:min(70dvh,560px)}
   .role-reveal-only .personal-role-card .flip-front img,.role-reveal-only .role-image-view img{height:min(70dvh,560px);object-fit:contain}
@@ -602,11 +602,11 @@ body.light .flip-card .role-team,body.light .flip-card .personal-card-properties
 .turning-role .role-details-view{transform:rotateY(180deg);display:flex;flex-direction:column;background:linear-gradient(#101413b8,#101413ef),var(--role-art) center/cover;color:#f3e8d3}
 .turning-role .personal-card-properties{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:#c9a158 transparent;padding:18px}
 .turning-role .role-rules-header{padding:8px 0 18px}.turning-role .role-rules-header h2{font-size:25px}.turning-role .role-rule-sections{padding:0 14px}.turning-role .role-rule-sections p{font-size:16px!important;line-height:1.85}.turning-role .role-private-team{padding:14px;margin-bottom:16px}.turning-role .role-teammates strong{font-size:18px;padding:8px 12px}
-.role-turn-hint{display:block;flex:none;background:#0b1110ed;color:#edcd88;text-align:center;font-size:12px;padding:10px 4px;border-top:1px solid #b38e4c44}.role-image-view .role-turn-hint{position:absolute;bottom:0;inset-inline:0}
+.role-turn-hint{position:absolute;bottom:0;inset-inline:0;z-index:2;display:block;border:0;background:linear-gradient(transparent,#080c0cf2 62%);color:#f6e3b0;text-align:center;font-size:clamp(16px,6.2cqw,24px);font-weight:900;letter-spacing:.02em;padding:32px 12px 16px;line-height:1.2;pointer-events:none}
+.role-image-view .role-turn-hint,.turning-role .role-image-view .role-turn-hint,.turning-role .role-details-view .role-turn-hint{position:absolute;bottom:0;inset-inline:0;flex:none;min-height:0}
 .turning-role:focus-visible{outline:3px solid #edcd88;outline-offset:5px}.role-gallery>.turning-role[data-view="details"]{grid-column:auto}
 .turning-role .role-image-view{display:flex;flex-direction:column;background:#101413}
 .turning-role .role-image-view img{flex:1;min-height:0;object-fit:contain}
-.turning-role .role-image-view .role-turn-hint{position:static;flex:none;min-height:34px}
 .guide-card-modes{display:flex;flex-wrap:wrap;gap:10px;margin:16px 0 24px}
 .guide-card-modes [aria-pressed="true"]{outline:2px solid #d8b368;outline-offset:2px}
 @media(prefers-reduced-motion:reduce){.role-turn-inner{transition:none}}
@@ -718,7 +718,7 @@ body:has(.cinema-home) .shell{max-width:1080px;margin:auto;padding-top:18px}body
 .kids-role-card .role-image-view img{object-fit:contain;width:100%;height:100%}
 .role-reader.turning-role.kids-role-card{max-width:394px}
 .illustrated-role[data-kids="true"] img{aspect-ratio:394/661;object-fit:contain}
-.kids-role-card .role-image-view .role-turn-hint{font-size:10px;padding:4px;background:#101413cc}
+.kids-role-card .role-image-view .role-turn-hint{font-size:clamp(15px,5.8cqw,22px);padding:28px 10px 14px;background:linear-gradient(transparent,#080c0cf2 62%)}
 
 /* One control palette across the lobby, game, and profile. */
 .ui-icon{display:inline-block;width:1.1em;height:1.1em;vertical-align:-.18em;flex-shrink:0;pointer-events:none}
