@@ -1031,5 +1031,8 @@ body.app-shell h1,body.app-shell h2,body.app-shell h3{font-weight:800}
   body.app-shell .auth-card{max-width:480px!important;margin-inline:0!important}
 }
 
-body.app-shell .chat-launch{margin:0 0 12px}
+body.app-shell .chat-launch{margin:8px 0}
+.role-action-tray{width:100%;margin:8px auto 0;padding:12px;border:1px solid #80663f88;border-radius:16px;background:#121614}
+.role-act-title{margin:0 0 10px;font-size:18px;color:#e8c37a;text-align:center}
+.phase-play>.role-presentation{margin-bottom:8px}
 

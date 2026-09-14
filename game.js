@@ -1459,6 +1459,35 @@ function nightChatBar(){
   const label=jailed?discussionText('محادثة السجن','Jail chat'):game.me.role==='jailer'?discussionText('محادثة السجن','Jail chat'):discussionText('محادثة المافيا','Mafia chat');
   return `<button type="button" class="btn gold wide chat-launch" data-chat-button onclick="openChat()">${chatHasUnread()?'🔴 ':''}💬 ${label}</button>`;
 }
+function roleActTitle(){
+  const me=game?.me, phase=game?.phase;
+  if(!me)return '';
+  if(me.jailed&&phase==='night')return discussionText('السجن','Jail');
+  if(phase==='night'){
+    if(mafiaRoleClient(me.role))return discussionText('اغتيال','Kill');
+    if(me.role==='doctor')return discussionText('حماية','Protect');
+    if(me.role==='detective')return discussionText('فحص','Investigate');
+    if(me.role==='witch')return discussionText('جرعة','Potion');
+    if(me.role==='serial_killer')return discussionText('اغتيال','Kill');
+    if(me.role==='cupid')return discussionText('ربط','Link');
+    if(me.role==='escort')return discussionText('تعطيل','Block');
+    if(me.role==='jailer')return discussionText('السجين','Prisoner');
+    if(me.role==='revealer')return discussionText('كشف','Reveal');
+    if(me.role==='vigilante')return discussionText('طلقة','Shot');
+    return '';
+  }
+  if(phase==='day'){
+    if(me.role==='detective')return discussionText('نتيجة الفحص','Investigation result');
+    if(me.role==='jailer')return discussionText('سجن','Jail');
+    if(me.role==='lawyer')return discussionText('حماية','Protect');
+    return '';
+  }
+  if(phase==='nomination')return discussionText('ترشيح','Nominate');
+  if(phase==='verdict')return discussionText('الحكم','Verdict');
+  if(phase==='vote')return discussionText('تصويت','Vote');
+  if(phase==='trial')return discussionText('المحاكمة','Trial');
+  return '';
+}
 function wrapCyclePlay(cycle, actionHtml) {
   const isDay = cycle === 'day';
   const isNight = cycle === 'night';
@@ -1468,7 +1497,9 @@ function wrapCyclePlay(cycle, actionHtml) {
   const hasPick = /class="[^"]*\bpick\b/.test(actionHtml);
   const talkBlock = !talk ? '' : (draw ? talk : `<details class="cycle-talk" data-disclosure-key="cycle-talk"${hasPick?'':' open'}><summary>${discussionText('النقاش','Discussion')}</summary>${talk}</details>`);
   const extra = isNight || isDay ? bossDiscussionChoice() : '';
-  return `${phaseBar()}<div class="phase-play ${cycle}-play">${isDay?morningBriefPanel():''}${isDay&&game.me?.role==='detective'?investigationPanel():''}${extra}<section class="cycle-action">${actionHtml}</section>${talkBlock}</div>`;
+  const title=roleActTitle();
+  const detect=game.me?.role==='detective'?investigationPanel():'';
+  return `${phaseBar()}<div class="phase-play ${cycle}-play">${personalRoleCard(true)}<section class="role-action-tray">${title?`<h2 class="role-act-title" data-no-translate>${title}</h2>`:''}${isNight?nightChatBar():''}${isDay?detect:''}${extra}<div class="cycle-action">${actionHtml}</div></section>${isDay?morningBriefPanel():''}${talkBlock}</div>`;
 }
 function morningBriefPanel(embedded=false) {
   const deaths = (game.lastDeaths || []).map((id) => `<div class="event danger-text">☠️ ${escapeHtml(nameOf(id))}</div>`).join('');
@@ -1629,10 +1660,6 @@ function renderPlayer(){
   renderWithNotices(renderPlayerContent);
   if(!roleAcknowledged())return;
   enhanceJourney(false);
-  if(game?.me?.alive&&roleAcknowledged()&&!['lobby','finished'].includes(game.phase)&&!document.querySelector('.personal-role-card')){
-    const reference=`<details class="role-reference"><summary>${discussionText('مراجعة دوري','Review my role')}: ${roleLabel(game.me.role)}</summary>${personalRoleCard(true)}</details>`;
-    $('#app').insertAdjacentHTML('beforeend',reference);
-  }
 }
 function setupSummary(roles, showCounts = true){
   const counts=[['mafia',roles.mafia],['doctor',roles.doctor],['detective',roles.detectives],['lawyer',roles.lawyer],['jailer',roles.jailer],['vigilante',roles.vigilante],['witch',roles.witch],['serial_killer',roles.serialKiller],['jester',roles.jester],['cupid',roles.cupid],['escort',roles.escort],['revealer',roles.revealer],['citizen',roles.citizens]];
