@@ -1226,18 +1226,24 @@ window.visualViewport?.addEventListener('resize',syncVisibleViewport);
 window.visualViewport?.addEventListener('scroll',syncVisibleViewport);
 window.addEventListener('resize',syncVisibleViewport);
 syncVisibleViewport();
+function dockChatLabel(){
+  if(game?.me?.jailed||game?.me?.role==='jailer')return discussionText('محادثة السجن','Jail chat');
+  return discussionText('محادثة المافيا','Mafia chat');
+}
 function mountPlayerTools(){
   if(!game?.me?.alive||['lobby','reveal','finished'].includes(game.phase)||document.querySelector('.player-dock'))return;
   const canChat=chatAllowed();
   const unread=canChat&&chatHasUnread();
   const host=game.me.isHost?`<button type="button" class="dock-item" onclick="toggleDelegatedHost()"><span class="dock-icon">👑</span><span>${discussionText('تحكم','Host')}</span></button>`:'';
+  const chat=canChat?`<button type="button" class="dock-chat" data-chat-button onclick="openChat()">${unread?'🔴 ':''}💬 ${dockChatLabel()}</button>`:'';
   const dock=document.createElement('nav');
   dock.className='player-dock';
   dock.setAttribute('aria-label',discussionText('شريط اللاعب','Player bar'));
-  dock.innerHTML=`<button type="button" class="dock-item" onclick="openMyRole()"><span class="dock-icon">🃏</span><span>${discussionText('دوري','Role')}</span></button>
-    <button type="button" class="dock-item" data-chat-button ${canChat?'':'disabled'} onclick="openChat()"><span class="dock-icon">💬</span><span>${discussionText('محادثة','Chat')}</span><i class="dock-badge" ${unread?'':'hidden'}></i></button>
+  dock.innerHTML=`${chat}<div class="dock-row">
+    <button type="button" class="dock-item" onclick="openMyRole()"><span class="dock-icon">🃏</span><span>${discussionText('دوري','Role')}</span></button>
     <button type="button" class="dock-item" onclick="openWill()"><span class="dock-icon">📜</span><span>${discussionText('وصية','Will')}</span></button>
-    <button type="button" class="dock-item" onclick="openReport()"><span class="dock-icon">🚩</span><span>${discussionText('بلاغ','Report')}</span></button>${host}`;
+    <button type="button" class="dock-item" onclick="openReport()"><span class="dock-icon">🚩</span><span>${discussionText('بلاغ','Report')}</span></button>${host}
+  </div>`;
   document.body.append(dock);
   document.body.classList.add('has-player-dock');
 }
@@ -1273,14 +1279,8 @@ function chatButtonLabel(unread=false){return `💬 ${discussionText('محادث
 function paintChatDock(){
   const unread=chatHasUnread();
   for(const button of document.querySelectorAll('[data-chat-button]')){
-    if(button.classList.contains('dock-item')){
-      button.classList.toggle('has-unread',unread);
-      const badge=button.querySelector('.dock-badge');
-      if(badge)badge.hidden=!unread;
-    }else if(button.classList.contains('chat-launch')){
-      const jailed=!!game?.me?.jailed;
-      const label=jailed||game?.me?.role==='jailer'?discussionText('محادثة السجن','Jail chat'):discussionText('محادثة المافيا','Mafia chat');
-      button.textContent=`${unread?'🔴 ':''}💬 ${label}`;
+    if(button.classList.contains('dock-chat')||button.classList.contains('chat-launch')){
+      button.textContent=`${unread?'🔴 ':''}💬 ${dockChatLabel()}`;
     }else button.textContent=chatButtonLabel(unread);
   }
 }
@@ -1466,12 +1466,6 @@ function renderNight() {
 
 function firstNightOnly(){return game?.phase==='night'&&game.round===1}
 function firstNightLabel(){return discussionText('الليلة الأولى: للمحقق فقط','First night: detective only')}
-function nightChatBar(){
-  if(!chatAllowed())return '';
-  const jailed=!!game.me.jailed;
-  const label=jailed?discussionText('محادثة السجن','Jail chat'):game.me.role==='jailer'?discussionText('محادثة السجن','Jail chat'):discussionText('محادثة المافيا','Mafia chat');
-  return `<button type="button" class="btn gold wide chat-launch" data-chat-button onclick="openChat()">${chatHasUnread()?'🔴 ':''}💬 ${label}</button>`;
-}
 function roleActTitle(){
   const me=game?.me, phase=game?.phase;
   if(!me)return '';
@@ -1512,7 +1506,7 @@ function wrapCyclePlay(cycle, actionHtml) {
   const extra = isNight || isDay ? bossDiscussionChoice() : '';
   const title=roleActTitle();
   const detect=game.me?.role==='detective'?investigationPanel():'';
-  return `${phaseBar()}<div class="phase-play ${cycle}-play">${personalRoleCard(true)}<section class="role-action-tray">${title?`<h2 class="role-act-title" data-no-translate>${title}</h2>`:''}${isNight?nightChatBar():''}${isDay?detect:''}${extra}<div class="cycle-action">${actionHtml}</div></section>${isDay?morningBriefPanel():''}${talkBlock}</div>`;
+  return `${phaseBar()}<div class="phase-play ${cycle}-play">${personalRoleCard(true)}<section class="role-action-tray">${title?`<h2 class="role-act-title" data-no-translate>${title}</h2>`:''}${isDay?detect:''}${extra}<div class="cycle-action">${actionHtml}</div></section>${isDay?morningBriefPanel():''}${talkBlock}</div>`;
 }
 function morningBriefPanel(embedded=false) {
   const deaths = (game.lastDeaths || []).map((id) => `<div class="event danger-text">☠️ ${escapeHtml(nameOf(id))}</div>`).join('');
