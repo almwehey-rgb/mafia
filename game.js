@@ -52,7 +52,7 @@ function lobbyIcon(name){const paths={wait:'<circle cx="12" cy="12" r="9"/><path
 function noirEmblem(){return `<aside class="home-emblem" aria-hidden="true"><img src="/assets/mafia-gold-icon.webp" alt="" width="220" height="220"><span>◆ MAFIA NIGHT ◆</span></aside>`;}
 function noirPageFrame(cardHtml,{wide=false}={}){return `<section class="noir-entry noir-subpage"><div class="noir-content${wide?' noir-content-wide':''}"><div class="card hero join-card auth-card">${cardHtml}</div><div class="noir-links"><button class="btn" type="button" onclick="home()">${discussionText('الرجوع للرئيسية','Back to home')}</button></div></div>${noirEmblem()}</section>`;}
 function backFromLobby(){pollingEpoch++;clearTimeout(pollTimer);closeSheet();document.querySelector('.player-tools')?.remove();game=null;if(hostAccessToken)renderHostHome();else renderHostLogin()}
-function phaseBar() { const controller=(hostToken||game?.me?.isHost)&&game;const live=controller&&!['lobby','finished'].includes(game.phase);const pause=live?`<button type="button" class="phase-pause phase-icon-btn" aria-label="${discussionText(game.phase==='paused'?'استكمال المباراة':'إيقاف مؤقت',game.phase==='paused'?'Resume game':'Pause game')}" onclick="hostAction('togglePause')">${lobbyIcon(game.phase==='paused'?'play':'pause')}</button>`:'';const admin=live?`<button type="button" class="phase-pause phase-icon-btn" aria-label="${discussionText('إدارة المباراة','Game management')}" onclick="showMatchTools()">${lobbyIcon('shield')}</button>`:'';const back=delegatedHostMode?`<button type="button" class="phase-pause phase-icon-btn" aria-label="${discussionText('العودة لدوري','Back to my role')}" onclick="toggleDelegatedHost()">${lobbyIcon('user')}</button>`:'';return `<div class="phase-bar"><span class="phase-symbol">${game?.phase==='lobby'?lobbyIcon('wait'):phaseIcon()}</span><b class="phase-label">${phaseName()}</b>${game?.round ? `<small>${discussionText('الجولة','Round')} ${game.round}</small>` : ''}${game&&!["lobby","finished"].includes(game.phase)?`<span class="phase-timer" id="phaseTimer" role="timer" aria-label="${discussionText('الوقت المتبقي','Time remaining')}">${phaseDuration}</span>`:''}${game?.phase==='lobby'?`<button type="button" class="phase-pause lobby-action lobby-back" onclick="backFromLobby()">${lobbyIcon('back')}<span class="btn-label">${discussionText('الرئيسية','Home')}</span></button>`:''}${pause}${admin}${hostToken?`<button type="button" class="phase-pause lobby-action" onclick="showAdminQR()" aria-label="${discussionText('وضع الأدمن الخاص','Private admin access')}">${lobbyIcon('admin')}<span class="btn-label">${discussionText('أدمن','Admin')}</span></button>`:''}${back}${!spectatorMode ? `<button type="button" class="phase-pause lobby-action lobby-exit" onclick="leaveRoom()" aria-label="${discussionText('مغادرة الغرفة','Leave room')}">${lobbyIcon('leave')}<span class="btn-label">${discussionText('مغادرة','Leave')}</span></button>` : ""}</div>`; }
+function phaseBar() { const controller=(hostToken||game?.me?.isHost)&&game;const live=controller&&!['lobby','finished'].includes(game.phase);const pause=live?`<button type="button" class="phase-pause phase-icon-btn" aria-label="${discussionText(game.phase==='paused'?'استكمال المباراة':'إيقاف مؤقت',game.phase==='paused'?'Resume game':'Pause game')}" onclick="hostAction('togglePause')">${lobbyIcon(game.phase==='paused'?'play':'pause')}</button>`:'';const toLobby=controller&&game.phase!=='lobby'?`<button type="button" class="phase-pause lobby-action lobby-back" onclick="returnToLobby()">${lobbyIcon('back')}<span class="btn-label">${discussionText('اللوبي','Lobby')}</span></button>`:'';const admin=live?`<button type="button" class="phase-pause phase-icon-btn" aria-label="${discussionText('إدارة المباراة','Game management')}" onclick="showMatchTools()">${lobbyIcon('shield')}</button>`:'';const back=delegatedHostMode?`<button type="button" class="phase-pause phase-icon-btn" aria-label="${discussionText('العودة لدوري','Back to my role')}" onclick="toggleDelegatedHost()">${lobbyIcon('user')}</button>`:'';return `<div class="phase-bar"><span class="phase-symbol">${game?.phase==='lobby'?lobbyIcon('wait'):phaseIcon()}</span><b class="phase-label">${phaseName()}</b>${game?.round ? `<small>${discussionText('الجولة','Round')} ${game.round}</small>` : ''}${game&&!["lobby","finished"].includes(game.phase)?`<span class="phase-timer" id="phaseTimer" role="timer" aria-label="${discussionText('الوقت المتبقي','Time remaining')}">${phaseDuration}</span>`:''}${game?.phase==='lobby'?`<button type="button" class="phase-pause lobby-action lobby-back" onclick="backFromLobby()">${lobbyIcon('back')}<span class="btn-label">${discussionText('الرئيسية','Home')}</span></button>`:''}${pause}${toLobby}${admin}${hostToken?`<button type="button" class="phase-pause lobby-action" onclick="showAdminQR()" aria-label="${discussionText('وضع الأدمن الخاص','Private admin access')}">${lobbyIcon('admin')}<span class="btn-label">${discussionText('أدمن','Admin')}</span></button>`:''}${back}${!spectatorMode ? `<button type="button" class="phase-pause lobby-action lobby-exit" onclick="leaveRoom()" aria-label="${discussionText('مغادرة الغرفة','Leave room')}">${lobbyIcon('leave')}<span class="btn-label">${discussionText('مغادرة','Leave')}</span></button>` : ""}</div>`; }
 function clientPhaseRemaining() {
   const clock=game?.phaseClock;
   if(!clock||!Number.isFinite(clock.startedAt))return Infinity;
@@ -1017,7 +1017,7 @@ function renderHostContent() {
     return;
   }
   if (game.phase === 'paused') {
-    $('#app').innerHTML = `${phaseBar()}<div class="card hero"><div class="role-title">⏸️ المباراة متوقفة</div><p>يمكن متابعة المباراة من المرحلة نفسها.</p><button class="btn red" onclick="hostAction('togglePause')">▶️ متابعة المباراة</button></div>`;
+    $('#app').innerHTML = `${phaseBar()}<div class="card hero"><div class="role-title">⏸️ المباراة متوقفة</div><p>يمكن متابعة المباراة من المرحلة نفسها.</p><button class="btn red" onclick="hostAction('togglePause')">▶️ متابعة المباراة</button><button class="btn gold wide" type="button" onclick="returnToLobby()">${discussionText('إيقاف والرجوع للوبي','Stop and return to lobby')}</button></div>`;
     return;
   }
   if (game.phase === 'reveal') {
@@ -1113,19 +1113,30 @@ async function leaveRoomConfirmed() {
 }
 async function returnToLobby() {
   if (lifecycleRequestPending || !game || game.phase === 'lobby') return;
+  if (!(hostToken || game.me?.isHost)) return;
   const midMatch = game.phase !== 'finished';
   if (midMatch && !confirm(discussionText('إيقاف القيم والرجوع للوبي؟ تقدر تدخل أو تطلع لاعبين وبعدين تبدأ قيم جديد.','Stop the match and return to the lobby? You can add or remove players, then start a new game.'))) return;
   lifecycleRequestPending = true;
+  const send = (version) => api({
+    action:'returnToLobby', code:game.code, lifecycleVersion:version,
+    hostToken, id:playerId, playerToken
+  });
   try {
-    const next = await withBusy(discussionText('جاري الرجوع للوبي…','Returning to lobby…'), () => api({
-      action:'returnToLobby', code:game.code, lifecycleVersion:game.lifecycleVersion,
-      hostToken, id:playerId, playerToken
-    }));
+    const next = await withBusy(discussionText('جاري الرجوع للوبي…','Returning to lobby…'), async () => {
+      try { return await send(game.lifecycleVersion); }
+      catch (error) {
+        if (error.code !== 'STALE_GAME') throw error;
+        const fresh = await api({ action:'state', code:game.code, id:playerId, playerToken, hostToken });
+        game = fresh;
+        return await send(fresh.lifecycleVersion);
+      }
+    });
     game = next;
     localHistory = [];
     localStorage.removeItem(`mafia-history-${game.code}`);
     setupStep = 1;
     closeSheet();
+    delegatedHostMode = true;
     renderHost();
   } catch (error) {
     notice(error.code === 'STALE_GAME' ? discussionText('تغيّرت حالة الغرفة. انتظر تحديث الشاشة.','The room state changed. Wait for the screen to update.') : discussionText('تعذر الرجوع للوبي، حاول مجددًا.','Could not return to the lobby. Try again.'));
@@ -1173,7 +1184,7 @@ function personalRoleCard(compact=false, extra={}) {
 function setShowingRole(on){document.body.classList.toggle('showing-role',!!on)}
 function roleReveal() {
   setShowingRole(true);
-  $('#app').innerHTML=`<section class="role-reveal-only">${personalRoleCard(false,{reveal:true})}<button class="btn red wide" onclick="acknowledgeRole()">${discussionText('فهمت','Got it')}</button></section>`;
+  $('#app').innerHTML=`${phaseBar()}<section class="role-reveal-only">${personalRoleCard(false,{reveal:true})}<button class="btn red wide" onclick="acknowledgeRole()">${discussionText('فهمت','Got it')}</button></section>`;
 }
 function mafiaRoleClient(role){return role==='mafia'||role==='mafia_boss'}
 function renderPlayerContent() {
@@ -1187,7 +1198,7 @@ function renderPlayerContent() {
   if (!me) { $('#app').innerHTML = '<div class="card hero"><h2>فقدنا جلسة اللاعب</h2><button class="btn" onclick="home()">دخول من جديد</button></div>'; return; }
   if (!me.alive) { delegatedHostMode=false; if(document.querySelector('.game-sheet'))closeSheet(); renderSpectator(); return; }
   setTimeout(mountPlayerTools, 0);
-  if (game.phase === 'paused') { $('#app').innerHTML = `${phaseBar()}<div class="card hero"><div class="role-title">⏸️ المباراة متوقفة</div><p>المضيف سيكمل المباراة من المرحلة نفسها.</p></div>`; return; }
+  if (game.phase === 'paused') { $('#app').innerHTML = `${phaseBar()}<div class="card hero"><div class="role-title">⏸️ المباراة متوقفة</div><p>المضيف سيكمل المباراة من المرحلة نفسها.</p>${me.isHost?`<button class="btn gold wide" type="button" onclick="returnToLobby()">${discussionText('إيقاف والرجوع للوبي','Stop and return to lobby')}</button>`:''}</div>`; return; }
   if (game.phase === 'finished') {
     $('#app').innerHTML = `${phaseBar()}<div class="card hero"><div class="role-title">${winnerTitle()}</div><p>${discussionText('دورك','Your role')}: ${roleLabel(me.role)}</p><p class="muted">${me.isHost ? discussionText('افتح تحكم المضيف لإعادة المباراة.','Open host controls to play again.') : discussionText('انتظر المضيف لإعادة المباراة.','Wait for the host to play again.')}</p></div>`;
     return;
@@ -1216,7 +1227,7 @@ syncVisibleViewport();
 function mountPlayerTools(){
   if(!game?.me?.alive||['lobby','reveal','finished'].includes(game.phase)||document.querySelector('.player-tools'))return;
   const canChat=game.phase==='night'&&(game.me.jailed||game.me.role==='jailer'||game.me.role==='mafia'||game.me.role==='mafia_boss');
-  const tools=document.createElement('details');tools.className='player-tools';tools.innerHTML=`<summary>${discussionText('أدوات','Tools')}${canChat&&chatHasUnread()?' 🔴':''}</summary><div class="player-tools-list">${game.me.isHost?`<button type="button" onclick="toggleDelegatedHost()">👑 ${discussionText('تحكم','Host')}</button>`:''}<button type="button" onclick="openWill()">📜 ${discussionText('وصية','Will')}</button>${canChat?`<button type="button" data-chat-button onclick="openChat()">💬 ${discussionText('محادثة','Chat')}${chatHasUnread()?' 🔴':''}</button>`:''}<button type="button" onclick="openReport()">🚩 ${discussionText('بلاغ','Report')}</button></div>`;document.querySelector('#app').appendChild(tools);
+  const tools=document.createElement('details');tools.className='player-tools';tools.innerHTML=`<summary>${discussionText('أدوات','Tools')}${canChat&&chatHasUnread()?' 🔴':''}</summary><div class="player-tools-list">${game.me.isHost?`<button type="button" onclick="toggleDelegatedHost()">👑 ${discussionText('تحكم','Host')}</button><button type="button" onclick="returnToLobby()">🏠 ${discussionText('اللوبي','Lobby')}</button>`:''}<button type="button" onclick="openWill()">📜 ${discussionText('وصية','Will')}</button>${canChat?`<button type="button" data-chat-button onclick="openChat()">💬 ${discussionText('محادثة','Chat')}${chatHasUnread()?' 🔴':''}</button>`:''}<button type="button" onclick="openReport()">🚩 ${discussionText('بلاغ','Report')}</button></div>`;document.querySelector('#app').appendChild(tools);
 }
 function toggleDelegatedHost(){delegatedHostMode=!delegatedHostMode;document.querySelector('.player-tools')?.remove();delegatedHostMode?renderHost():renderPlayer()}
 let sheetReturnFocus=null;
@@ -1434,7 +1445,7 @@ function wrapCyclePlay(cycle, actionHtml) {
   const hasPick = /class="[^"]*\bpick\b/.test(actionHtml);
   const talkBlock = !talk ? '' : (draw ? talk : `<details class="cycle-talk" data-disclosure-key="cycle-talk"${hasPick?'':' open'}><summary>${discussionText('النقاش','Discussion')}</summary>${talk}</details>`);
   const extra = isNight || isDay ? bossDiscussionChoice() : '';
-  return `<div class="phase-play ${cycle}-play">${isDay?morningBriefPanel():''}${isDay&&game.me?.role==='detective'?investigationPanel():''}${extra}<section class="cycle-action">${actionHtml}</section>${talkBlock}</div>`;
+  return `${phaseBar()}<div class="phase-play ${cycle}-play">${isDay?morningBriefPanel():''}${isDay&&game.me?.role==='detective'?investigationPanel():''}${extra}<section class="cycle-action">${actionHtml}</section>${talkBlock}</div>`;
 }
 function morningBriefPanel(embedded=false) {
   const deaths = (game.lastDeaths || []).map((id) => `<div class="event danger-text">☠️ ${escapeHtml(nameOf(id))}</div>`).join('');
