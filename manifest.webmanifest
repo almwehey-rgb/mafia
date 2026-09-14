@@ -1,0 +1,21 @@
+{
+  "name": "مافيا",
+  "short_name": "مافيا",
+  "description": "لعبة مافيا جماعية بالعربي والإنجليزي",
+  "lang": "ar",
+  "dir": "rtl",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0b0d0e",
+  "theme_color": "#0b0d0e",
+  "icons": [
+    {
+      "src": "/assets/mafia-gold-icon.png",
+      "sizes": "1254x1254",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

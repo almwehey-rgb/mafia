@@ -1,0 +1,15 @@
+.env
+.env.local
+.env*
+*.log
+node_modules/
+.vercel
+.cursor/
+supabase/.temp/
+.deploy-*
+.deploy-chunks/
+.deploy-staging/
+.mcp-*
+.supabase-deploy-payload.json
+deploy-args-min.json
+deploy-mcp-invoke.js
