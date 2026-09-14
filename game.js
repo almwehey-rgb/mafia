@@ -1021,11 +1021,11 @@ function renderHostContent() {
   }
   if (game.phase === 'reveal') {
     const ready = game.roleReadyCount || 0, total = game.players.length;
-    $('#app').innerHTML = `${phaseBar()}<div class="grid"><div class="card hero"><div class="role-title">👁️ تأكيد الأدوار</div><div class="counter">${ready} / ${total}</div><p>كل لاعب يشاهد دوره سرًا ثم يضغط «فهمت دوري».</p><div class="progress"><span style="width:${total?ready/total*100:0}%"></span></div><button class="btn red wide" ${ready<total?'disabled':''} onclick="hostAction('beginNight')">🌙 بدء الليلة الأولى</button></div><div class="card"><h2>حالة اللاعبين</h2><div class="players">${playerList()}</div></div></div>`;
+    $('#app').innerHTML = `${phaseBar()}<div class="grid"><div class="card hero"><div class="role-title">👁️ تأكيد الأدوار</div><div class="counter">${ready} / ${total}</div><p>كل لاعب يشاهد دوره سرًا ثم يضغط «فهمت دوري».</p><div class="progress"><span style="width:${total?ready/total*100:0}%"></span></div><button class="btn red wide" ${ready<total?'disabled':''} onclick="hostAction('beginNight')">🌙 ${discussionText('بدء الليلة الأولى: للمحقق فقط','Start first night: detective only')}</button></div><div class="card"><h2>حالة اللاعبين</h2><div class="players">${playerList()}</div></div></div>`;
     return;
   }
   if (game.phase === 'night') {
-    $('#app').innerHTML = `${phaseBar()}<div class="grid"><section class="card hero phase-play night-play"><div class="role-title">🌙 ${discussionText('الليلة','Night')} ${game.round}</div><p>${discussionText('الجميع يثبت اختياره سرًا على جواله.','Everyone locks a secret choice on their phone.')}</p><div class="status ${game.nightReady ? '' : 'wait'}">${game.nightReady ? discussionText('اكتملت اختيارات الليل ✅','Night choices complete ✅') : discussionText('بانتظار اختيارات الليل…','Waiting for night choices…')}</div><button class="btn red wide" ${game.nightReady||phaseTimeExpired() ? '' : 'disabled'} data-timeout-action="resolveNight" onclick="hostAction('resolveNight')">${discussionText('إعلان الصباح','Announce morning')}</button></section><div class="card">${eventCards()}<h2>${discussionText('حالة اللاعبين','Player status')}</h2><div class="players">${playerList()}</div></div></div>`;
+    $('#app').innerHTML = `${phaseBar()}<div class="grid"><section class="card hero phase-play night-play"><div class="role-title">🌙 ${firstNightOnly()?firstNightLabel():`${discussionText('الليلة','Night')} ${game.round}`}</div><p>${firstNightOnly()?discussionText('هذه الليلة للمحقق فقط. البقية ينتظرون الصباح.','This night is for the detective only. Everyone else waits for morning.'):discussionText('الجميع يثبت اختياره سرًا على جواله.','Everyone locks a secret choice on their phone.')}</p><div class="status ${game.nightReady ? '' : 'wait'}">${game.nightReady ? discussionText('اكتملت اختيارات الليل ✅','Night choices complete ✅') : discussionText('بانتظار اختيارات الليل…','Waiting for night choices…')}</div><button class="btn red wide" ${game.nightReady||phaseTimeExpired() ? '' : 'disabled'} data-timeout-action="resolveNight" onclick="hostAction('resolveNight')">${discussionText('إعلان الصباح','Announce morning')}</button></section><div class="card">${eventCards()}<h2>${discussionText('حالة اللاعبين','Player status')}</h2><div class="players">${playerList()}</div></div></div>`;
     return;
   }
   if (game.phase === 'day') {
@@ -1338,7 +1338,7 @@ function renderVerdict(){
 function renderNight() {
   const me = game.me;
   if (game.round === 1 && me.role !== 'detective') {
-    $('#app').innerHTML = `<div class="card" data-no-translate><h2>${discussionText('🔎 الليلة الأولى للمحقق فقط','🔎 First night: detective only')}</h2><p>${discussionText('لا اغتيال ولا حماية ولا قدرات أخرى هذه الليلة. انتظر الصباح.','No kills, protection, or other role actions tonight. Wait for morning.')}</p></div>`;
+    $('#app').innerHTML = `<div class="card" data-no-translate><h2>🌙 ${firstNightLabel()}</h2><p>${discussionText('انتظر إعلان الصباح.','Wait for morning.')}</p></div>`;
     return;
   }
   if (me.jailed) {
@@ -1376,7 +1376,7 @@ function renderNight() {
   if (me.role === 'detective') {
     const targets = alivePlayers().filter((player) => player.id !== playerId && !(me.selectedIds || []).includes(player.id));
     const finished = game.round > detectiveQuestionCount(game.detectiveQuestions);
-    $('#app').innerHTML = `<div class="card" data-no-translate><div class="role-title">${discussionText('🕵️ المحقق','🕵️ Detective')}</div><p>${discussionText(`سؤال واحد كل جولة. إجمالي فرص التحقيق: ${detectiveQuestionCount(game.detectiveQuestions)}.`,`One question per round. Total investigation opportunities: ${detectiveQuestionCount(game.detectiveQuestions)}.`)}</p>${finished ? `<h2>${discussionText('انتهت فرص التحقيق المحددة. تقدر تواصل النقاش والتصويت.','Your investigation rounds are over. You can still discuss and vote.')}</h2>` : `<h2>${discussionText('سؤال الجولة','Round question')}: ${me.questionsUsed} / ${me.questionLimit}</h2>${me.acted ? `<p class="ok">${discussionText('تم تسجيل سؤالك. النتيجة بعد إعلان الصباح ✅','Question recorded. The result appears in the morning ✅')}</p>` : choiceButtons(targets, 'nightAction', { icon: '🔎' })}`}</div>`;
+    $('#app').innerHTML = `<div class="card" data-no-translate><div class="role-title">${game.round===1?firstNightLabel():discussionText('🕵️ المحقق','🕵️ Detective')}</div><p>${game.round===1?discussionText('اختر لاعبًا واحدًا لفحصه.','Choose one player to investigate.'):discussionText(`سؤال واحد كل جولة. إجمالي فرص التحقيق: ${detectiveQuestionCount(game.detectiveQuestions)}.`,`One question per round. Total investigation opportunities: ${detectiveQuestionCount(game.detectiveQuestions)}.`)}</p>${finished ? `<h2>${discussionText('انتهت فرص التحقيق المحددة. تقدر تواصل النقاش والتصويت.','Your investigation rounds are over. You can still discuss and vote.')}</h2>` : `<h2>${discussionText('سؤال الجولة','Round question')}: ${me.questionsUsed} / ${me.questionLimit}</h2>${me.acted ? `<p class="ok">${discussionText('تم تسجيل سؤالك. النتيجة بعد إعلان الصباح ✅','Question recorded. The result appears in the morning ✅')}</p>` : choiceButtons(targets, 'nightAction', { icon: '🔎' })}`}</div>`;
     return;
   }
   if (me.role === 'vigilante') {
@@ -1418,6 +1418,8 @@ function renderNight() {
   $('#app').innerHTML = `<div class="card hero"><div class="role-title">${roleLabel(me.role)}</div><p>${discussionText('أغمض عينك وانتظر الصباح.','Close your eyes and wait for morning.')}</p></div>`;
 }
 
+function firstNightOnly(){return game?.phase==='night'&&game.round===1}
+function firstNightLabel(){return discussionText('الليلة الأولى: للمحقق فقط','First night: detective only')}
 function wrapCyclePlay(cycle, actionHtml) {
   const isDay = cycle === 'day';
   const isNight = cycle === 'night';
@@ -1427,7 +1429,7 @@ function wrapCyclePlay(cycle, actionHtml) {
   const hasPick = /class="[^"]*\bpick\b/.test(actionHtml);
   const talkBlock = !talk ? '' : (draw ? talk : `<details class="cycle-talk" data-disclosure-key="cycle-talk"${hasPick?'':' open'}><summary>${discussionText('النقاش','Discussion')}</summary>${talk}</details>`);
   const kickers = {
-    night: `🌙 ${discussionText('الليل','Night')} ${game.round}`,
+    night: firstNightOnly() ? `🌙 ${firstNightLabel()}` : `🌙 ${discussionText('الليل','Night')} ${game.round}`,
     day: `☀️ ${discussionText('النهار','Day')} ${game.round}`,
     nomination: `☝️ ${discussionText('ترشيح','Nomination')}`,
     trial: `⚖️ ${discussionText('محاكمة','Trial')}`,
@@ -1605,7 +1607,7 @@ function controllerTaskHint() {
   const messages = {
     lobby: ['شارك كود الغرفة، اختر التشكيلة، ثم راجع الملخص قبل التوزيع.', 'Share the room code, choose a preset, then review before dealing.'],
     reveal: [`بانتظار تأكيد ${Math.max(0,game.players.length-(game.roleReadyCount||0))} لاعب. يبدأ الليل عند تأكيد الجميع.`, `Waiting for ${Math.max(0,game.players.length-(game.roleReadyCount||0))} players. Night can begin when everyone confirms.`],
-    night: ['أعلن الصباح بعد اكتمال اختيارات الليل أو انتهاء المهلة.', 'Announce morning when night choices complete or time runs out.'],
+    night: firstNightOnly() ? ['الليلة الأولى: للمحقق فقط. أعلن الصباح بعد فحص المحقق أو انتهاء المهلة.', 'First night: detective only. Announce morning after the investigation or the timer.'] : ['أعلن الصباح بعد اكتمال اختيارات الليل أو انتهاء المهلة.', 'Announce morning when night choices complete or time runs out.'],
     day: ['راجع نتائج الليل، أدر النقاش، ثم ابدأ التصويت بعد اكتمال أفعال النهار.', 'Review night results, run discussion, then start voting after day actions complete.'],
     nomination: ['اختر المتهم بعد اكتمال الترشيحات أو انتهاء المهلة.', 'Resolve the accused when nominations complete or time runs out.'],
     trial: ['اترك وقت الدفاع للمتهم، ثم انتقل للحكم عند انتهاء الوقت.', 'Let the accused defend, then move to verdict when time ends.'],
@@ -1620,7 +1622,7 @@ function playerTaskHint() {
   if(game.phase==='reveal')return roleAcknowledged()?discussionText('تم تأكيد دورك. انتظر بداية الليل.','Your role is confirmed. Wait for night to begin.'):'';
   if(game.phase==='paused')return discussionText('المباراة متوقفة. انتظر المضيف ليستكملها.','The match is paused. Wait for the host to resume.');
   if(game.phase==='night') {
-    if(game.round===1&&me.role!=='detective')return discussionText('الليلة الأولى للمحقق فقط. انتظر إعلان الصباح.','First night is for Detectives only. Wait for morning.');
+    if(game.round===1&&me.role!=='detective')return firstNightLabel();
     if(me.jailed)return discussionText('أنت مسجون؛ قدرتك متوقفة هذه الليلة. انتظر قرار السجّان.','You are jailed; your ability is blocked tonight. Wait for the Jailer.');
     if(me.acted)return discussionText('تم تسجيل اختيارك. انتظر إعلان الصباح.','Your choice is recorded. Wait for morning.');
     if(mafiaRoleClient(me.role))return discussionText('اختر هدف الاغتيال أو تخطَّ الليلة.','Choose a kill target or skip tonight.');
