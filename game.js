@@ -1612,12 +1612,17 @@ function publicNewsEvents(){
 function squareEventLine(event){
   const named=(game.eliminations||[]).filter(p=>p.reason===event).map(p=>p.name).filter(Boolean);
   const who=named.join('، ');
-  if(event==='mafia_kill'||event==='serial_kill'||event==='witch_poison'||event==='vigilante_kill')return who?discussionText(`خرج ${who} هذه الليلة.` , `${who} left tonight.`):discussionText('خرج لاعب هذه الليلة.','A player left tonight.');
-  if(event==='mafia_skipped'||event==='mafia_locked'||event==='mafia_disabled'||event==='mafia_delayed'||event==='detective_only_night')return discussionText('ليلة هادئة. ما خرج أحد.','A quiet night. Nobody left.');
-  if(event==='doctor_saved')return discussionText('الطبيب حمى الهدف، وما خرج أحد.','The Doctor protected the target, so nobody left.');
-  if(event==='jail_saved')return discussionText('السجن حمى الهدف، وما خرج أحد.','Jail protected the target, so nobody left.');
+  if(event==='mafia_kill')return who?discussionText(`المافيا اغتالت ${who}.`,`Mafia killed ${who}.`):eventLabel(event);
+  if(event==='doctor_saved')return discussionText('الطبيب حمى الهدف، وما صار اغتيال.','The Doctor protected the target, so there was no kill.');
+  if(event==='jail_saved')return discussionText('السجن حمى الهدف من اغتيال المافيا.','Jail protected the target from the Mafia kill.');
   if(event==='witch_saved')return discussionText('الساحرة أنقذت لاعبًا بجرعة الحياة.','The Witch saved a player with the life potion.');
-  if(event==='vote_eliminated'||event==='trial_guilty')return who?discussionText(`خرج ${who}.`,`${who} is out.`):discussionText('خرج لاعب.','A player is out.');
+  if(event==='serial_kill')return who?discussionText(`القاتل المتسلسل اغتال ${who}.`,`The Serial Killer killed ${who}.`):eventLabel(event);
+  if(event==='witch_poison')return who?discussionText(`سم الساحرة قتل ${who}.`,`Witch poison killed ${who}.`):eventLabel(event);
+  if(event==='jailer_executed')return who?discussionText(`السجّان أعدم ${who}.`,`The Jailer executed ${who}.`):eventLabel(event);
+  if(event==='vigilante_kill')return who?discussionText(`طلقة القناص قتلت ${who}.`,`The sniper killed ${who}.`):eventLabel(event);
+  if(event==='lovers_died')return who?discussionText(`مات الحبيبان: ${who}.`,`The linked pair died: ${who}.`):eventLabel(event);
+  if(event==='vote_eliminated')return who?discussionText(`التصويت استبعد ${who}.`,`The vote eliminated ${who}.`):eventLabel(event);
+  if(event==='trial_guilty')return who?discussionText(`صدر الحكم بإدانة ${who}.`,`The verdict condemned ${who}.`):eventLabel(event);
   if(event==='player_accused'&&game.accusedPlayer)return discussionText(`المتهم للمحاكمة: ${nameOf(game.accusedPlayer)}.`,`Accused for trial: ${nameOf(game.accusedPlayer)}.`);
   if(event==='lawyer_saved')return discussionText('المحامي أنقذ اللاعب من نتيجة التصويت.','The Lawyer saved the player from the vote.');
   if(event==='escort_blocked')return discussionText('المعطّل عطّل قدرة لاعب هذه الليلة.','The Escort blocked a player tonight.');
@@ -1686,8 +1691,8 @@ function squarePanelHtml(voteBody=''){
   const roundTalkDone=game.phase==='day'&&view.round===game.round&&view.id&&(view.complete||view.status==='done');
   const waiting=roundTalkDone?`<p class="pick-hint is-set">${discussionText('النقاش انتهى. انتظر بدء التصويت.','Discussion is over. Wait for voting to start.')}</p>`:'';
   const causes={
-    mafia_kill:['خرج','Out'], vote_eliminated:['خرج','Out'], trial_guilty:['خرج','Out'],
-    vigilante_kill:['خرج','Out'], serial_kill:['خرج','Out'], witch_poison:['خرج','Out'],
+    mafia_kill:['اغتالته المافيا','Killed by Mafia'], vote_eliminated:['استُبعد بالتصويت','Voted out'], trial_guilty:['أُدين بالحكم','Voted guilty'],
+    vigilante_kill:['طلقة القناص','Sniper shot'], serial_kill:['اغتيال القاتل المتسلسل','Serial Killer'], witch_poison:['سم الساحرة','Witch poison'],
     jailer_executed:['إعدام السجّان','Jailer execution'], lovers_died:['مات مع شريكه','Linked partner'], host_expelled:['استبعده المضيف','Host expelled'], eliminated:['خرج','Eliminated']
   };
   const deathRows=(game.eliminations||[]).map(p=>{const label=causes[p.reason]||causes.eliminated;return `<p>☠️ <b>${escapeHtml(p.name)}</b> — ${discussionText(...label)}</p>`;}).join('')
@@ -1798,8 +1803,8 @@ home();
 
 function eliminationNotice() {
   const causes = {
-    mafia_kill:['خرج','Out'], vote_eliminated:['خرج','Out'], trial_guilty:['خرج','Out'],
-    vigilante_kill:['خرج','Out'], serial_kill:['خرج','Out'], witch_poison:['خرج','Out'],
+    mafia_kill:['اغتيال المافيا','Killed by Mafia'], vote_eliminated:['الاستبعاد بالتصويت','Voted out'], trial_guilty:['حكم التصويت بالإدانة','Voted guilty'],
+    vigilante_kill:['طلقة القناص الأخيرة','Sniper final shot'], serial_kill:['اغتيال القاتل المتسلسل','Killed by Serial Killer'], witch_poison:['سم الساحرة','Witch poison'],
     jailer_executed:['إعدام السجّان','Jailer execution'], lovers_died:['الارتباط بلاعب مستبعد','Linked partner eliminated'], host_expelled:['استبعاد من المضيف','Expelled by host'], eliminated:['الاستبعاد','Eliminated']
   };
   const rows=(game?.eliminations||[]).map(p=>{const label=causes[p.reason]||causes.eliminated;return `<p><b>${escapeHtml(p.name)}</b> — ${discussionText(...label)}${p.detail?`: ${escapeHtml(p.detail)}`:''}</p>`;}).join('');
