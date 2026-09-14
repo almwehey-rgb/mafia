@@ -1186,7 +1186,7 @@ function personalRoleCard(compact=false, extra={}) {
 function setShowingRole(on){document.body.classList.toggle('showing-role',!!on)}
 function roleReveal() {
   setShowingRole(true);
-  $('#app').innerHTML=`${phaseBar()}<section class="role-reveal-only">${personalRoleCard(false,{reveal:true})}<button class="btn red wide" onclick="acknowledgeRole()">${discussionText('فهمت','Got it')}</button></section>`;
+  $('#app').innerHTML=`<section class="role-reveal-only">${personalRoleCard(false,{reveal:true})}<div class="reveal-ack"><span class="phase-timer" id="phaseTimer" role="timer" aria-label="${discussionText('الوقت المتبقي','Time remaining')}">${phaseDuration}</span><button class="btn red" onclick="acknowledgeRole()">${discussionText('فهمت','Got it')}</button></div></section>`;
 }
 function mafiaRoleClient(role){return role==='mafia'||role==='mafia_boss'}
 function renderPlayerContent() {

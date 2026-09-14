@@ -585,15 +585,17 @@ body.light .flip-card .role-team,body.light .flip-card .personal-card-properties
 .role-reveal-only{display:grid;justify-items:center;align-content:start;gap:8px;width:min(400px,100%);margin:0 auto;padding:0 0 max(12px,env(safe-area-inset-bottom))}
 .role-reveal-only .role-presentation{width:100%;margin:0;display:grid;gap:8px}
 .role-reveal-only .personal-role-card,.role-reveal-only .reveal-card{width:100%;max-width:none;margin:0}
-.role-reveal-only .btn{width:100%;position:sticky;bottom:max(8px,env(safe-area-inset-bottom));z-index:3}
+.role-reveal-only .reveal-ack{display:grid;grid-template-columns:auto minmax(0,1fr);gap:8px;align-items:center;width:100%;position:sticky;bottom:max(6px,env(safe-area-inset-bottom));z-index:3}
+.role-reveal-only .reveal-ack .phase-timer{min-width:52px;min-height:48px;margin:0;display:grid;place-items:center;border-radius:12px;font-size:18px;font-weight:800}
+.role-reveal-only .reveal-ack .btn{width:auto;min-height:48px;margin:0;position:static}
 .role-reveal-only .role-allies{width:100%;margin:0;padding:8px 10px;border-radius:12px;font-size:14px}
 .role-reveal-only .role-allies h3{font-size:12px;margin:0 0 6px}
 .role-reveal-only .role-turn-hint{font-size:clamp(13px,3.6vw,16px);padding:6px 8px}
 body.showing-role .header,body.showing-role .utility-bar{display:none!important}
 body.showing-role .shell{padding:8px 12px 10px!important}
-body.showing-role .role-reveal-only{width:min(94vw,420px);min-height:calc(100dvh - 20px);grid-template-rows:minmax(0,1fr) auto auto;align-content:stretch}
+body.showing-role .role-reveal-only{width:min(94vw,420px);min-height:calc(100dvh - 16px);grid-template-rows:minmax(0,1fr) auto;align-content:stretch}
 body.showing-role .role-reveal-only .role-presentation{align-self:start}
-body.showing-role .role-reader.turning-role{max-width:none;width:100%;height:min(74dvh,620px);aspect-ratio:auto}
+body.showing-role .role-reader.turning-role{max-width:none;width:100%;height:min(62dvh,520px);aspect-ratio:auto}
 @media(max-width:700px){
   .role-reveal-only .turning-role .role-turn-inner,.role-reveal-only .personal-role-card .flip-inner{min-height:0;height:100%}
   .role-reveal-only .personal-role-card .flip-front img,.role-reveal-only .role-image-view img{height:100%;object-fit:contain}
