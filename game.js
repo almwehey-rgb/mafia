@@ -403,9 +403,29 @@ function investigationResultLabel(result) {
   if (/Ù|Ø/.test(r)) return r.includes('Ø¨') || r.includes('Ø±') ? discussionText('بريء', 'Innocent') : discussionText('مافيا', 'Mafia');
   return discussionText(r, r);
 }
+function selectedTargets(){
+  const me=game?.me||{};
+  const extra=actionFeedback?.context===actionContext()?[actionFeedback.target]:[];
+  if(['nomination','vote','verdict'].includes(game?.phase))return [...new Set([me.voteTarget,...extra].filter(Boolean).map(String))];
+  const ids=[me.actionTarget,me.jailerSelected,...(me.selectedIds||[]),...extra].filter(Boolean).flatMap((value)=>String(value).split(','));
+  return [...new Set(ids.map((id)=>id.replace(/^(SAVE|POISON):/,'')))];
+}
+function isPicked(id){return selectedTargets().includes(String(id));}
+function pickMark(){return `<span class="pick-mark">${discussionText('اختيارك','Your pick')}</span>`;}
+function pickHintHtml(){
+  const has=selectedTargets().length;
+  return `<p class="pick-hint${has?' is-set':''}">${has?discussionText('تم تسجيل اختيارك. اضغط اسمًا آخر لتغييره.','Your choice is saved. Tap another name to change it.'):discussionText('اضغط اسمًا للاختيار. يمكنك تغييره قبل انتهاء المرحلة.','Tap a name to choose. You can change it before the phase ends.')}</p>`;
+}
+function skipPick(action, target, label){
+  const on=isPicked(target);
+  return `<button class="pick skip${on?' is-picked':''}" data-target="${escapeHtml(target)}" aria-pressed="${on}" onclick="${action}(${jsArg(target)})">${label}${on?` ${pickMark()}`:''}</button>`;
+}
 function choiceButtons(players, action, options = {}) {
-  const inner = players.map((player) => `<button class="pick" data-target="${escapeHtml(player.id)}" aria-pressed="false" onclick="${action}(${jsArg(player.id)})">${options.icon || '👤'} ${escapeHtml(player.name)}${player.id === playerId ? ` (${discussionText('أنت','You')})` : ''}</button>`).join('');
-  return `<div class="choice-stack">${inner}</div>`;
+  const inner = players.map((player) => {
+    const on=isPicked(player.id);
+    return `<button class="pick${on?' is-picked':''}" data-target="${escapeHtml(player.id)}" aria-pressed="${on}" onclick="${action}(${jsArg(player.id)})">${options.icon || '👤'} ${escapeHtml(player.name)}${player.id === playerId ? ` (${discussionText('أنت','You')})` : ''}${on?` ${pickMark()}`:''}</button>`;
+  }).join('');
+  return `${options.hint===false?'':pickHintHtml()}<div class="choice-stack">${inner}</div>`;
 }
 function jsArg(value) { return escapeHtml(JSON.stringify(String(value))); }
 function escapeHtml(value) {
@@ -1272,6 +1292,7 @@ function mountPlayerTools(){
   </div>`;
   document.body.append(dock);
   document.body.classList.add('has-player-dock');
+  paintActionFeedback();
 }
 function openDockMore(){
   const host=game?.me?.isHost?`<button class="btn gold wide" type="button" onclick="toggleDelegatedHost()">👑 ${discussionText('تحكم','Host')}</button><button class="btn wide" type="button" onclick="returnToLobby()">🏠 ${discussionText('اللوبي','Lobby')}</button>`:'';
@@ -1413,8 +1434,9 @@ function renderTrialPlayer(){
 }
 function renderVerdict(){
   const accused=game.accusedPlayer===playerId;
-  const options=`<div class="verdict-grid choice-stack"><button class="pick execute" data-target="GUILTY" aria-pressed="false" onclick="castVote('GUILTY')">${discussionText('🔨 مذنب','🔨 Guilty')}</button><button class="pick innocent" data-target="INNOCENT" aria-pressed="false" onclick="castVote('INNOCENT')">${discussionText('🕊️ بريء','🕊️ Innocent')}</button></div>`;
-  $('#app').innerHTML=`<div class="card hero"><div class="accused-name">${escapeHtml(nameOf(game.accusedPlayer))}</div>${accused||game.me.voted?'':options}</div>`;
+  const guilty=isPicked('GUILTY'),innocent=isPicked('INNOCENT');
+  const options=`${pickHintHtml()}<div class="verdict-grid choice-stack"><button class="pick execute${guilty?' is-picked':''}" data-target="GUILTY" aria-pressed="${guilty}" onclick="castVote('GUILTY')">${discussionText('🔨 مذنب','🔨 Guilty')}${guilty?` ${pickMark()}`:''}</button><button class="pick innocent${innocent?' is-picked':''}" data-target="INNOCENT" aria-pressed="${innocent}" onclick="castVote('INNOCENT')">${discussionText('🕊️ بريء','🕊️ Innocent')}${innocent?` ${pickMark()}`:''}</button></div>`;
+  $('#app').innerHTML=`<div class="card hero"><div class="accused-name">${escapeHtml(nameOf(game.accusedPlayer))}</div>${accused?'':options}</div>`;
 }
 
 function renderNight() {
@@ -1439,7 +1461,7 @@ function renderNight() {
   if (me.role === 'mafia' || me.role === 'mafia_boss') {
     const teamIds = new Set((me.mafiaTeam || []).map((x) => x.id));
     const targets = alivePlayers().filter((player) => !teamIds.has(player.id));
-    $('#app').innerHTML = `<div class="card">${(me.mafiaTeam||[]).length?`<div class="status wait">${(me.mafiaTeam||[]).map((x)=>escapeHtml(x.name)).join('، ')}</div>`:''}${me.acted ? '' : `${choiceButtons(targets, 'nightAction', { icon: '🔪' })}<button class="pick skip" onclick="nightAction('SKIP')">⏭️ ${discussionText('تخطي','Skip')}</button>`}</div>`;
+    $('#app').innerHTML = `<div class="card">${(me.mafiaTeam||[]).length?`<div class="status wait">${(me.mafiaTeam||[]).map((x)=>escapeHtml(x.name)).join('، ')}</div>`:''}${choiceButtons(targets, 'nightAction', { icon: '🔪' })}${skipPick('nightAction','SKIP',`⏭️ ${discussionText('تخطي','Skip')}`)}</div>`;
     return;
   }
   if (me.role === 'doctor') {
@@ -1448,7 +1470,7 @@ function renderNight() {
       return;
     }
     const targets = alivePlayers().filter((player) => player.id !== me.doctorLastTarget);
-    $('#app').innerHTML = `<div class="card" data-no-translate>${me.acted ? '' : `<h2>من ستحمي الليلة؟</h2>${choiceButtons(targets, 'nightAction', { icon: '🩺' })}`}</div>`;
+    $('#app').innerHTML = `<div class="card" data-no-translate><h2>من ستحمي الليلة؟</h2>${choiceButtons(targets, 'nightAction', { icon: '🩺' })}</div>`;
     return;
   }
   if (me.role === 'revealer') {
@@ -1456,9 +1478,12 @@ function renderNight() {
     return;
   }
   if (me.role === 'detective') {
-    const targets = alivePlayers().filter((player) => player.id !== playerId && !(me.selectedIds || []).includes(player.id));
+    const picked = new Set(me.selectedIds || []);
+    const remaining = alivePlayers().filter((player) => player.id !== playerId && !picked.has(player.id));
+    const chosen = alivePlayers().filter((player) => picked.has(player.id));
     const finished = game.round > detectiveQuestionCount(game.detectiveQuestions);
-    $('#app').innerHTML = `<div class="card" data-no-translate>${finished||me.acted?'':choiceButtons(targets, 'nightAction', { icon: '🔎' })}</div>`;
+    const chosenHtml = chosen.length ? `<p class="pick-hint is-set">${discussionText('فحصك','Your check')}: ${chosen.map((p)=>escapeHtml(p.name)).join('، ')}${me.acted?` — ${discussionText('لا يمكن تغيير الفحص بعد تسجيله.','This check cannot be changed.')}`:''}</p>` : '';
+    $('#app').innerHTML = `<div class="card" data-no-translate>${chosenHtml}${finished||me.acted?'':choiceButtons(remaining, 'nightAction', { icon: '🔎' })}</div>`;
     return;
   }
   if (me.role === 'vigilante') {
@@ -1467,12 +1492,12 @@ function renderNight() {
   }
   if (me.role === 'witch') {
     const targets = alivePlayers();
-    $('#app').innerHTML = `<div class="card"><div class="role-title">${roleLabel('witch')}</div><p>🧪 الحياة: ${me.charges?.life ? 'متوفرة' : 'استُخدمت'} · ☠️ السم: ${me.charges?.poison ? 'متوفرة' : 'استُخدمت'}</p>${me.acted ? '<h2 class="ok">تم تسجيل الجرعة ✅</h2>' : `${me.charges?.life ? `<h2>جرعة الحياة</h2>${choiceButtons(targets, "witchAction.bind(null,'SAVE')", { icon: '💚' })}` : ''}${me.charges?.poison ? `<h2>جرعة السم</h2>${choiceButtons(targets.filter((p) => p.id !== playerId), 'confirmPoison', { icon: '☠️' })}` : ''}`}</div>`;
+    $('#app').innerHTML = `<div class="card"><div class="role-title">${roleLabel('witch')}</div><p>🧪 الحياة: ${me.charges?.life ? 'متوفرة' : 'استُخدمت'} · ☠️ السم: ${me.charges?.poison ? 'متوفرة' : 'استُخدمت'}</p>${pickHintHtml()}${me.charges?.life ? `<h2>جرعة الحياة</h2>${choiceButtons(targets, "witchAction.bind(null,'SAVE')", { icon: '💚', hint: false })}` : ''}${me.charges?.poison ? `<h2>جرعة السم</h2>${choiceButtons(targets.filter((p) => p.id !== playerId), 'confirmPoison', { icon: '☠️', hint: false })}` : ''}</div>`;
     return;
   }
   if (me.role === 'serial_killer') {
     const targets = alivePlayers().filter((player) => player.id !== playerId);
-    $('#app').innerHTML = `<div class="card">${me.acted ? '' : `<h2>من ستقتل الليلة؟</h2>${choiceButtons(targets, 'nightAction', { icon: '🩸' })}`}</div>`;
+    $('#app').innerHTML = `<div class="card"><h2>من ستقتل الليلة؟</h2>${choiceButtons(targets, 'nightAction', { icon: '🩸' })}</div>`;
     return;
   }
   if (me.role === 'cupid') {
@@ -1480,20 +1505,21 @@ function renderNight() {
       $('#app').innerHTML = `<div class="card wait-only"></div>`;
       return;
     }
-    const targets = alivePlayers().filter((player) => player.id !== playerId && !(me.selectedIds || []).includes(player.id));
-    $('#app').innerHTML = `<div class="card"><div class="role-title">${roleLabel('cupid')}</div><h2>اختر حبيبين: ${(me.selectedIds || []).length} / 2</h2>${me.acted ? '<h2 class="ok">تم ربط مصيرهما 💘</h2>' : choiceButtons(targets, 'nightAction', { icon: '💘' })}</div>`;
+    const remaining = alivePlayers().filter((player) => player.id !== playerId && !(me.selectedIds || []).includes(player.id));
+    const chosen = alivePlayers().filter((player) => (me.selectedIds || []).includes(player.id));
+    $('#app').innerHTML = `<div class="card"><div class="role-title">${roleLabel('cupid')}</div><h2>اختر حبيبين: ${(me.selectedIds || []).length} / 2</h2>${chosen.length?choiceButtons(chosen,'nightAction',{icon:'💘',hint:false}):''}${me.acted?`<h2 class="ok">${discussionText('تم ربط مصيرهما','Their fates are linked')} 💘</h2>`:`${pickHintHtml()}${choiceButtons(remaining, 'nightAction', { icon: '💘', hint: false })}`}</div>`;
     return;
   }
   if (me.role === 'escort') {
     const targets = alivePlayers().filter((player) => player.id !== playerId);
-    $('#app').innerHTML = `<div class="card">${me.acted ? '' : `<h2>من ستعطّل الليلة؟</h2>${choiceButtons(targets, 'nightAction', { icon: '🚫' })}`}</div>`;
+    $('#app').innerHTML = `<div class="card"><h2>من ستعطّل الليلة؟</h2>${choiceButtons(targets, 'nightAction', { icon: '🚫' })}</div>`;
     return;
   }
   if (me.role === 'jailer') {
     if (!me.jailedPlayer || me.executionsLeft <= 0) {
       $('#app').innerHTML = `<div class="card wait-only"></div>`;
     } else {
-    $('#app').innerHTML = `<div class="card hero"><div class="role-title">${roleLabel('jailer')}</div>${me.acted ? '' : `<h2>${discussionText('السجين','Prisoner')}: ${escapeHtml(me.jailedPlayer)}</h2><div class="actions" style="justify-content:center"><button class="btn green" onclick="nightAction('SPARE')">${discussionText('إطلاقه','Spare')}</button><button class="btn danger" onclick="confirmExecute()">${discussionText('إعدامه','Execute')}</button></div>`}</div>`;
+    $('#app').innerHTML = `<div class="card hero"><div class="role-title">${roleLabel('jailer')}</div><h2>${discussionText('السجين','Prisoner')}: ${escapeHtml(me.jailedPlayer)}</h2>${pickHintHtml()}<div class="actions" style="justify-content:center">${skipPick('nightAction','SPARE',discussionText('إطلاقه','Spare')).replace('pick skip','btn green pick')}<button class="btn danger pick${isPicked('EXECUTE')?' is-picked':''}" data-target="EXECUTE" aria-pressed="${isPicked('EXECUTE')}" onclick="confirmExecute()">${discussionText('إعدامه','Execute')}${isPicked('EXECUTE')?` ${pickMark()}`:''}</button></div></div>`;
     }
     return;
   }
@@ -1610,11 +1636,11 @@ function renderDay() {
   const me = game.me;
   if (me.role === 'jailer') {
     const targets = alivePlayers().filter((player) => player.id !== playerId);
-    $('#app').innerHTML = `<div class="card">${me.jailerSelected ? '' : `<h2>من ستسجن الليلة؟</h2>${choiceButtons(targets, 'jailPlayer', { icon: '🔐' })}`}</div>`;
+    $('#app').innerHTML = `<div class="card"><h2>من ستسجن الليلة؟</h2>${choiceButtons(targets, 'jailPlayer', { icon: '🔐' })}</div>`;
     return;
   }
   if (me.role === 'lawyer') {
-    $('#app').innerHTML = `<div class="card">${me.acted ? '' : `<h2>من ستحمي من التصويت؟</h2>${choiceButtons(alivePlayers(), 'lawyerProtect', { icon: '⚖️' })}`}</div>`;
+    $('#app').innerHTML = `<div class="card"><h2>من ستحمي من التصويت؟</h2>${choiceButtons(alivePlayers(), 'lawyerProtect', { icon: '⚖️' })}</div>`;
     return;
   }
   $('#app').innerHTML = '';
@@ -1623,7 +1649,7 @@ function renderVote() {
   const me = game.me;
   const targets = alivePlayers().filter((player) => player.id !== playerId);
   const nomination=game.phase==='nomination';
-  $('#app').innerHTML = `<div class="card">${me.voted?'':`<h2>${nomination?discussionText('من تريد محاكمته؟','Who should stand trial?'):discussionText('اختر لاعبًا','Choose a player')}</h2>`}${choiceButtons(targets,'castVote')}${game.enabledRoles?.allow_no_vote?`<button class="pick skip" onclick="castVote('SKIP')">✋ ${discussionText('تخطي','Skip')}</button>`:''}</div>`;
+  $('#app').innerHTML = `<div class="card"><h2>${nomination?discussionText('من تريد محاكمته؟','Who should stand trial?'):discussionText('اختر لاعبًا','Choose a player')}</h2>${choiceButtons(targets,'castVote')}${game.enabledRoles?.allow_no_vote?skipPick('castVote','SKIP',`✋ ${discussionText('تخطي','Skip')}`):''}</div>`;
 }
 
 let actionFeedback = null;
@@ -1634,13 +1660,17 @@ function paintActionFeedback(){
   if(!actionFeedback || actionFeedback.context!==actionContext())return;
   const {state,target}=actionFeedback;
   const displayTarget=target.replace(/^(SAVE|POISON):/,'');
-  const label=game.players.find(p=>p.id===displayTarget)?.name || ({SKIP:discussionText('تخطي','Skip'),GUILTY:discussionText('مذنب','Guilty'),INNOCENT:discussionText('بريء','Innocent')})[target] || '';
-  const message=state==='pending'?discussionText('جاري إرسال الاختيار…','Sending choice…'):state==='success'?discussionText('✓ تم تسجيل اختيارك','✓ Choice recorded'):discussionText('تعذر تأكيد الإرسال. تحقق من الاتصال والحالة قبل المحاولة مجددًا.','Could not confirm delivery. Check your connection and current state before trying again.');
+  const label=game.players.find(p=>p.id===displayTarget)?.name || ({SKIP:discussionText('تخطي','Skip'),GUILTY:discussionText('مذنب','Guilty'),INNOCENT:discussionText('بريء','Innocent'),SPARE:discussionText('إطلاقه','Spare'),EXECUTE:discussionText('إعدامه','Execute'),COUNT:discussionText('كشف','Reveal')})[target] || '';
+  const message=state==='pending'?discussionText('جاري إرسال الاختيار…','Sending choice…'):state==='success'?discussionText('✓ تم تسجيل اختيارك — يمكنك تغييره','✓ Choice saved — you can change it'):discussionText('تعذر تأكيد الإرسال. تحقق من الاتصال والحالة قبل المحاولة مجددًا.','Could not confirm delivery. Check your connection and current state before trying again.');
   const card=document.createElement('p');card.id='actionFeedback';card.className='status action-feedback '+state;card.setAttribute('role',state==='error'?'alert':'status');card.setAttribute('data-no-translate','');card.textContent=message+(label?' — '+label:'');
-  document.querySelector('#app .phase-bar')?.insertAdjacentElement('afterend',card) || document.getElementById('app').prepend(card);
-  for(const button of document.querySelectorAll('#app .pick')){
+  document.querySelector('.player-dock .dock-play')?.insertAdjacentElement('afterbegin',card) || document.querySelector('#app .phase-bar')?.insertAdjacentElement('afterend',card) || document.getElementById('app')?.prepend(card);
+  for(const button of document.querySelectorAll('.pick')){
     button.disabled=state==='pending';
-    if(button.dataset.target)button.setAttribute('aria-pressed',String(button.dataset.target===displayTarget));
+    if(button.dataset.target){
+      const pressed=isPicked(button.dataset.target)||button.dataset.target===displayTarget;
+      button.setAttribute('aria-pressed',String(pressed));
+      button.classList.toggle('is-picked',pressed);
+    }
   }
 }
 async function playerAction(action, target) {

@@ -367,6 +367,7 @@ function publicView(room: any, players: any[], meId?: string, host = false) {
       acted: me.role === "detective" ? selected(me).length >= limit : me.role === "cupid" ? selected(me).length >= 2 : Boolean(me.action_target),
       voted: Boolean(me.vote_target),
       voteTarget: me.vote_target || null,
+      actionTarget: me.action_target || null,
       acknowledged: roleState(me).ack === true,
       willText: me.will_text || "",
       muted: roleState(me).muted === true,

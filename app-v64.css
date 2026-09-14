@@ -785,8 +785,11 @@ body.light{--ux-surface:#fffaf0;--ux-text:#241f19;--ux-muted:#595247;--ux-border
 .player-management{margin-inline-start:auto}.player-management summary{cursor:pointer;min-height:44px;padding:10px;font-size:16px}.player-management .kick{width:auto;padding:10px;font-size:16px}
 .btn{border-radius:var(--ux-radius);min-height:44px}
 .btn.danger{background:var(--ux-danger)!important;color:#fff!important;border:2px solid var(--ux-danger)!important}
-.pick[aria-pressed=true]{outline:3px solid var(--ux-accent);outline-offset:2px}
-.pick[aria-pressed=true]::after{content:' ✓';font-weight:900}
+.pick[aria-pressed=true],.pick.is-picked{background:linear-gradient(#ead07a,#c9a227);color:#1a1408;border:2px solid #f6e7b8;box-shadow:0 0 0 2px #3a2f18}
+.pick[aria-pressed=true]::after,.pick.is-picked::after{content:' ✓';font-weight:900}
+.pick-mark{display:block;font-size:12px;font-weight:800;margin-top:4px;opacity:.9}
+.pick-hint{margin:8px 0;font-size:15px;line-height:1.5;color:var(--ux-muted)}
+.pick-hint.is-set{color:var(--ux-accent);font-weight:800}
 .action-feedback{width:min(720px,100%);margin:12px auto;overflow-wrap:anywhere}
 .action-feedback.error{border:2px solid var(--ux-danger)}
 .pick,.kick,.mute-btn,.mini-action,.step button{min-width:44px;min-height:44px;touch-action:manipulation}
@@ -1042,6 +1045,7 @@ body.app-shell h1,body.app-shell h2,body.app-shell h3{font-weight:800}
 .player-dock .choice-stack,.player-dock .verdict-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:0;max-height:none}
 .player-dock .choice-stack .pick,.player-dock .verdict-grid .pick,.player-dock .pick{min-height:48px;width:100%;padding:10px 8px;font-size:16px;font-weight:700}
 .player-dock .pick.skip{grid-column:1/-1}
+.player-dock .pick[aria-pressed=true],.player-dock .pick.is-picked{background:linear-gradient(#ead07a,#c9a227);color:#1a1408}
 .player-dock .dock-play.dock-card-play{display:grid;place-items:center;overflow:auto}
 .player-dock .square-block{margin:0 0 14px;padding:0 0 12px;border-bottom:1px solid #80663f55}
 .player-dock .square-block:last-child{border:0;margin:0;padding:0}
