@@ -1288,12 +1288,12 @@ function mountPlayerTools(){
   const dock=document.createElement('nav');
   dock.className='player-dock';
   dock.setAttribute('aria-label',discussionText('شريط اللاعب','Player bar'));
-  dock.innerHTML=`${play}<div class="dock-row">
-    <button type="button" class="dock-item${on('ability')}" onclick="selectDockTab('ability')"><span class="dock-icon">⚡</span><span>${discussionText('قدرتي','Ability')}</span></button>
-    <button type="button" class="dock-item${on('card')}" onclick="selectDockTab('card')"><span class="dock-icon">🃏</span><span>${discussionText('كرتي','My card')}</span></button>
-    <button type="button" class="dock-item dock-home-tab${on('home')}" onclick="selectDockTab('home')"><span class="dock-icon">🏠</span><span>${discussionText('الرئيسية','Home')}</span></button>
-    <button type="button" class="dock-item${chatOn}" data-chat-button ${canChat?'':'disabled'} onclick="openChat()"><span class="dock-icon">💬</span><span>${discussionText('محادثة','Chat')}</span><i class="dock-badge" ${unread?'':'hidden'}></i></button>
-    <button type="button" class="dock-item" onclick="openDockMore()"><span class="dock-icon">⋯</span><span>${discussionText('المزيد','More')}</span></button>
+  dock.innerHTML=`${play}<div class="dock-row" data-no-translate>
+    <button type="button" class="dock-item${on('ability')}" onclick="selectDockTab('ability')"><span class="dock-icon">⚡</span><span class="dock-label">${discussionText('قدرتي','Ability')}</span></button>
+    <button type="button" class="dock-item${on('card')}" onclick="selectDockTab('card')"><span class="dock-icon">🃏</span><span class="dock-label">${discussionText('كرتي','My card')}</span></button>
+    <button type="button" class="dock-item dock-home-tab${on('home')}" onclick="selectDockTab('home')"><span class="dock-icon">🏠</span><span class="dock-label">${discussionText('الرئيسية','Home')}</span></button>
+    <button type="button" class="dock-item${chatOn}${unread?' has-unread':''}" data-chat-button ${canChat?'':'disabled'} onclick="openChat()"><span class="dock-icon">💬</span><span class="dock-label">${discussionText('محادثة','Chat')}</span><i class="dock-badge" ${unread?'':'hidden'}></i></button>
+    <button type="button" class="dock-item" onclick="openDockMore()"><span class="dock-icon">⋯</span><span class="dock-label">${discussionText('المزيد','More')}</span></button>
   </div>`;
   document.body.append(dock);
   document.body.classList.add('has-player-dock');
@@ -1334,16 +1334,20 @@ function chatHasUnread(){return unreadChat&&chatAllowed();}
 function chatButtonLabel(unread=false){return `💬 ${discussionText('محادثة','Chat')}${unread?' •':''}`;}
 function paintChatDock(){
   const unread=chatHasUnread();
+  const can=chatAllowed();
+  const labelText=discussionText('محادثة','Chat');
   for(const button of document.querySelectorAll('[data-chat-button]')){
-    if(button.classList.contains('dock-item')){
-      button.classList.toggle('has-unread',unread);
-      const badge=button.querySelector('.dock-badge');
-      if(badge)badge.hidden=!unread;
-      const label=button.querySelector('span:not(.dock-icon)');
-      if(label)label.textContent=discussionText('محادثة','Chat');
-      button.disabled=!chatAllowed();
-      button.classList.toggle('dock-chat-on',chatAllowed());
-    }else button.textContent=`${unread?'🔴 ':''}💬 ${dockChatLabel()}`;
+    button.classList.add('dock-item');
+    if(!button.querySelector('.dock-icon')||!button.querySelector('.dock-label')){
+      button.innerHTML=`<span class="dock-icon">💬</span><span class="dock-label">${labelText}</span><i class="dock-badge" hidden></i>`;
+    }
+    button.disabled=!can;
+    button.classList.toggle('dock-chat-on',can);
+    button.classList.toggle('has-unread',unread);
+    const label=button.querySelector('.dock-label');
+    if(label)label.textContent=labelText;
+    const badge=button.querySelector('.dock-badge');
+    if(badge)badge.hidden=!unread;
   }
 }
 function markChatRead(messages){const latest=messages?.at(-1);if(latest)localStorage.setItem(chatReadKey(),String(latest.id));unreadChat=false;paintChatDock();}
