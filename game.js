@@ -73,23 +73,43 @@ function deathIdList(){
   return raw.map((id)=>String(id?.id||id||'')).filter(Boolean);
 }
 function samePlayer(a,b){return String(a||'')!==''&&String(a)===String(b);}
+function myDeathReason(){
+  const me=impactSelfId();
+  const mine=(game?.eliminations||[]).find((p)=>samePlayer(p.id,me)||(game?.me?.name&&p.name===game.me.name));
+  const event=mine?.reason||announcementEvents().find((e)=>IMPACT_DEATH.has(e))||'';
+  const lines={
+    mafia_kill:['المافيا اغتالتك.','Mafia killed you.'],
+    serial_kill:['القاتل المتسلسل اغتالك.','The Serial Killer killed you.'],
+    witch_poison:['سم الساحرة قتلك.','Witch poison killed you.'],
+    jailer_executed:['السجّان أعدمك.','The Jailer executed you.'],
+    vigilante_kill:['طلقة القناص قتلتك.','The sniper killed you.'],
+    lovers_died:['متّ مع شريكك.','You died with your linked partner.'],
+    vote_eliminated:['التصويت استبعدك.','The vote eliminated you.'],
+    trial_guilty:['صدر الحكم بإدانتك.','The verdict found you guilty.'],
+    host_expelled:['المضيف استبعدك.','The host expelled you.'],
+    jester_won:['المهرج فاز بعد استبعادك.','The Jester won after you were voted out.']
+  };
+  if(lines[event])return discussionText(...lines[event]);
+  if(event&&typeof squareEventLine==='function')return squareEventLine(event);
+  return discussionText('خرجت من المباراة.','You are out of the match.');
+}
 function playImpact(kind){
   const death=kind==='death';
   closeDeathImpact();
   impactArmed=death;
-  const pulse=()=>{if(navigator.vibrate)navigator.vibrate(death?[80,40,160,40,240,50,360]:[50,40,90,40,140,50,220]);};
+  const pulse=()=>{if(navigator.vibrate)navigator.vibrate(death?[120,40,200,40,280,50,400,60,220]:[50,40,90,40,140,50,220]);};
   pulse();
   if(death){
-    impactPulseTimer=setInterval(pulse,450);
+    impactPulseTimer=setInterval(pulse,520);
     const overlay=document.createElement('button');
     overlay.id='deathImpact';
     overlay.type='button';
     overlay.className='death-impact';
     overlay.setAttribute('aria-label',discussionText('اضغط للخروج','Tap to dismiss'));
-    overlay.innerHTML=`<b>${discussionText('خرجت من المباراة','You are out')}</b><span>${discussionText('اضغط للخروج','Tap to dismiss')}</span>`;
+    overlay.innerHTML=`<b>${escapeHtml(myDeathReason())}</b><span>${discussionText('اضغط للخروج','Tap to dismiss')}</span>`;
     overlay.addEventListener('click',closeDeathImpact);
     document.body.appendChild(overlay);
-    impactCloseTimer=setTimeout(closeDeathImpact,2000);
+    impactCloseTimer=setTimeout(closeDeathImpact,7000);
   }else{
     document.body.classList.add('impact-save');
     impactCloseTimer=setTimeout(closeDeathImpact,900);
