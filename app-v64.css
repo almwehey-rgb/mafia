@@ -1042,12 +1042,8 @@ body.app-shell h1,body.app-shell h2,body.app-shell h3{font-weight:800}
 .player-dock .dock-play h3{margin:10px 0 6px;font-size:14px;color:#e8c37a;text-align:center}
 .player-dock .dock-play .card{margin:0;padding:0;border:0;background:transparent;box-shadow:none}
 .player-dock .dock-chat{width:100%;min-height:46px;margin:0;border:0;border-radius:12px;background:#c9a227;color:#1a1408;font:800 15px Tahoma,Arial;cursor:pointer}
-.player-dock .dock-row{display:grid;grid-template-columns:repeat(3,1fr)}
-.player-dock .dock-row:has(.dock-item:nth-child(4)){grid-template-columns:repeat(4,1fr)}
-.player-dock .dock-item{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;min-height:44px;margin:0;padding:4px 2px;border:0;background:transparent;color:#e8d3a4;font:600 11px Tahoma,Arial;cursor:pointer}
-.player-dock .dock-icon{font-size:18px;line-height:1}
 body.has-player-dock .shell{padding-bottom:calc(88px + env(safe-area-inset-bottom))!important}
-body.has-player-dock:has(.dock-chat) .shell,body.has-player-dock:has(.dock-play) .shell{padding-bottom:calc(42dvh + env(safe-area-inset-bottom))!important}
+body.has-player-dock:has(.dock-chat) .shell,body.has-player-dock:has(.dock-play) .shell{padding-bottom:calc(38dvh + env(safe-area-inset-bottom))!important}
 body.light .player-dock{background:#f4ebd8f5;border-color:#b19767}
 body.light .player-dock .dock-item{color:#5a431c}
 body.light .player-dock .dock-chat{background:#b8892a;color:#1a1408}

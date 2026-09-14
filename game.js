@@ -1239,22 +1239,24 @@ function extractDockAction(html){
   return (card||box).innerHTML;
 }
 function mountPlayerTools(){
-  if(!game?.me?.alive||['lobby','reveal','finished'].includes(game.phase)||document.querySelector('.player-dock'))return;
+  if(!game?.me?.alive||['lobby','reveal','finished'].includes(game.phase))return;
   const canChat=chatAllowed();
   const unread=canChat&&chatHasUnread();
-  const host=game.me.isHost?`<button type="button" class="dock-item" onclick="toggleDelegatedHost()"><span class="dock-icon">👑</span><span>${discussionText('تحكم','Host')}</span></button>`:'';
-  const play=pendingDockPlay.body?`<details class="dock-play"${pendingDockPlay.open?' open':''}><summary class="role-act-title" data-no-translate>${pendingDockPlay.title||discussionText('الإجراء','Action')}</summary>${pendingDockPlay.body}</details>`:'';
-  const chat=canChat?`<button type="button" class="dock-chat" data-chat-button onclick="openChat()">${unread?'🔴 ':''}💬 ${dockChatLabel()}</button>`:'';
-  const dock=document.createElement('nav');
-  dock.className='player-dock';
-  dock.setAttribute('aria-label',discussionText('شريط اللاعب','Player bar'));
-  dock.innerHTML=`${play}${chat}<div class="dock-row">
-    <button type="button" class="dock-item" onclick="openMyRole()"><span class="dock-icon">🃏</span><span>${discussionText('دوري','Role')}</span></button>
-    <button type="button" class="dock-item" onclick="openWill()"><span class="dock-icon">📜</span><span>${discussionText('وصية','Will')}</span></button>
-    <button type="button" class="dock-item" onclick="openReport()"><span class="dock-icon">🚩</span><span>${discussionText('بلاغ','Report')}</span></button>${host}
-  </div>`;
-  document.body.append(dock);
-  document.body.classList.add('has-player-dock');
+  if(!document.querySelector('.player-dock') && (pendingDockPlay.body||canChat)){
+    const play=pendingDockPlay.body?`<details class="dock-play"${pendingDockPlay.open?' open':''}><summary class="role-act-title" data-no-translate>${pendingDockPlay.title||discussionText('الإجراء','Action')}</summary>${pendingDockPlay.body}</details>`:'';
+    const chat=canChat?`<button type="button" class="dock-chat" data-chat-button onclick="openChat()">${unread?'🔴 ':''}💬 ${dockChatLabel()}</button>`:'';
+    const dock=document.createElement('nav');
+    dock.className='player-dock';
+    dock.setAttribute('aria-label',discussionText('شريط اللاعب','Player bar'));
+    dock.innerHTML=`${play}${chat}`;
+    document.body.append(dock);
+    document.body.classList.add('has-player-dock');
+  }
+  if(document.querySelector('.player-tools'))return;
+  const tools=document.createElement('details');
+  tools.className='player-tools';
+  tools.innerHTML=`<summary>${discussionText('أدوات','Tools')}</summary><div class="player-tools-list">${game.me.isHost?`<button type="button" onclick="toggleDelegatedHost()">👑 ${discussionText('تحكم','Host')}</button><button type="button" onclick="returnToLobby()">🏠 ${discussionText('اللوبي','Lobby')}</button>`:''}<button type="button" onclick="openMyRole()">🃏 ${discussionText('دوري','Role')}</button><button type="button" onclick="openWill()">📜 ${discussionText('وصية','Will')}</button><button type="button" onclick="openReport()">🚩 ${discussionText('بلاغ','Report')}</button></div>`;
+  document.querySelector('#app')?.appendChild(tools);
 }
 function openMyRole(){
   if(!game?.me?.role)return;
