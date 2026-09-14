@@ -1613,8 +1613,9 @@ function squareEventLine(event){
   const named=(game.eliminations||[]).filter(p=>p.reason===event).map(p=>p.name).filter(Boolean);
   const who=named.join('، ');
   if(event==='mafia_kill'||event==='serial_kill'||event==='witch_poison'||event==='vigilante_kill')return who?discussionText(`خرج ${who} هذه الليلة.` , `${who} left tonight.`):discussionText('خرج لاعب هذه الليلة.','A player left tonight.');
-  if(event==='doctor_saved')return discussionText('الطبيب حمى الهدف، وما مات أحد من الاغتيال.','The Doctor protected the target, so there was no night kill.');
-  if(event==='jail_saved')return discussionText('السجن حمى الهدف، وما مات أحد من الاغتيال.','Jail protected the target, so there was no night kill.');
+  if(event==='mafia_skipped'||event==='mafia_locked'||event==='mafia_disabled'||event==='mafia_delayed'||event==='detective_only_night')return discussionText('ليلة هادئة. ما خرج أحد.','A quiet night. Nobody left.');
+  if(event==='doctor_saved')return discussionText('الطبيب حمى الهدف، وما خرج أحد.','The Doctor protected the target, so nobody left.');
+  if(event==='jail_saved')return discussionText('السجن حمى الهدف، وما خرج أحد.','Jail protected the target, so nobody left.');
   if(event==='witch_saved')return discussionText('الساحرة أنقذت لاعبًا بجرعة الحياة.','The Witch saved a player with the life potion.');
   if(event==='vote_eliminated'||event==='trial_guilty')return who?discussionText(`خرج ${who}.`,`${who} is out.`):discussionText('خرج لاعب.','A player is out.');
   if(event==='player_accused'&&game.accusedPlayer)return discussionText(`المتهم للمحاكمة: ${nameOf(game.accusedPlayer)}.`,`Accused for trial: ${nameOf(game.accusedPlayer)}.`);
