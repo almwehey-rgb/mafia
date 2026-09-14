@@ -51,7 +51,8 @@ function phaseName(phase = game?.phase) { return ({ lobby: discussionText('ال�
 function lobbyIcon(name){const paths={wait:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',admin:'<path d="M12 3 4 6v6c0 5 8 9 8 9s8-4 8-9V6z"/><path d="m8 12 3 3 5-6"/>',shield:'<path d="M12 3 4 6v6c0 5 8 9 8 9s8-4 8-9V6z"/>',leave:'<path d="M9 4H4v16h5M10 12h11m-4-4 4 4-4 4"/>',back:'<path d="M5 12h14m-6-6 6 6-6 6"/>',share:'<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>',bots:'<rect x="3" y="3" width="18" height="18" rx="3"/><path d="M7 7h.1M17 7h.1M12 12h.1M7 17h.1M17 17h.1"/>',user:'<circle cx="12" cy="7" r="4"/><path d="M4 21v-2a8 8 0 0 1 16 0v2"/>',play:'<path d="m7 3 14 9L7 21V3Z"/>',pause:'<path d="M7 4v16M17 4v16"/>',camera:'<rect x="6" y="2" width="12" height="20" rx="2"/><path d="M10 18h4"/>'};return '<svg class="lobby-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+paths[name]+'</svg>'}
 function noirEmblem(){return `<aside class="home-emblem" aria-hidden="true"><img src="/assets/mafia-gold-icon.webp" alt="" width="220" height="220"><span>◆ MAFIA NIGHT ◆</span></aside>`;}
 function noirPageFrame(cardHtml,{wide=false}={}){return `<section class="noir-entry noir-subpage"><div class="noir-content${wide?' noir-content-wide':''}"><div class="card hero join-card auth-card">${cardHtml}</div><div class="noir-links"><button class="btn" type="button" onclick="home()">${discussionText('الرجوع للرئيسية','Back to home')}</button></div></div>${noirEmblem()}</section>`;}
-function backFromLobby(){pollingEpoch++;clearTimeout(pollTimer);closeSheet();document.querySelector('.player-tools')?.remove();game=null;if(hostAccessToken)renderHostHome();else renderHostLogin()}
+function removePlayerChrome(){document.querySelector('.player-tools')?.remove();document.querySelector('.player-dock')?.remove();document.body.classList.remove('has-player-dock')}
+function backFromLobby(){pollingEpoch++;clearTimeout(pollTimer);closeSheet();removePlayerChrome();game=null;if(hostAccessToken)renderHostHome();else renderHostLogin()}
 function phaseBar() { const controller=(hostToken||game?.me?.isHost)&&game;const live=controller&&!['lobby','finished'].includes(game.phase);const pause=live?`<button type="button" class="phase-pause phase-icon-btn" aria-label="${discussionText(game.phase==='paused'?'استكمال المباراة':'إيقاف مؤقت',game.phase==='paused'?'Resume game':'Pause game')}" onclick="hostAction('togglePause')">${lobbyIcon(game.phase==='paused'?'play':'pause')}</button>`:'';const toLobby=controller&&game.phase!=='lobby'?`<button type="button" class="phase-pause lobby-action lobby-back" onclick="returnToLobby()">${lobbyIcon('back')}<span class="btn-label">${discussionText('اللوبي','Lobby')}</span></button>`:'';const admin=live?`<button type="button" class="phase-pause phase-icon-btn" aria-label="${discussionText('إدارة المباراة','Game management')}" onclick="showMatchTools()">${lobbyIcon('shield')}</button>`:'';const back=delegatedHostMode?`<button type="button" class="phase-pause phase-icon-btn" aria-label="${discussionText('العودة لدوري','Back to my role')}" onclick="toggleDelegatedHost()">${lobbyIcon('user')}</button>`:'';return `<div class="phase-bar"><span class="phase-symbol">${game?.phase==='lobby'?lobbyIcon('wait'):phaseIcon()}</span><b class="phase-label">${phaseName()}</b>${game?.round ? `<small>${discussionText('الجولة','Round')} ${game.round}</small>` : ''}${game&&!["lobby","finished"].includes(game.phase)?`<span class="phase-timer" id="phaseTimer" role="timer" aria-label="${discussionText('الوقت المتبقي','Time remaining')}">${phaseDuration}</span>`:''}${game?.phase==='lobby'?`<button type="button" class="phase-pause lobby-action lobby-back" onclick="backFromLobby()">${lobbyIcon('back')}<span class="btn-label">${discussionText('الرئيسية','Home')}</span></button>`:''}${pause}${toLobby}${admin}${hostToken?`<button type="button" class="phase-pause lobby-action" onclick="showAdminQR()" aria-label="${discussionText('وضع الأدمن الخاص','Private admin access')}">${lobbyIcon('admin')}<span class="btn-label">${discussionText('أدمن','Admin')}</span></button>`:''}${back}${!spectatorMode ? `<button type="button" class="phase-pause lobby-action lobby-exit" onclick="leaveRoom()" aria-label="${discussionText('مغادرة الغرفة','Leave room')}">${lobbyIcon('leave')}<span class="btn-label">${discussionText('مغادرة','Leave')}</span></button>` : ""}</div>`; }
 function clientPhaseRemaining() {
   const clock=game?.phaseClock;
@@ -542,7 +543,7 @@ async function logoutHost() {
   hostAccessToken='';hostToken='';playerToken='';playerId='';game=null;delegatedHostMode=false;
   const keys=[];for(let i=0;i<localStorage.length;i++)keys.push(localStorage.key(i));
   for(const key of keys)if(key==='mafia-host-access-token'||key==='mafia-session'||key.startsWith('mafia-session-'))localStorage.removeItem(key);
-  document.querySelector('.player-tools')?.remove();renderLanding();
+  removePlayerChrome();renderLanding();
 }
 function renderHostHome() {
  setRoomTag();
@@ -571,7 +572,7 @@ function home() {
   pollingEpoch++;
   warmApi();
   clearTimeout(pollTimer);
-  document.querySelector('.player-tools')?.remove();
+  removePlayerChrome();
   closeSheet();
   game = null;
   const roomCode = new URLSearchParams(location.search).get('room');
@@ -676,7 +677,7 @@ async function joinSpectator() {
   } catch { notice(discussionText('تأكد من كود الغرفة والاسم','Check the room code and name')); }
 }
 function renderSpectatorContent() {
-  document.querySelector('.player-tools')?.remove();
+  removePlayerChrome();
   setRoomTag(`👁️ ${game.code}`);
   $('#app').innerHTML = `${phaseBar()}<div class="grid"><div class="card hero"><div class="role-title">${phaseIcon()}</div><h1>${phaseName()}</h1><p class="muted" data-no-translate>${discussionText(game.me?.alive===false?'خرجت من المباراة. تتابع فقط، بدون كلام أو تصويت أو قدرات.':'متابعة الأحداث العامة فقط، بدون كشف الأدوار السرية.','Watch public events only. No talking, voting or role actions.')}</p>${game.phase==='finished'?`<h2>${winnerTitle()}</h2>`:''}${eventCards()}${game.phase==='day'?discussionPanel(false):''}</div><div class="card"><h2>اللاعبون (${game.players.length})</h2><div class="players">${playerList()}</div></div></div>`;
 }
@@ -1190,7 +1191,7 @@ function roleReveal() {
 function mafiaRoleClient(role){return role==='mafia'||role==='mafia_boss'}
 function renderPlayerContent() {
   setRoomTag();
-  document.querySelector('.player-tools')?.remove();
+  removePlayerChrome();
   const me = game.me;
   if (game.phase === 'lobby') {
     $('#app').innerHTML = `<div class="card hero"><div class="role-title">✅ ${discussionText('دخلت الغرفة','Joined the room')}</div><h2>${escapeHtml(me?.name || '')}</h2><p>${discussionText('انتظر المضيف لبدء القيم. انقطاع الاتصال المؤقت يحفظ مقعدك.','Wait for the host to start. A brief disconnect keeps your seat.')}</p><button class="btn" onclick="leaveRoom()">🚪 ${discussionText('مغادرة الغرفة','Leave room')}</button><div class="counter">${game.players.length}</div><p class="muted">${discussionText('لاعبون داخل الغرفة','Players joined')}</p>${me?.isHost?`<button class="btn gold" onclick="toggleDelegatedHost()">👑 ${discussionText('فتح تحكم المضيف','Open host controls')}</button>`:''}</div>`;
@@ -1226,14 +1227,28 @@ window.visualViewport?.addEventListener('scroll',syncVisibleViewport);
 window.addEventListener('resize',syncVisibleViewport);
 syncVisibleViewport();
 function mountPlayerTools(){
-  if(!game?.me?.alive||['lobby','reveal','finished'].includes(game.phase)||document.querySelector('.player-tools'))return;
-  const canChat=game.phase==='night'&&(game.me.jailed||game.me.role==='jailer'||game.me.role==='mafia'||game.me.role==='mafia_boss');
-  const tools=document.createElement('details');tools.className='player-tools';tools.innerHTML=`<summary>${discussionText('أدوات','Tools')}${canChat&&chatHasUnread()?' 🔴':''}</summary><div class="player-tools-list">${game.me.isHost?`<button type="button" onclick="toggleDelegatedHost()">👑 ${discussionText('تحكم','Host')}</button><button type="button" onclick="returnToLobby()">🏠 ${discussionText('اللوبي','Lobby')}</button>`:''}<button type="button" onclick="openWill()">📜 ${discussionText('وصية','Will')}</button>${canChat?`<button type="button" data-chat-button onclick="openChat()">💬 ${discussionText('محادثة','Chat')}${chatHasUnread()?' 🔴':''}</button>`:''}<button type="button" onclick="openReport()">🚩 ${discussionText('بلاغ','Report')}</button></div>`;document.querySelector('#app').appendChild(tools);
+  if(!game?.me?.alive||['lobby','reveal','finished'].includes(game.phase)||document.querySelector('.player-dock'))return;
+  const canChat=chatAllowed();
+  const unread=canChat&&chatHasUnread();
+  const host=game.me.isHost?`<button type="button" class="dock-item" onclick="toggleDelegatedHost()"><span class="dock-icon">👑</span><span>${discussionText('تحكم','Host')}</span></button>`:'';
+  const dock=document.createElement('nav');
+  dock.className='player-dock';
+  dock.setAttribute('aria-label',discussionText('شريط اللاعب','Player bar'));
+  dock.innerHTML=`<button type="button" class="dock-item" onclick="openMyRole()"><span class="dock-icon">🃏</span><span>${discussionText('دوري','Role')}</span></button>
+    <button type="button" class="dock-item" data-chat-button ${canChat?'':'disabled'} onclick="openChat()"><span class="dock-icon">💬</span><span>${discussionText('محادثة','Chat')}</span><i class="dock-badge" ${unread?'':'hidden'}></i></button>
+    <button type="button" class="dock-item" onclick="openWill()"><span class="dock-icon">📜</span><span>${discussionText('وصية','Will')}</span></button>
+    <button type="button" class="dock-item" onclick="openReport()"><span class="dock-icon">🚩</span><span>${discussionText('بلاغ','Report')}</span></button>${host}`;
+  document.body.append(dock);
+  document.body.classList.add('has-player-dock');
 }
-function toggleDelegatedHost(){delegatedHostMode=!delegatedHostMode;document.querySelector('.player-tools')?.remove();delegatedHostMode?renderHost():renderPlayer()}
+function openMyRole(){
+  if(!game?.me?.role)return;
+  openSheet(discussionText('دوري','My role'), interactiveRoleCard(game.me.role,{personal:true,reveal:true}));
+}
+function toggleDelegatedHost(){delegatedHostMode=!delegatedHostMode;removePlayerChrome();delegatedHostMode?renderHost():renderPlayer()}
 let sheetReturnFocus=null;
-function closeSheet(){stopChatPolling();const sheet=document.querySelector('.game-sheet');if(!sheet)return;sheet.remove();document.querySelector('.shell')?.removeAttribute('inert');document.querySelector('.utility-bar')?.removeAttribute('inert');if(sheetReturnFocus?.isConnected)sheetReturnFocus.focus();sheetReturnFocus=null;}
-function openSheet(title,body){closeSheet();sheetReturnFocus=document.activeElement;const sheet=document.createElement('div');sheet.className='game-sheet';sheet.innerHTML=`<div class="sheet-card" role="dialog" aria-modal="true" aria-labelledby="sheetTitle"><div class="toolbar"><h2 id="sheetTitle">${title}</h2><button aria-label="${discussionText('إغلاق','Close')}" class="close-sheet" onclick="closeSheet()">×</button></div>${body}</div>`;document.body.appendChild(sheet);document.querySelector('.shell')?.setAttribute('inert','');document.querySelector('.utility-bar')?.setAttribute('inert','');sheet.querySelector('.close-sheet').focus();
+function closeSheet(){stopChatPolling();const sheet=document.querySelector('.game-sheet');if(!sheet)return;sheet.remove();document.querySelector('.shell')?.removeAttribute('inert');document.querySelector('.utility-bar')?.removeAttribute('inert');document.querySelector('.player-dock')?.removeAttribute('inert');if(sheetReturnFocus?.isConnected)sheetReturnFocus.focus();sheetReturnFocus=null;}
+function openSheet(title,body){closeSheet();sheetReturnFocus=document.activeElement;const sheet=document.createElement('div');sheet.className='game-sheet';sheet.innerHTML=`<div class="sheet-card" role="dialog" aria-modal="true" aria-labelledby="sheetTitle"><div class="toolbar"><h2 id="sheetTitle">${title}</h2><button aria-label="${discussionText('إغلاق','Close')}" class="close-sheet" onclick="closeSheet()">×</button></div>${body}</div>`;document.body.appendChild(sheet);document.querySelector('.shell')?.setAttribute('inert','');document.querySelector('.utility-bar')?.setAttribute('inert','');document.querySelector('.player-dock')?.setAttribute('inert','');sheet.querySelector('.close-sheet').focus();
  sheet.addEventListener('keydown',event=>{
  if(event.key==='Escape'){event.preventDefault();closeSheet();return;}
  if(event.key!=='Tab')return;
@@ -1255,7 +1270,15 @@ let unreadChat=false,chatNoticeAt=0,chatNoticePending=false;
 function chatReadKey(){return `mafia-chat-read-${game?.code}-${playerId}-${game?.round}-${game?.me?.jailed||game?.me?.role==='jailer'?'jail':'mafia'}`;}
 function chatHasUnread(){return unreadChat&&chatAllowed();}
 function chatButtonLabel(unread=false){return `💬 ${discussionText('محادثة','Chat')}${unread?' •':''}`;}
-function markChatRead(messages){const latest=messages?.at(-1);if(latest)localStorage.setItem(chatReadKey(),String(latest.id));unreadChat=false;document.querySelector('[data-chat-button]')?.replaceChildren(document.createTextNode(chatButtonLabel()));}
+function paintChatDock(){
+  const button=document.querySelector('[data-chat-button]');
+  if(!button)return;
+  const unread=chatHasUnread();
+  button.classList.toggle('has-unread',unread);
+  const badge=button.querySelector('.dock-badge');
+  if(badge)badge.hidden=!unread;
+}
+function markChatRead(messages){const latest=messages?.at(-1);if(latest)localStorage.setItem(chatReadKey(),String(latest.id));unreadChat=false;paintChatDock();}
 async function pollChatNotification(){
  if(!chatAllowed()||document.querySelector('.chat-list')||chatNoticePending||Date.now()-chatNoticeAt<5000)return;
  chatNoticeAt=Date.now();chatNoticePending=true;const key=chatReadKey(),epoch=pollingEpoch;
@@ -1263,7 +1286,7 @@ async function pollChatNotification(){
   if(epoch!==pollingEpoch||key!==chatReadKey()||!chatAllowed())return;
   const seen=Number(localStorage.getItem(key)||0);
   unreadChat=(result.messages||[]).some(m=>Number(m.id)>seen&&m.author_id!==playerId);
-  const button=document.querySelector('[data-chat-button]');if(button)button.textContent=chatButtonLabel(unreadChat);
+  paintChatDock();
  }catch{}finally{chatNoticePending=false;}
 }
 let chatCache=[],chatOlderCursor=null,chatHasOlder=false,chatLoadingOlder=false;
@@ -1530,7 +1553,7 @@ function eliminationNotice() {
 function renderPendingShot(controller=false) {
   const shot=game?.pendingShot;
   if(!shot || game.phase==='finished')return false;
-  document.querySelector('.player-tools')?.remove();
+  removePlayerChrome();
   if(document.querySelector('.game-sheet'))closeSheet();
   if(shot.resolving){$('#app').innerHTML=`<section class="card" data-no-translate><p>${discussionText('جاري تنفيذ الطلقة الأخيرة…','Resolving the final shot…')}</p>${shot.target?`<button class="btn" onclick="takeLastShot(${jsArg(shot.target)})">${discussionText('إعادة المحاولة إذا تأخر التنفيذ','Retry if resolution stalls')}</button>`:''}</section>`;return true;}
   const canShoot=game.me?.id===shot.playerId || (controller&&game.players.find(p=>p.id===shot.playerId)?.isBot);
