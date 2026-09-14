@@ -1031,7 +1031,5 @@ body.app-shell h1,body.app-shell h2,body.app-shell h3{font-weight:800}
   body.app-shell .auth-card{max-width:480px!important;margin-inline:0!important}
 }
 
-@media(display-mode:standalone),(display-mode:fullscreen){
-  body.app-shell .header{padding-top:max(12px,env(safe-area-inset-top))}
-}
+body.app-shell .chat-launch{margin:0 0 12px}
 

@@ -1260,10 +1260,16 @@ function chatReadKey(){return `mafia-chat-read-${game?.code}-${playerId}-${game?
 function chatHasUnread(){return unreadChat&&chatAllowed();}
 function chatButtonLabel(unread=false){return `💬 ${discussionText('محادثة','Chat')}${unread?' •':''}`;}
 function paintChatDock(){
-  const button=document.querySelector('[data-chat-button]');
-  if(button)button.textContent=chatButtonLabel(chatHasUnread());
+  const unread=chatHasUnread();
+  for(const button of document.querySelectorAll('[data-chat-button]')){
+    if(button.classList.contains('chat-launch')){
+      const jailed=!!game?.me?.jailed;
+      const label=jailed||game?.me?.role==='jailer'?discussionText('محادثة السجن','Jail chat'):discussionText('محادثة المافيا','Mafia chat');
+      button.textContent=`${unread?'🔴 ':''}💬 ${label}`;
+    }else button.textContent=chatButtonLabel(unread);
+  }
   const summary=document.querySelector('.player-tools>summary');
-  if(summary)summary.textContent=`${discussionText('أدوات','Tools')}${chatHasUnread()?' 🔴':''}`;
+  if(summary)summary.textContent=`${discussionText('أدوات','Tools')}${unread?' 🔴':''}`;
 }
 function markChatRead(messages){const latest=messages?.at(-1);if(latest)localStorage.setItem(chatReadKey(),String(latest.id));unreadChat=false;paintChatDock();}
 async function pollChatNotification(){
@@ -1447,6 +1453,12 @@ function renderNight() {
 
 function firstNightOnly(){return game?.phase==='night'&&game.round===1}
 function firstNightLabel(){return discussionText('الليلة الأولى: للمحقق فقط','First night: detective only')}
+function nightChatBar(){
+  if(!chatAllowed())return '';
+  const jailed=!!game.me.jailed;
+  const label=jailed?discussionText('محادثة السجن','Jail chat'):game.me.role==='jailer'?discussionText('محادثة السجن','Jail chat'):discussionText('محادثة المافيا','Mafia chat');
+  return `<button type="button" class="btn gold wide chat-launch" data-chat-button onclick="openChat()">${chatHasUnread()?'🔴 ':''}💬 ${label}</button>`;
+}
 function wrapCyclePlay(cycle, actionHtml) {
   const isDay = cycle === 'day';
   const isNight = cycle === 'night';
@@ -1456,7 +1468,7 @@ function wrapCyclePlay(cycle, actionHtml) {
   const hasPick = /class="[^"]*\bpick\b/.test(actionHtml);
   const talkBlock = !talk ? '' : (draw ? talk : `<details class="cycle-talk" data-disclosure-key="cycle-talk"${hasPick?'':' open'}><summary>${discussionText('النقاش','Discussion')}</summary>${talk}</details>`);
   const extra = isNight || isDay ? bossDiscussionChoice() : '';
-  return `${phaseBar()}<div class="phase-play ${cycle}-play">${isDay?morningBriefPanel():''}${isDay&&game.me?.role==='detective'?investigationPanel():''}${extra}<section class="cycle-action">${actionHtml}</section>${talkBlock}</div>`;
+  return `${phaseBar()}<div class="phase-play ${cycle}-play">${isNight?nightChatBar():''}${isDay?morningBriefPanel():''}${isDay&&game.me?.role==='detective'?investigationPanel():''}${extra}<section class="cycle-action">${actionHtml}</section>${talkBlock}</div>`;
 }
 function morningBriefPanel(embedded=false) {
   const deaths = (game.lastDeaths || []).map((id) => `<div class="event danger-text">☠️ ${escapeHtml(nameOf(id))}</div>`).join('');
