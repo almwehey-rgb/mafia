@@ -75,12 +75,13 @@ function iWasEliminated(prevAlive){
   const me=impactSelfId();
   if(!me)return false;
   if((game.lastDeaths||[]).includes(me))return true;
-  if((game.eliminations||[]).some(p=>p.id===me))return true;
+  if(game.lastEliminated===me)return true;
+  if((game.eliminations||[]).some(p=>p.id===me && Number(p.round)===Number(game.round)))return true;
   return prevAlive===true && game.me?.alive===false;
 }
 function maybeImpact(prevAlive){
-  if(!game?.lastEvent)return;
-  const sig=`${game.matchId||game.code}|${game.round}|${game.lastEvent}|${game.lastSaved}|${(game.lastDeaths||[]).join(',')}`;
+  if(!game?.lastEvent && prevAlive!==true)return;
+  const sig=`${game.matchId||game.code}|${game.round}|${game.lastEvent}|${game.lastSaved}|${(game.lastDeaths||[]).join(',')}|${game.lastEliminated||''}|${game.me?.alive}`;
   if(sig===lastImpactSig)return;
   const first=!lastImpactSig;
   lastImpactSig=sig;
@@ -89,7 +90,7 @@ function maybeImpact(prevAlive){
   const deathNews=events.some(e=>IMPACT_DEATH.has(e));
   const saveNews=events.some(e=>IMPACT_SAVE.has(e));
   const victim=iWasEliminated(prevAlive);
-  if((deathNews||prevAlive===true&&game.me?.alive===false)&&victim)playImpact('death');
+  if(victim&&(deathNews||prevAlive===true&&game.me?.alive===false))playImpact('death');
   else if(saveNews)playImpact('save');
 }
 function phaseIcon(phase = game?.phase) { return ({ lobby: '🎴', reveal: '👁️', night: '🌙', day: '☀️', nomination: '☝️', trial: '⚖️', verdict: '🔨', vote: '🗳️', paused: '⏸️', finished: '🏆' })[phase] || '🎭'; }
