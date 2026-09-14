@@ -1227,17 +1227,28 @@ window.visualViewport?.addEventListener('scroll',syncVisibleViewport);
 window.addEventListener('resize',syncVisibleViewport);
 syncVisibleViewport();
 function mountPlayerTools(){
-  if(!game?.me?.alive||['lobby','reveal','finished'].includes(game.phase)||document.querySelector('.player-tools'))return;
+  if(!game?.me?.alive||['lobby','reveal','finished'].includes(game.phase)||document.querySelector('.player-dock'))return;
   const canChat=chatAllowed();
-  const tools=document.createElement('details');
-  tools.className='player-tools';
-  tools.innerHTML=`<summary>${discussionText('أدوات','Tools')}${canChat&&chatHasUnread()?' 🔴':''}</summary><div class="player-tools-list">${game.me.isHost?`<button type="button" onclick="toggleDelegatedHost()">👑 ${discussionText('تحكم','Host')}</button><button type="button" onclick="returnToLobby()">🏠 ${discussionText('اللوبي','Lobby')}</button>`:''}<button type="button" onclick="openWill()">📜 ${discussionText('وصية','Will')}</button>${canChat?`<button type="button" data-chat-button onclick="openChat()">${chatButtonLabel(chatHasUnread())}</button>`:''}<button type="button" onclick="openReport()">🚩 ${discussionText('بلاغ','Report')}</button></div>`;
-  document.querySelector('#app').appendChild(tools);
+  const unread=canChat&&chatHasUnread();
+  const host=game.me.isHost?`<button type="button" class="dock-item" onclick="toggleDelegatedHost()"><span class="dock-icon">👑</span><span>${discussionText('تحكم','Host')}</span></button>`:'';
+  const dock=document.createElement('nav');
+  dock.className='player-dock';
+  dock.setAttribute('aria-label',discussionText('شريط اللاعب','Player bar'));
+  dock.innerHTML=`<button type="button" class="dock-item" onclick="openMyRole()"><span class="dock-icon">🃏</span><span>${discussionText('دوري','Role')}</span></button>
+    <button type="button" class="dock-item" data-chat-button ${canChat?'':'disabled'} onclick="openChat()"><span class="dock-icon">💬</span><span>${discussionText('محادثة','Chat')}</span><i class="dock-badge" ${unread?'':'hidden'}></i></button>
+    <button type="button" class="dock-item" onclick="openWill()"><span class="dock-icon">📜</span><span>${discussionText('وصية','Will')}</span></button>
+    <button type="button" class="dock-item" onclick="openReport()"><span class="dock-icon">🚩</span><span>${discussionText('بلاغ','Report')}</span></button>${host}`;
+  document.body.append(dock);
+  document.body.classList.add('has-player-dock');
+}
+function openMyRole(){
+  if(!game?.me?.role)return;
+  openSheet(discussionText('دوري','My role'), interactiveRoleCard(game.me.role,{personal:true,reveal:true}));
 }
 function toggleDelegatedHost(){delegatedHostMode=!delegatedHostMode;removePlayerChrome();delegatedHostMode?renderHost():renderPlayer()}
 let sheetReturnFocus=null;
-function closeSheet(){stopChatPolling();const sheet=document.querySelector('.game-sheet');if(!sheet)return;sheet.remove();document.querySelector('.shell')?.removeAttribute('inert');document.querySelector('.utility-bar')?.removeAttribute('inert');if(sheetReturnFocus?.isConnected)sheetReturnFocus.focus();sheetReturnFocus=null;}
-function openSheet(title,body){closeSheet();sheetReturnFocus=document.activeElement;const sheet=document.createElement('div');sheet.className='game-sheet';sheet.innerHTML=`<div class="sheet-card" role="dialog" aria-modal="true" aria-labelledby="sheetTitle"><div class="toolbar"><h2 id="sheetTitle">${title}</h2><button aria-label="${discussionText('إغلاق','Close')}" class="close-sheet" onclick="closeSheet()">×</button></div>${body}</div>`;document.body.appendChild(sheet);document.querySelector('.shell')?.setAttribute('inert','');document.querySelector('.utility-bar')?.setAttribute('inert','');sheet.querySelector('.close-sheet').focus();
+function closeSheet(){stopChatPolling();const sheet=document.querySelector('.game-sheet');if(!sheet)return;sheet.remove();document.querySelector('.shell')?.removeAttribute('inert');document.querySelector('.utility-bar')?.removeAttribute('inert');document.querySelector('.player-dock')?.removeAttribute('inert');if(sheetReturnFocus?.isConnected)sheetReturnFocus.focus();sheetReturnFocus=null;}
+function openSheet(title,body){closeSheet();sheetReturnFocus=document.activeElement;const sheet=document.createElement('div');sheet.className='game-sheet';sheet.innerHTML=`<div class="sheet-card" role="dialog" aria-modal="true" aria-labelledby="sheetTitle"><div class="toolbar"><h2 id="sheetTitle">${title}</h2><button aria-label="${discussionText('إغلاق','Close')}" class="close-sheet" onclick="closeSheet()">×</button></div>${body}</div>`;document.body.appendChild(sheet);document.querySelector('.shell')?.setAttribute('inert','');document.querySelector('.utility-bar')?.setAttribute('inert','');document.querySelector('.player-dock')?.setAttribute('inert','');sheet.querySelector('.close-sheet').focus();
  sheet.addEventListener('keydown',event=>{
  if(event.key==='Escape'){event.preventDefault();closeSheet();return;}
  if(event.key!=='Tab')return;
@@ -1262,14 +1273,16 @@ function chatButtonLabel(unread=false){return `💬 ${discussionText('محادث
 function paintChatDock(){
   const unread=chatHasUnread();
   for(const button of document.querySelectorAll('[data-chat-button]')){
-    if(button.classList.contains('chat-launch')){
+    if(button.classList.contains('dock-item')){
+      button.classList.toggle('has-unread',unread);
+      const badge=button.querySelector('.dock-badge');
+      if(badge)badge.hidden=!unread;
+    }else if(button.classList.contains('chat-launch')){
       const jailed=!!game?.me?.jailed;
       const label=jailed||game?.me?.role==='jailer'?discussionText('محادثة السجن','Jail chat'):discussionText('محادثة المافيا','Mafia chat');
       button.textContent=`${unread?'🔴 ':''}💬 ${label}`;
     }else button.textContent=chatButtonLabel(unread);
   }
-  const summary=document.querySelector('.player-tools>summary');
-  if(summary)summary.textContent=`${discussionText('أدوات','Tools')}${unread?' 🔴':''}`;
 }
 function markChatRead(messages){const latest=messages?.at(-1);if(latest)localStorage.setItem(chatReadKey(),String(latest.id));unreadChat=false;paintChatDock();}
 async function pollChatNotification(){
