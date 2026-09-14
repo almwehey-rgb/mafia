@@ -1581,10 +1581,32 @@ function squareEventLine(event){
   if(event==='escort_blocked')return discussionText('المعطّل عطّل قدرة لاعب هذه الليلة.','The Escort blocked a player tonight.');
   return eventLabel(event);
 }
+function mySpeakTurn(){
+  if(!game?.me?.alive||!['day','trial'].includes(game.phase))return false;
+  const view=typeof clientDiscussion==='function'?clientDiscussion():{};
+  if(view.mode!=='turns'||view.status!=='active'||typeof openingDrawActive==='function'&&openingDrawActive(view))return false;
+  return view.speakerId===playerId;
+}
+function speakTurnHtml(){
+  if(!mySpeakTurn())return '';
+  const view=clientDiscussion();
+  return `<section class="speak-turn" data-no-translate><h2>${discussionText('دورك في النقاش','Your turn to speak')}</h2><p>${discussionText('تكلم الآن. إذا خلصت أو ما تبي تكمل، اضغط تخطي.','Speak now. If you are done or do not want to continue, tap Skip.')}</p><div class="discussion-clock" role="timer">${formatDiscussionTime(view.remainingMs)}</div><button class="btn gold wide" type="button" onclick="discussionAction('passDiscussion')">⏭️ ${discussionText('تخطي','Skip')}</button></section>`;
+}
 function nowTaskHtml(){
   const hint=typeof playerTaskHint==='function'?playerTaskHint():'';
   if(!hint)return '';
   return `<div class="square-block square-now"><h3>${discussionText('المطلوب الآن','Now')}</h3><p>${escapeHtml(hint)}</p></div>`;
+}
+let speakSyncKey='';
+let speakSyncBusy=false;
+function syncSpeakTurn(view){
+  if(speakSyncBusy||!game?.me?.alive||hostToken||delegatedHostMode)return;
+  const key=`${game.phase}:${view?.speakerId||''}:${view?.status||''}:${mySpeakTurn()}`;
+  if(key===speakSyncKey)return;
+  speakSyncKey=key;
+  if(!['day','trial'].includes(game.phase))return;
+  speakSyncBusy=true;
+  try{renderPlayer();}finally{speakSyncBusy=false;}
 }
 function squarePanelHtml(voteBody=''){
   const view=typeof clientDiscussion==='function'?clientDiscussion():{status:'off'};
@@ -1605,23 +1627,25 @@ function squarePanelHtml(voteBody=''){
   const news=String(game.lastEvent||'').split(',').filter(Boolean).map(e=>`<p>${squareEventLine(e)}</p>`).join('');
   const announce=news?`<div class="square-block"><h3>${discussionText('الإعلان','Announcements')}</h3>${news}</div>`:'';
   const vote=voteBody?`<div class="square-block"><h3>${discussionText('التصويت','Vote')}</h3>${voteBody}</div>`:'';
-  return [nowTaskHtml(),speaker&&`<div class="square-block">${speaker}</div>`,announce,dead,vote].filter(Boolean).join('')||`<p class="muted">${discussionText('ما فيه خبر الحين.','Nothing to show yet.')}</p>`;
+  return [speakTurnHtml(),nowTaskHtml(),speaker&&`<div class="square-block">${speaker}</div>`,announce,dead,vote].filter(Boolean).join('')||`<p class="muted">${discussionText('ما فيه خبر الحين.','Nothing to show yet.')}</p>`;
 }
 function wrapCyclePlay(cycle, actionHtml) {
   const isDay = cycle === 'day';
   const isNight = cycle === 'night';
   const extra = isNight || isDay ? bossDiscussionChoice() : '';
+  const speak=speakTurnHtml();
   const detectHits=(game.me?.investigationResults||[]).filter(r=>r.round===game.round);
   const detect=isDay&&game.me?.role==='detective'?investigationPanel():'';
   const action=extractDockAction(actionHtml);
   const votes=voteSummaryCard();
   const voteNeed=['nomination','vote','verdict','trial'].includes(game.phase);
-  const abilityTitle=voteNeed?(detectHits.length?discussionText('نتيجة الفحص','Investigation result'):discussionText('قدرتي','Ability')):(roleActTitle()||discussionText('قدرتي','Ability'));
-  const abilityBody=voteNeed?detect:[detect,extra,action].filter(Boolean).join('');
+  const abilityTitle=speak?discussionText('دورك في النقاش','Your turn to speak'):(voteNeed?(detectHits.length?discussionText('نتيجة الفحص','Investigation result'):discussionText('قدرتي','Ability')):(roleActTitle()||discussionText('قدرتي','Ability')));
+  const abilityBody=[speak,voteNeed?detect:[detect,extra,action].filter(Boolean).join('')].filter(Boolean).join('');
   const voteBody=voteNeed?[action,votes].filter(Boolean).join(''):votes;
   const squareBody=squarePanelHtml(voteBody);
-  const auto=detectHits.length||dockHasAction(voteNeed?detect:[extra,action].join(''))?'ability':'none';
-  const key=[game.matchId,game.round,game.phase,detectHits.length,!!game.voteSummary,(game.lastDeaths||[]).join(',')].join('|');
+  const view=typeof clientDiscussion==='function'?clientDiscussion():{};
+  const auto=speak||detectHits.length||dockHasAction(voteNeed?detect:[extra,action].join(''))?'ability':'none';
+  const key=[game.matchId,game.round,game.phase,detectHits.length,!!game.voteSummary,(game.lastDeaths||[]).join(','),view.speakerId||'',speak].join('|');
   if(key!==dockAutoKey){dockAutoKey=key;pendingDockPlay.tab=auto;}
   if(pendingDockPlay.tab==='square'||pendingDockPlay.tab==='vote')pendingDockPlay.tab='none';
   pendingDockPlay={...pendingDockPlay,abilityTitle,abilityBody,voteBody,squareBody};
@@ -1829,6 +1853,7 @@ function playerTaskHint() {
     return discussionText('لا توجد قدرة ليلية لك الآن. انتظر الصباح.','You have no night action now. Wait for morning.');
   }
   if(game.phase==='day') {
+    if(mySpeakTurn())return discussionText('دورك تتكلم الآن. تقدر تتخطى بعد ما تخلص.','It is your turn to speak. You can skip when you are done.');
     if(me.role==='jailer')return me.jailerSelected?discussionText('تم اختيار السجين. شارك في النقاش وانتظر التصويت.','Prisoner selected. Join discussion and wait for voting.'):discussionText('اختر لاعبًا ليسجن في الليلة القادمة.','Choose one player to jail tonight.');
     if(me.role==='lawyer')return me.acted?discussionText('تم تسجيل حماية التصويت. شارك في النقاش.','Vote protection recorded. Join discussion.'):discussionText('اختر لاعبًا لتحميه من نتيجة التصويت.','Choose one player to protect from voting.');
     return discussionText('شارك في النقاش وراقب التناقضات حتى يبدأ التصويت.','Join discussion and watch for contradictions until voting starts.');

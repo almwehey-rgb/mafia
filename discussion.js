@@ -72,20 +72,23 @@ function formatDiscussionTime(milliseconds) {
   return `${Math.floor(seconds/60)}:${String(seconds%60).padStart(2,'0')}`;
 }
 function updateDiscussionClocks() {
-  const panel = document.querySelector('.discussion-panel');
-  if (!panel || !game) return;
+  if (!game) return;
   const view = clientDiscussion();
-  const signature = `${view.id}:${view.status}:${view.speakerId}:${view.order?.join(',')}:${Boolean(openingDrawActive(view))}:${localStorage.getItem('mafia-lang')}`;
-  if (panel.dataset.signature !== signature) {
-    const controller = panel.dataset.controller === 'true';
-    panel.outerHTML = discussionPanel(controller);
-    const updated = document.querySelector('.discussion-panel');
-    if (updated) updated.dataset.signature = signature;
+  const panel = document.querySelector('.discussion-panel');
+  if (panel) {
+    const signature = `${view.id}:${view.status}:${view.speakerId}:${view.order?.join(',')}:${Boolean(openingDrawActive(view))}:${localStorage.getItem('mafia-lang')}`;
+    if (panel.dataset.signature !== signature) {
+      const controller = panel.dataset.controller === 'true';
+      panel.outerHTML = discussionPanel(controller);
+      const updated = document.querySelector('.discussion-panel');
+      if (updated) updated.dataset.signature = signature;
+    }
   }
-  const clock = document.querySelector('.discussion-clock');
-  if (clock) { clock.textContent = formatDiscussionTime(view.remainingMs); clock.classList.toggle('urgent',view.remainingMs<=10000); }
+  const clock = document.querySelectorAll('.discussion-clock');
+  for(const el of clock){ el.textContent = formatDiscussionTime(view.remainingMs); el.classList.toggle('urgent',view.remainingMs<=10000); }
   const vote = document.querySelector('[data-discussion-vote]');
   if (vote) vote.disabled = !(view.complete && ((game.lawyerReady && game.jailerReady) || phaseTimeExpired()));
+  if(typeof syncSpeakTurn==='function')syncSpeakTurn(view);
 }
 async function discussionAction(action, operation) {
   if (discussionRequestPending) return;
