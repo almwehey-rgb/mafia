@@ -1078,7 +1078,22 @@ body.has-player-dock:has(.dock-play) .journey-hint{display:none}
 .player-dock .dock-item.has-unread .dock-badge{display:block;animation:dock-unread 1.2s ease-in-out infinite}
 .player-dock .dock-item:disabled{opacity:.45}
 @keyframes dock-unread{50%{transform:scale(1.25);box-shadow:0 0 0 2px #0c0e0d,0 0 8px #e23d4a}}
-body.has-player-dock .shell{padding-bottom:calc(80px + env(safe-area-inset-bottom))!important}
+body.impact-death,body.impact-save{animation:impact-shake .75s cubic-bezier(.36,.07,.19,.97) both}
+body.impact-death::before,body.impact-save::before{content:'';position:fixed;inset:0;z-index:240;pointer-events:none;animation:impact-flash .75s ease-out both}
+body.impact-death::before{background:radial-gradient(circle at center,transparent 30%,#7a102288 100%)}
+body.impact-save::before{background:radial-gradient(circle at center,transparent 35%,#c9a22777 100%)}
+@keyframes impact-shake{
+  0%,100%{transform:translate(0)}
+  12%{transform:translate(-14px,8px) rotate(-1.2deg)}
+  24%{transform:translate(16px,-10px) rotate(1.4deg)}
+  36%{transform:translate(-12px,-7px) rotate(-.8deg)}
+  48%{transform:translate(13px,9px) rotate(1deg)}
+  60%{transform:translate(-8px,4px) rotate(-.5deg)}
+  72%{transform:translate(7px,-3px)}
+  84%{transform:translate(-3px,2px)}
+}
+@keyframes impact-flash{0%{opacity:1}100%{opacity:0}}
+html.reduce-motion body.impact-death,html.reduce-motion body.impact-save,html.reduce-motion body.impact-death::before,html.reduce-motion body.impact-save::before{animation:none}
 body.light .player-dock:has(.dock-play){background:#f4ebd8f5}
 body.light .player-dock .dock-item{color:#5a431c}
 body.light .player-dock .dock-item.dock-home-tab{background:transparent;color:#8a5a12;border-color:#b8892a}

@@ -46,6 +46,41 @@ function signalPhase() {
     oscillator.start(); oscillator.stop(context.currentTime + .28);
   } catch {}
 }
+const IMPACT_DEATH=new Set(['mafia_kill','serial_kill','witch_poison','jailer_executed','vigilante_kill','lovers_died','vote_eliminated','trial_guilty','host_expelled','jester_won']);
+const IMPACT_SAVE=new Set(['doctor_saved','jail_saved','witch_saved','lawyer_saved']);
+let lastImpactSig='';
+function playImpact(kind){
+  const death=kind==='death';
+  if(navigator.vibrate)navigator.vibrate(death?[80,40,160,40,280,60,420]:[50,40,90,40,140,50,220]);
+  document.body.classList.remove('impact-death','impact-save');
+  void document.body.offsetWidth;
+  document.body.classList.add(death?'impact-death':'impact-save');
+  setTimeout(()=>document.body.classList.remove('impact-death','impact-save'),900);
+  if(!soundEnabled)return;
+  try{
+    const context=new (window.AudioContext || window.webkitAudioContext)();
+    const oscillator=context.createOscillator();
+    const gain=context.createGain();
+    oscillator.type=death?'sawtooth':'triangle';
+    oscillator.frequency.setValueAtTime(death?90:420,context.currentTime);
+    oscillator.frequency.exponentialRampToValueAtTime(death?40:280,context.currentTime+(death?0.45:0.28));
+    gain.gain.setValueAtTime(death?0.16:0.1,context.currentTime);
+    gain.gain.exponentialRampToValueAtTime(.001,context.currentTime+(death?0.5:0.32));
+    oscillator.connect(gain).connect(context.destination);
+    oscillator.start();oscillator.stop(context.currentTime+(death?0.52:0.34));
+  }catch{}
+}
+function maybeImpact(){
+  if(!game?.lastEvent)return;
+  const sig=`${game.matchId||game.code}|${game.round}|${game.lastEvent}|${(game.lastDeaths||[]).join(',')}`;
+  if(sig===lastImpactSig)return;
+  const first=!lastImpactSig;
+  lastImpactSig=sig;
+  if(first)return;
+  const events=String(game.lastEvent).split(',').filter(Boolean);
+  if(events.some(e=>IMPACT_DEATH.has(e)))playImpact('death');
+  else if(events.some(e=>IMPACT_SAVE.has(e)))playImpact('save');
+}
 function phaseIcon(phase = game?.phase) { return ({ lobby: '🎴', reveal: '👁️', night: '🌙', day: '☀️', nomination: '☝️', trial: '⚖️', verdict: '🔨', vote: '🗳️', paused: '⏸️', finished: '🏆' })[phase] || '🎭'; }
 function phaseName(phase = game?.phase) { return ({ lobby: discussionText('الانتظار','Lobby'), reveal: discussionText('كشف الأدوار','Role reveal'), night: discussionText('الليل','Night'), day: discussionText('الصباح','Morning'), nomination: discussionText('الترشيح','Nomination'), trial: discussionText('المحاكمة','Trial'), verdict: discussionText('الحكم','Verdict'), vote: discussionText('التصويت','Voting'), paused: discussionText('متوقفة مؤقتًا','Paused'), finished: discussionText('النهاية','Results') })[phase] || ''; }
 function lobbyIcon(name){const paths={wait:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',admin:'<path d="M12 3 4 6v6c0 5 8 9 8 9s8-4 8-9V6z"/><path d="m8 12 3 3 5-6"/>',shield:'<path d="M12 3 4 6v6c0 5 8 9 8 9s8-4 8-9V6z"/>',leave:'<path d="M9 4H4v16h5M10 12h11m-4-4 4 4-4 4"/>',back:'<path d="M5 12h14m-6-6 6 6-6 6"/>',share:'<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>',bots:'<rect x="3" y="3" width="18" height="18" rx="3"/><path d="M7 7h.1M17 7h.1M12 12h.1M7 17h.1M17 17h.1"/>',user:'<circle cx="12" cy="7" r="4"/><path d="M4 21v-2a8 8 0 0 1 16 0v2"/>',play:'<path d="m7 3 14 9L7 21V3Z"/>',pause:'<path d="M7 4v16M17 4v16"/>',camera:'<rect x="6" y="2" width="12" height="20" rx="2"/><path d="M10 18h4"/>'};return '<svg class="lobby-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+paths[name]+'</svg>'}
@@ -701,7 +736,7 @@ function renderSpectatorContent() {
   setRoomTag(`👁️ ${game.code}`);
   $('#app').innerHTML = `${phaseBar()}<div class="grid"><div class="card hero"><div class="role-title">${phaseIcon()}</div><h1>${phaseName()}</h1><p class="muted" data-no-translate>${discussionText(game.me?.alive===false?'خرجت من المباراة. تتابع فقط، بدون كلام أو تصويت أو قدرات.':'متابعة الأحداث العامة فقط، بدون كشف الأدوار السرية.','Watch public events only. No talking, voting or role actions.')}</p>${game.phase==='finished'?`<h2>${winnerTitle()}</h2>`:''}${eventCards()}${game.phase==='day'?discussionPanel(false):''}</div><div class="card"><h2>اللاعبون (${game.players.length})</h2><div class="players">${playerList()}</div></div></div>`;
 }
-function startSpectatorPolling(){clearTimeout(pollTimer);pollFails=0;const epoch=++pollingEpoch;const tick=async()=>{try{const next=await api({action:'spectatorState',code:game.code,id:spectatorId,spectatorToken});if(epoch!==pollingEpoch)return;pollFails=0;const changed=renderStateKey(next)!==renderStateKey(game);game=next;setReconnect(false);if(changed)renderSpectator()}catch{if(epoch===pollingEpoch){pollFails++;if(pollFails>=2)setReconnect(true)}}finally{if(epoch===pollingEpoch)pollTimer=setTimeout(tick,2000)}};pollTimer=setTimeout(tick,700)}
+function startSpectatorPolling(){clearTimeout(pollTimer);pollFails=0;const epoch=++pollingEpoch;const tick=async()=>{try{const next=await api({action:'spectatorState',code:game.code,id:spectatorId,spectatorToken});if(epoch!==pollingEpoch)return;pollFails=0;const changed=renderStateKey(next)!==renderStateKey(game);game=next;maybeImpact();setReconnect(false);if(changed)renderSpectator()}catch{if(epoch===pollingEpoch){pollFails++;if(pollFails>=2)setReconnect(true)}}finally{if(epoch===pollingEpoch)pollTimer=setTimeout(tick,2000)}};pollTimer=setTimeout(tick,700)}
 function replacementForm() {
   setRoomTag('🔄');
   $('#app').innerHTML = noirPageFrame(`<h1>${discussionText('استبدال لاعب','Replace player')}</h1><p class="muted">${discussionText('خذ رمز الاستبدال من المضيف.','Get the replacement code from the host.')}</p><label for="roomCode">${discussionText('كود الغرفة','Room code')}</label><input class="input" id="roomCode" inputmode="numeric" maxlength="4" dir="ltr" placeholder="1234"><label for="replacementCode">${discussionText('رمز الاستبدال','Replacement code')}</label><input class="input" id="replacementCode" maxlength="8" dir="ltr"><label for="playerName">${discussionText('اسم اللاعب الجديد','New player name')}</label><input class="input" id="playerName" maxlength="20" autocomplete="name"><button class="btn red wide" type="button" onclick="claimSeat()">${discussionText('استلام مكان اللاعب','Take player seat')}</button>`);
@@ -825,6 +860,7 @@ function startPolling(host) {
       const changed = renderStateKey(next) !== renderStateKey(game);
       if (host && next.canControl === false) { host=false;hostToken='';saveSession(false); }
       game = next;
+      maybeImpact();
       if(previousChatKey!==chatReadKey()){unreadChat=false;if(document.querySelector('.chat-list'))closeSheet();}
       if (previousPhase && previousPhase !== next.phase) signalPhase();
       if (document.querySelector('.chat-list') && !chatAllowed()) closeSheet();
@@ -1170,6 +1206,7 @@ async function startGame() {
   enabledRoles.phase_seconds=phaseDuration;
   try {
     game = await withBusy(discussionText('جاري توزيع الأدوار…','Dealing roles…'), () => api({ action: 'start', code: game.code, lifecycleVersion:game.lifecycleVersion, hostToken, id:playerId, playerToken, mafiaCount, detectiveCount, detectiveQuestions, enabledRoles }));
+    lastImpactSig='';
     localHistory = []; localStorage.removeItem(`mafia-history-${game.code}`);
     signalPhase(); rememberEvent();
     renderHost();
@@ -1177,7 +1214,7 @@ async function startGame() {
   finally { lifecycleRequestPending = false; }
 }
 async function hostAction(action) {
-  try { const previous=game.phase; game = await api({ action, code: game.code, hostToken, id:playerId, playerToken }); if(previous!==game.phase)signalPhase(); rememberEvent(); renderHost(); }
+  try { const previous=game.phase; game = await api({ action, code: game.code, hostToken, id: playerId, playerToken }); if(previous!==game.phase)signalPhase(); maybeImpact(); rememberEvent(); renderHost(); }
   catch (error) { notice(error.code === 'STALE_GAME' ? 'تغيّرت حالة الغرفة أثناء الطلب. انتظر تحديث الشاشة ثم حاول مجددًا.' : error.code === 'WAITING_ACTIONS' ? 'بانتظار بقية اختيارات الليل' : 'بانتظار بقية اللاعبين'); }
 }
 async function kickPlayer(target){if(!confirm(discussionText('طرد اللاعب ','Remove player ')+nameOf(target)+discussionText(' من الغرفة؟ سيحتاج إلى الدخول مجددًا.',' from the room? They will need to rejoin.')))return;try{game=await api({action:'kick',code:game.code,hostToken,id:playerId,playerToken,target});renderHost()}catch{notice('تعذر طرد اللاعب')}}
