@@ -926,4 +926,17 @@ body.light .role-privacy{background:#f4dfd6;color:#74352e!important;border-color
   .accused-name{font-size:clamp(26px,8vw,48px)}
 }
 @media(max-width:520px){.next-action-hint p{font-size:16px}.morning-brief h2,.day-action-panel h2{font-size:20px}.day-action-panel{padding:12px}.cycle-kicker{font-size:14px}}
+html[data-text-size="s"]{-webkit-text-size-adjust:92%}
+html[data-text-size="l"]{-webkit-text-size-adjust:112%}
+html[data-text-size="xl"]{-webkit-text-size-adjust:124%}
+html.reduce-motion,html.reduce-motion *{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important;scroll-behavior:auto!important}
+.display-sheet{position:fixed;inset:0;z-index:80;display:grid;place-items:end center;padding:12px;background:#0008}
+.display-sheet .display-card{width:min(520px,100%);margin-bottom:env(safe-area-inset-bottom);padding:16px 16px 22px}
+.display-row{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:12px 0}
+.display-row .btn{min-width:88px}
+.display-help{margin:0 0 14px;font-size:14px}
+.display-label{margin:8px 0 6px;font-weight:900}
+.display-sizes{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.display-sizes .btn[aria-pressed="true"],.display-row .btn[aria-pressed="true"]{background:#b41420;border-color:#ef3340}
+body .utility-bar .settings-toggle{min-width:44px!important}
 

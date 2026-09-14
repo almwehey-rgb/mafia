@@ -1538,15 +1538,22 @@ async function takeLastShot(target) {
 async function electMafiaLeader(target){
   try{game=await api({action:'electMafiaLeader',code:game.code,id:playerId,playerToken,target});renderPlayer();}catch{notice(discussionText('تعذر تسجيل اختيار الزعيم، حاول مرة ثانية.','Could not record your leader vote.'));}
 }
+function resignOfferKey(){return `mafia-resign:${game?.matchId||game?.code||''}:${playerId}`;}
+function dismissResignOffer(){try{localStorage.setItem(resignOfferKey(),'done');}catch{}document.getElementById('leaderElectionCard')?.remove();}
 async function resignMafiaLeader(){
  if(!confirm('التنازل وفتح تصويت سري لمدة 30 ثانية لاختيار زعيم بديل؟'))return;
+ dismissResignOffer();
  await electMafiaLeader('RESIGN');
 }
 function leaderElectionCard(){
  if(!game?.me?.alive||!roleAcknowledged()||['lobby','finished','paused'].includes(game.phase))return '';
- if(!game.me.leaderElection)return game.me.role==='mafia_boss'&&(game.me.mafiaTeam||[]).some(p=>p.id!==game.me.id&&p.alive!==false)?'<section id="leaderElectionCard" class="card"><button class="btn" onclick="resignMafiaLeader()">التنازل عن القيادة</button></section>':'';
- const ended=Date.now()+discussionClockOffset>=game.me.leaderDeadline;
- return `<section id="leaderElectionCard" class="card"><h2>اختيار زعيم المافيا الجديد</h2><p>تصويت سري بعد التنازل. الأكثر أصواتًا يصبح الزعيم، والتعادل بقرعة. تنتهي المهلة خلال 30 ثانية، وتبقى القيادة الحالية حتى حسم البديل.</p>${ended?'<button class="btn gold" onclick="electMafiaLeader(&quot;FINALIZE&quot;)">حسم التصويت وتحديث الكروت</button>':game.me.leaderVote?'<p>تم تسجيل صوتك. بانتظار بقية الفريق.</p>':choiceButtons((game.me.mafiaTeam||[]).filter(p=>p.id!==game.me.leaderFormer&&p.alive!==false),'electMafiaLeader',{icon:'👑'})}</section>`;
+ if(game.me.leaderElection){
+  const ended=Date.now()+discussionClockOffset>=game.me.leaderDeadline;
+  return `<section id="leaderElectionCard" class="card"><h2>اختيار زعيم المافيا الجديد</h2><p>تصويت سري بعد التنازل. الأكثر أصواتًا يصبح الزعيم، والتعادل بقرعة. تنتهي المهلة خلال 30 ثانية، وتبقى القيادة الحالية حتى حسم البديل.</p>${ended?'<button class="btn gold" onclick="electMafiaLeader(&quot;FINALIZE&quot;)">حسم التصويت وتحديث الكروت</button>':game.me.leaderVote?'<p>تم تسجيل صوتك. بانتظار بقية الفريق.</p>':choiceButtons((game.me.mafiaTeam||[]).filter(p=>p.id!==game.me.leaderFormer&&p.alive!==false),'electMafiaLeader',{icon:'👑'})}</section>`;
+ }
+ if(game.me.role!=='mafia_boss'||!(game.me.mafiaTeam||[]).some(p=>p.id!==game.me.id&&p.alive!==false))return '';
+ if(localStorage.getItem(resignOfferKey())==='done')return '';
+ return `<section id="leaderElectionCard" class="card" data-no-translate><button class="btn red wide" onclick="resignMafiaLeader()">التنازل عن القيادة</button><button class="btn wide" type="button" onclick="dismissResignOffer()">${discussionText('إخفاء — يظهر مرة واحدة','Hide — shown once')}</button></section>`;
 }
 function voteSummaryCard() {
   const summary=game?.voteSummary;

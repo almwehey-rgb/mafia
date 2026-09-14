@@ -74,12 +74,86 @@ function walk(root,lang){
   }
  }
 }
-function updateControls(){const lang=localStorage.getItem('mafia-lang')||'ar',theme=localStorage.getItem('mafia-theme')||'dark';if(document.documentElement.lang!==lang)document.documentElement.lang=lang;document.documentElement.dir=lang==='ar'?'rtl':'ltr';document.body.classList.toggle('light',theme==='light');const l=document.querySelector('.lang-toggle'),t=document.querySelector('.theme-toggle'),f=document.querySelector('.fullscreen-toggle');if(l){l.textContent=lang==='ar'?'EN':'AR';l.setAttribute('aria-label',lang==='ar'?'التبديل إلى الإنجليزية':'Switch to Arabic')}if(t){t.innerHTML=window.mafiaIcons.svg(theme==='dark'?'sun':'moon');t.setAttribute('aria-label',theme==='dark'?(lang==='ar'?'الوضع النهاري':'Light mode'):(lang==='ar'?'الوضع الليلي':'Dark mode'))}if(f){f.innerHTML=window.mafiaIcons.svg('expand');f.setAttribute('aria-label',lang==='ar'?'ملء الشاشة':'Full screen')}walk(document.body,lang);window.mafiaIcons?.refresh(lang,localize);window.refreshRoleDetails?.();window.refreshDemo?.()}
+function displayText(ar,en){return (localStorage.getItem('mafia-lang')||'ar')==='en'?en:ar}
+let displayWakeLock=null;
+function displayPrefs(){
+  const text=['s','m','l','xl'].includes(localStorage.getItem('mafia-text-size'))?localStorage.getItem('mafia-text-size'):'m';
+  return {
+    lockZoom: localStorage.getItem('mafia-lock-zoom')!=='off',
+    textSize: text,
+    reduceMotion: localStorage.getItem('mafia-reduce-motion')==='on',
+    keepAwake: localStorage.getItem('mafia-keep-awake')==='on'
+  };
+}
+function applyDisplayPrefs(){
+  const prefs=displayPrefs();
+  const html=document.documentElement;
+  const meta=document.querySelector('meta[name="viewport"]');
+  if(meta)meta.setAttribute('content',prefs.lockZoom?'width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover':'width=device-width,initial-scale=1,viewport-fit=cover');
+  html.classList.toggle('lock-zoom',prefs.lockZoom);
+  html.classList.toggle('reduce-motion',prefs.reduceMotion);
+  html.dataset.textSize=prefs.textSize;
+  const zoom={s:'0.92',m:'1',l:'1.12',xl:'1.24'}[prefs.textSize];
+  html.style.zoom=zoom==='1'?'':zoom;
+  html.style.setProperty('--text-zoom',zoom);
+  applyWakeLock(prefs.keepAwake);
+}
+async function applyWakeLock(on){
+  try{
+    if(!on){await displayWakeLock?.release();displayWakeLock=null;return;}
+    if(!('wakeLock'in navigator))return;
+    displayWakeLock=await navigator.wakeLock.request('screen');
+  }catch{displayWakeLock=null;}
+}
+function blockZoomGesture(event){
+  if(displayPrefs().lockZoom)event.preventDefault();
+}
+function setDisplayPref(key,value){
+  localStorage.setItem(key,value);
+  applyDisplayPrefs();
+  const panel=document.querySelector('.display-sheet');
+  if(panel)paintDisplaySettings(panel);
+}
+function paintDisplaySettings(root){
+  const prefs=displayPrefs();
+  const on=displayText('تشغيل','On');
+  const off=displayText('إيقاف','Off');
+  root.querySelector('[data-lock-zoom]').textContent=prefs.lockZoom?on:off;
+  root.querySelector('[data-lock-zoom]').setAttribute('aria-pressed',String(prefs.lockZoom));
+  root.querySelector('[data-reduce-motion]').textContent=prefs.reduceMotion?on:off;
+  root.querySelector('[data-reduce-motion]').setAttribute('aria-pressed',String(prefs.reduceMotion));
+  root.querySelector('[data-keep-awake]').textContent=prefs.keepAwake?on:off;
+  root.querySelector('[data-keep-awake]').setAttribute('aria-pressed',String(prefs.keepAwake));
+  for(const button of root.querySelectorAll('[data-text-size]'))button.setAttribute('aria-pressed',String(button.dataset.textSize===prefs.textSize));
+}
+function closeDisplaySettings(){document.querySelector('.display-sheet')?.remove();}
+function openDisplaySettings(){
+  closeDisplaySettings();
+  const sheet=document.createElement('div');
+  sheet.className='display-sheet';
+  sheet.innerHTML=`<div class="sheet-card display-card" role="dialog" aria-modal="true" data-no-translate><div class="toolbar"><h2>${displayText('إعدادات الشاشة','Display settings')}</h2><button type="button" class="close-sheet" aria-label="${displayText('إغلاق','Close')}">×</button></div>
+    <label class="display-row"><span>${displayText('منع الزوم بالضغط المزدوج','Block accidental pinch/double-tap zoom')}</span><button type="button" class="btn" data-lock-zoom></button></label>
+    <p class="muted display-help">${displayText('إذا انضغط مرتين بالغلط الصفحة ما تكبر. طفّه إذا تبي تكبّر الصفحة بأصابعك.','Stops accidental zoom. Turn off if you want to pinch-zoom.')}</p>
+    <p class="display-label">${displayText('حجم الخط','Text size')}</p>
+    <div class="display-sizes">${[['s',displayText('أصغر','Smaller')],['m',displayText('عادي','Normal')],['l',displayText('أكبر','Larger')],['xl',displayText('كبير جدًا','Largest')]].map(([id,label])=>`<button type="button" class="btn" data-text-size="${id}">${label}</button>`).join('')}</div>
+    <label class="display-row"><span>${displayText('تقليل الحركة','Reduce motion')}</span><button type="button" class="btn" data-reduce-motion></button></label>
+    <label class="display-row"><span>${displayText('إبقاء الشاشة مضاءة','Keep screen awake')}</span><button type="button" class="btn" data-keep-awake></button></label>
+  </div>`;
+  document.body.append(sheet);
+  paintDisplaySettings(sheet);
+  sheet.querySelector('.close-sheet').onclick=closeDisplaySettings;
+  sheet.querySelector('[data-lock-zoom]').onclick=()=>setDisplayPref('mafia-lock-zoom',displayPrefs().lockZoom?'off':'on');
+  sheet.querySelector('[data-reduce-motion]').onclick=()=>setDisplayPref('mafia-reduce-motion',displayPrefs().reduceMotion?'off':'on');
+  sheet.querySelector('[data-keep-awake]').onclick=()=>setDisplayPref('mafia-keep-awake',displayPrefs().keepAwake?'off':'on');
+  for(const button of sheet.querySelectorAll('[data-text-size]'))button.onclick=()=>setDisplayPref('mafia-text-size',button.dataset.textSize);
+  sheet.querySelector('.close-sheet').focus();
+}
+function updateControls(){const lang=localStorage.getItem('mafia-lang')||'ar',theme=localStorage.getItem('mafia-theme')||'dark';if(document.documentElement.lang!==lang)document.documentElement.lang=lang;document.documentElement.dir=lang==='ar'?'rtl':'ltr';document.body.classList.toggle('light',theme==='light');applyDisplayPrefs();const l=document.querySelector('.lang-toggle'),t=document.querySelector('.theme-toggle'),f=document.querySelector('.fullscreen-toggle'),s=document.querySelector('.settings-toggle');if(l){l.textContent=lang==='ar'?'EN':'AR';l.setAttribute('aria-label',lang==='ar'?'التبديل إلى الإنجليزية':'Switch to Arabic')}if(t){t.innerHTML=window.mafiaIcons.svg(theme==='dark'?'sun':'moon');t.setAttribute('aria-label',theme==='dark'?(lang==='ar'?'الوضع النهاري':'Light mode'):(lang==='ar'?'الوضع الليلي':'Dark mode'))}if(f){f.innerHTML=window.mafiaIcons.svg('expand');f.setAttribute('aria-label',lang==='ar'?'ملء الشاشة':'Full screen')}if(s){s.textContent='⚙';s.setAttribute('aria-label',lang==='ar'?'إعدادات الشاشة':'Display settings')}walk(document.body,lang);window.mafiaIcons?.refresh(lang,localize);window.refreshRoleDetails?.();window.refreshDemo?.()}
 function setLang(lang){localStorage.setItem('mafia-lang',lang);if(typeof game!=='undefined'&&game){if(typeof spectatorMode!=='undefined'&&spectatorMode)renderSpectator();else if(hostToken||delegatedHostMode)renderHost();else if(game.me)renderPlayer();}updateControls()}
 function toggleLang(){setLang((localStorage.getItem('mafia-lang')||'ar')==='ar'?'en':'ar')}
 function toggleTheme(){localStorage.setItem('mafia-theme',(localStorage.getItem('mafia-theme')||'dark')==='dark'?'light':'dark');updateControls()}
 async function toggleFullscreen(){try{if(document.fullscreenElement)await document.exitFullscreen();else await document.documentElement.requestFullscreen()}catch{}}
-function addCompactControlStyles(){const style=document.createElement('style');style.textContent='.utility-bar{gap:8px;flex-wrap:nowrap}.utility-bar button{min-height:46px;padding:8px 12px;font-size:16px!important}.utility-bar .lang-toggle{min-width:82px}.utility-bar .theme-toggle,.utility-bar .fullscreen-toggle{width:48px;padding:8px;font-size:22px!important}.utility-bar .theme-toggle{margin-left:auto}@media(max-width:520px){.utility-bar{gap:6px}.utility-bar button{min-height:44px;padding:8px 10px;font-size:14px!important}.utility-bar .lang-toggle{min-width:76px}.utility-bar .theme-toggle,.utility-bar .fullscreen-toggle{width:44px;font-size:20px!important}.utility-bar .theme-toggle{margin-left:auto}}';document.head.append(style)}
-document.addEventListener('DOMContentLoaded',()=>{localStorage.removeItem('mafia-turn-state');localStorage.removeItem('mafia-day-end');addCompactControlStyles();const bar=document.createElement('div');bar.className='utility-bar';bar.setAttribute('data-no-translate','');bar.innerHTML='<button class="lang-toggle" type="button">EN</button><button class="theme-toggle" type="button"></button><button class="fullscreen-toggle" type="button">⛶</button>';document.body.prepend(bar);bar.querySelector('.lang-toggle').onclick=toggleLang;bar.querySelector('.theme-toggle').onclick=toggleTheme;bar.querySelector('.fullscreen-toggle').onclick=toggleFullscreen;updateControls();new MutationObserver(ms=>{const lang=localStorage.getItem('mafia-lang')||'ar';for(const m of ms){if(m.type==='characterData')walk(m.target,lang);else for(const n of m.addedNodes)if(n.nodeType===1||n.nodeType===3)walk(n,lang)}}).observe(document.body,{childList:true,subtree:true,characterData:true})});
+function addCompactControlStyles(){const style=document.createElement('style');style.textContent='.utility-bar{gap:8px;flex-wrap:nowrap}.utility-bar button{min-height:46px;padding:8px 12px;font-size:16px!important}.utility-bar .lang-toggle{min-width:82px}.utility-bar .theme-toggle,.utility-bar .fullscreen-toggle,.utility-bar .settings-toggle{width:48px;padding:8px;font-size:22px!important}.utility-bar .theme-toggle{margin-left:auto}@media(max-width:520px){.utility-bar{gap:6px}.utility-bar button{min-height:44px;padding:8px 10px;font-size:14px!important}.utility-bar .lang-toggle{min-width:70px}.utility-bar .theme-toggle,.utility-bar .fullscreen-toggle,.utility-bar .settings-toggle{width:44px;font-size:20px!important}.utility-bar .theme-toggle{margin-left:auto}}';document.head.append(style)}
+document.addEventListener('DOMContentLoaded',()=>{localStorage.removeItem('mafia-turn-state');localStorage.removeItem('mafia-day-end');addCompactControlStyles();applyDisplayPrefs();document.addEventListener('gesturestart',blockZoomGesture,{passive:false});document.addEventListener('gesturechange',blockZoomGesture,{passive:false});document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')applyWakeLock(displayPrefs().keepAwake)});const bar=document.createElement('div');bar.className='utility-bar';bar.setAttribute('data-no-translate','');bar.innerHTML='<button class="lang-toggle" type="button">EN</button><button class="theme-toggle" type="button"></button><button class="fullscreen-toggle" type="button">⛶</button><button class="settings-toggle" type="button">⚙</button>';document.body.prepend(bar);bar.querySelector('.lang-toggle').onclick=toggleLang;bar.querySelector('.theme-toggle').onclick=toggleTheme;bar.querySelector('.fullscreen-toggle').onclick=toggleFullscreen;bar.querySelector('.settings-toggle').onclick=openDisplaySettings;updateControls();new MutationObserver(ms=>{const lang=localStorage.getItem('mafia-lang')||'ar';for(const m of ms){if(m.type==='characterData')walk(m.target,lang);else for(const n of m.addedNodes)if(n.nodeType===1||n.nodeType===3)walk(n,lang)}}).observe(document.body,{childList:true,subtree:true,characterData:true})});
 if('serviceWorker'in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('/sw.js').catch(()=>{}));
 })();
