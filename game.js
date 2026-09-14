@@ -72,12 +72,12 @@ function playImpact(kind){
 }
 function maybeImpact(){
   if(!game?.lastEvent)return;
-  const sig=`${game.matchId||game.code}|${game.round}|${game.lastEvent}|${(game.lastDeaths||[]).join(',')}`;
+  const sig=`${game.matchId||game.code}|${game.round}|${game.lastEvent}|${game.lastSaved}|${(game.lastDeaths||[]).join(',')}`;
   if(sig===lastImpactSig)return;
   const first=!lastImpactSig;
   lastImpactSig=sig;
   if(first)return;
-  const events=String(game.lastEvent).split(',').filter(Boolean);
+  const events=typeof publicNewsEvents==='function'?publicNewsEvents():String(game.lastEvent||'').split(',').filter(Boolean);
   if(events.some(e=>IMPACT_DEATH.has(e)))playImpact('death');
   else if(events.some(e=>IMPACT_SAVE.has(e)))playImpact('save');
 }
@@ -1603,6 +1603,12 @@ function roleActTitle(){
   if(phase==='trial')return discussionText('المحاكمة','Trial');
   return '';
 }
+function publicNewsEvents(){
+  const events=String(game?.lastEvent||'').split(',').filter(Boolean);
+  const nightish=/(mafia_|doctor_|jail_saved|witch_|serial_|detective_only|escort_)/;
+  if(game?.lastSaved && !events.some((e)=>/_saved$/.test(e)) && (events.length===0 || events.some((e)=>nightish.test(e))))events.push('doctor_saved');
+  return events;
+}
 function squareEventLine(event){
   const named=(game.eliminations||[]).filter(p=>p.reason===event).map(p=>p.name).filter(Boolean);
   const who=named.join('، ');
@@ -1675,16 +1681,15 @@ function syncSpeakTurn(view){
   try{renderPlayer();}finally{speakSyncBusy=false;}
 }
 function squarePanelHtml(voteBody=''){
-  const view=typeof clientDiscussion==='function'?clientDiscussion():{};
   const voting=['nomination','vote','verdict'].includes(game.phase);
-  const discussDone=game.phase==='day'&&(view.complete||view.status==='done');
-  if(voting||discussDone){
+  if(voting){
     const title=game.phase==='nomination'?discussionText('الترشيح','Nomination'):game.phase==='verdict'?discussionText('الحكم','Verdict'):discussionText('التصويت','Voting');
-    const waiting=`<p class="pick-hint is-set">${discussionText('النقاش انتهى. انتظر بدء التصويت.','Discussion is over. Wait for voting to start.')}</p>`;
-    const vote=voteBody||(discussDone&&!voting?waiting:'');
-    return `${nowTaskHtml()}<div class="square-block vote-home"><h3>${title}</h3>${vote}</div>`;
+    return `${nowTaskHtml()}<div class="square-block vote-home"><h3>${title}</h3>${voteBody}</div>`;
   }
   const talk=discussionBoardHtml(false);
+  const view=typeof clientDiscussion==='function'?clientDiscussion():{};
+  const roundTalkDone=game.phase==='day'&&view.round===game.round&&view.id&&(view.complete||view.status==='done');
+  const waiting=roundTalkDone?`<p class="pick-hint is-set">${discussionText('النقاش انتهى. انتظر بدء التصويت.','Discussion is over. Wait for voting to start.')}</p>`:'';
   const causes={
     mafia_kill:['اغتالته المافيا','Killed by Mafia'], vote_eliminated:['استُبعد بالتصويت','Voted out'], trial_guilty:['أُدين بالحكم','Voted guilty'],
     vigilante_kill:['طلقة القناص','Sniper shot'], serial_kill:['اغتيال القاتل المتسلسل','Serial Killer'], witch_poison:['سم الساحرة','Witch poison'],
@@ -1693,10 +1698,10 @@ function squarePanelHtml(voteBody=''){
   const deathRows=(game.eliminations||[]).map(p=>{const label=causes[p.reason]||causes.eliminated;return `<p>☠️ <b>${escapeHtml(p.name)}</b> — ${discussionText(...label)}</p>`;}).join('')
     ||(game.lastDeaths||[]).map(id=>`<p>☠️ ${escapeHtml(nameOf(id))}</p>`).join('');
   const dead=`<div class="square-block"><h3>${discussionText('من مات','Who died')}</h3>${deathRows||`<p>${discussionText('لم يمت أحد','Nobody died')}</p>`}</div>`;
-  const news=String(game.lastEvent||'').split(',').filter(Boolean).map(e=>`<p>${squareEventLine(e)}</p>`).join('');
+  const news=publicNewsEvents().map((e)=>`<p class="${/_saved$/.test(e)?'square-save':''}">${squareEventLine(e)}</p>`).join('');
   const announce=news?`<div class="square-block"><h3>${discussionText('الإعلان','Announcements')}</h3>${news}</div>`:'';
   const vote=voteBody?`<div class="square-block"><h3>${discussionText('التصويت','Vote')}</h3>${voteBody}</div>`:'';
-  return [talk,nowTaskHtml(),announce,dead,vote].filter(Boolean).join('')||`<p class="muted">${discussionText('ما فيه خبر الحين.','Nothing to show yet.')}</p>`;
+  return [talk,waiting,nowTaskHtml(),announce,dead,vote].filter(Boolean).join('')||`<p class="muted">${discussionText('ما فيه خبر الحين.','Nothing to show yet.')}</p>`;
 }
 function wrapCyclePlay(cycle, actionHtml) {
   const isDay = cycle === 'day';
@@ -1713,7 +1718,7 @@ function wrapCyclePlay(cycle, actionHtml) {
   const voteBody=voteNeed?[action,votes].filter(Boolean).join(''):'';
   const squareBody=squarePanelHtml(voteBody);
   const view=typeof clientDiscussion==='function'?clientDiscussion():{};
-  const votingHome=['nomination','vote','verdict'].includes(game.phase)||(isDay&&(view.complete||view.status==='done'));
+  const votingHome=['nomination','vote','verdict'].includes(game.phase);
   const auto=votingHome?'none':(speak||detectHits.length||dockHasAction(voteNeed?detect:[extra,action].join(''))?'ability':'none');
   const key=[game.matchId,game.round,game.phase,detectHits.length,!!game.voteSummary,(game.lastDeaths||[]).join(','),view.speakerId||'',speak].join('|');
   if(key!==dockAutoKey){dockAutoKey=key;pendingDockPlay.tab=auto;}

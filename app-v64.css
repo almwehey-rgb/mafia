@@ -1056,6 +1056,7 @@ body.app-shell h1,body.app-shell h2,body.app-shell h3{font-weight:800}
 .square-home .square-block:last-child{border:0;margin:0;padding:0}
 .square-home .square-block h3{margin:0 0 8px;font-size:13px;color:#e8c37a}
 .square-home .square-now{background:#1a2218;border:1px solid #c9a22766;border-radius:12px;padding:12px;border-bottom:1px solid #c9a22766}
+.square-home .square-save{color:#f0ca7c;font-size:18px;font-weight:900;line-height:1.55}
 .speak-turn{margin:0 0 14px;padding:16px;border:2px solid #c9a227;border-radius:14px;background:#1a2218;text-align:center}
 .speak-turn h2{margin:0 0 8px;color:#f0ca7c}
 .speak-turn p{margin:0 0 12px;font-size:16px;line-height:1.55}
