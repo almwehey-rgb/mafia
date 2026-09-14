@@ -497,6 +497,7 @@ function wireJoinFields(focusName = false) {
   (focusName ? nameInput : codeInput).focus({ preventScroll: true });
 }
 function renderLanding() {
+  setShowingRole(false);
   setRoomTag();
   spectatorMode = false;
   delegatedHostMode = false;
@@ -639,7 +640,7 @@ function interactiveRoleCard(role, {personal=false, compact=false, image='', ope
  const team=personal&&mafiaRoleClient(role)?`<aside class="role-allies" data-no-translate><h3>${discussionText('زملاؤك في المافيا','Your Mafia allies')} <small>${discussionText('خاص بفريقك','Team only')}</small></h3><div>${teammates.map(p=>`<span>${escapeHtml(p.name)}</span>`).join('')||`<p>${discussionText('أنت عضو المافيا الوحيد','You are the only Mafia member')}</p>`}</div></aside>`:'';
  const identity=compact||reveal?'':`<header class="role-identity" data-no-translate><h2>${escapeHtml(title)}</h2><span>${escapeHtml(roleTeamLabel(role))}</span>${review?`<span class="review-role-count" aria-label="${discussionText('عدد اللاعبين','Player count')}">× ${count}</span>`:''}</header>`;
  const flipHint=discussionText('اضغط','Tap');
- return `<section class="role-presentation ${review?'review-role-presentation':''} ${compact?'compact-presentation':''} ${reveal?'reveal-presentation':''}" data-no-translate>${identity}${team}<article class="role-reader turning-role ${kids?'kids-role-card':''} ${personal?'personal-role-card':''} ${compact?'compact':''} ${reveal?'reveal-card':''}" ${review?`data-review-role="${role}"`:''} data-view="${open?'details':'image'}" style="--role-art:url('${image}')" role="button" tabindex="0" aria-label="${label} — ${discussionText('اضغط لقلب الكرت','Tap to flip')}" aria-pressed="${open}" onclick="selectRoleView(this,this.dataset.view!=='details')" onkeydown="if(event.target===this&&(event.key==='Enter'||event.key===' ')){event.preventDefault();selectRoleView(this,this.dataset.view!=='details')}"><div class="role-turn-inner"><div class="role-image-view" aria-hidden="${open}"><img src="${image}" alt="${label}" width="1024" height="1536" loading="lazy" decoding="async"><span class="role-turn-hint">${flipHint}</span></div><div class="role-details-view" aria-hidden="${!open}"><div class="personal-card-properties">${detailedRoleProperties(role,personal)}</div></div></div></article></section>`;
+ return `<section class="role-presentation ${review?'review-role-presentation':''} ${compact?'compact-presentation':''} ${reveal?'reveal-presentation':''}" data-no-translate>${identity}<article class="role-reader turning-role ${kids?'kids-role-card':''} ${personal?'personal-role-card':''} ${compact?'compact':''} ${reveal?'reveal-card':''}" ${review?`data-review-role="${role}"`:''} data-view="${open?'details':'image'}" style="--role-art:url('${image}')" role="button" tabindex="0" aria-label="${label} — ${discussionText('اضغط لقلب الكرت','Tap to flip')}" aria-pressed="${open}" onclick="selectRoleView(this,this.dataset.view!=='details')" onkeydown="if(event.target===this&&(event.key==='Enter'||event.key===' ')){event.preventDefault();selectRoleView(this,this.dataset.view!=='details')}"><div class="role-turn-inner"><div class="role-image-view" aria-hidden="${open}"><img src="${image}" alt="${label}" width="1024" height="1536" loading="lazy" decoding="async"><span class="role-turn-hint">${flipHint}</span></div><div class="role-details-view" aria-hidden="${!open}"><div class="personal-card-properties">${detailedRoleProperties(role,personal)}</div></div></div></article>${team}</section>`;
 }
 let homeGalleryObserver;
 function mountHomeCharacters() {
@@ -1169,7 +1170,9 @@ function personalRoleCard(compact=false, extra={}) {
   if(personalCardState.key!==key)personalCardState={key,open:false};
   return interactiveRoleCard(role,{personal:true,compact,open:personalCardState.open,...extra});
 }
+function setShowingRole(on){document.body.classList.toggle('showing-role',!!on)}
 function roleReveal() {
+  setShowingRole(true);
   $('#app').innerHTML=`<section class="role-reveal-only">${personalRoleCard(false,{reveal:true})}<button class="btn red wide" onclick="acknowledgeRole()">${discussionText('فهمت','Got it')}</button></section>`;
 }
 function mafiaRoleClient(role){return role==='mafia'||role==='mafia_boss'}
@@ -1591,6 +1594,7 @@ function renderWithNotices(content,controller=false) {
   }
 }
 function renderPlayer(){
+  setShowingRole(!!(game?.me?.alive && !roleAcknowledged() && !['lobby','finished'].includes(game.phase)));
   renderWithNotices(renderPlayerContent);
   if(!roleAcknowledged())return;
   enhanceJourney(false);
@@ -1654,7 +1658,7 @@ function enhanceJourney(controller){
   document.querySelectorAll('.setup-tabs button').forEach((button,index)=>{if(index+1===setupStep)button.setAttribute('aria-current','step');});
   paintActionFeedback();updatePhaseTimer();
 }
-function renderHost(){renderWithNotices(renderHostContent,true);enhanceJourney(true);mountHostProgress();}
+function renderHost(){setShowingRole(false);renderWithNotices(renderHostContent,true);enhanceJourney(true);mountHostProgress();}
 function renderSpectator(){renderWithNotices(renderSpectatorContent);}
 
 function disciplineButtons(player) {
