@@ -1227,17 +1227,17 @@ window.visualViewport?.addEventListener('scroll',syncVisibleViewport);
 window.addEventListener('resize',syncVisibleViewport);
 syncVisibleViewport();
 function mountPlayerTools(){
+  if(hostToken||delegatedHostMode)return;
   if(!game?.me?.alive||['lobby','reveal','finished'].includes(game.phase)||document.querySelector('.player-dock'))return;
   const canChat=chatAllowed();
   const unread=canChat&&chatHasUnread();
-  const host=game.me.isHost?`<button type="button" class="dock-item" onclick="toggleDelegatedHost()"><span class="dock-icon">👑</span><span>${discussionText('تحكم','Host')}</span></button>`:'';
   const dock=document.createElement('nav');
   dock.className='player-dock';
   dock.setAttribute('aria-label',discussionText('شريط اللاعب','Player bar'));
   dock.innerHTML=`<button type="button" class="dock-item" onclick="openMyRole()"><span class="dock-icon">🃏</span><span>${discussionText('دوري','Role')}</span></button>
     <button type="button" class="dock-item" data-chat-button ${canChat?'':'disabled'} onclick="openChat()"><span class="dock-icon">💬</span><span>${discussionText('محادثة','Chat')}</span><i class="dock-badge" ${unread?'':'hidden'}></i></button>
     <button type="button" class="dock-item" onclick="openWill()"><span class="dock-icon">📜</span><span>${discussionText('وصية','Will')}</span></button>
-    <button type="button" class="dock-item" onclick="openReport()"><span class="dock-icon">🚩</span><span>${discussionText('بلاغ','Report')}</span></button>${host}`;
+    <button type="button" class="dock-item" onclick="openReport()"><span class="dock-icon">🚩</span><span>${discussionText('بلاغ','Report')}</span></button>`;
   document.body.append(dock);
   document.body.classList.add('has-player-dock');
 }
@@ -1626,6 +1626,7 @@ function renderWithNotices(content,controller=false) {
   }
 }
 function renderPlayer(){
+  document.body.classList.remove('host-mode');
   setShowingRole(!!(game?.me?.alive && !roleAcknowledged() && !['lobby','finished'].includes(game.phase)));
   renderWithNotices(renderPlayerContent);
   if(!roleAcknowledged())return;
@@ -1690,7 +1691,7 @@ function enhanceJourney(controller){
   document.querySelectorAll('.setup-tabs button').forEach((button,index)=>{if(index+1===setupStep)button.setAttribute('aria-current','step');});
   paintActionFeedback();updatePhaseTimer();
 }
-function renderHost(){setShowingRole(false);renderWithNotices(renderHostContent,true);enhanceJourney(true);mountHostProgress();}
+function renderHost(){document.body.classList.add('host-mode');removePlayerChrome();setShowingRole(false);renderWithNotices(renderHostContent,true);enhanceJourney(true);mountHostProgress();}
 function renderSpectator(){renderWithNotices(renderSpectatorContent);}
 
 function disciplineButtons(player) {
