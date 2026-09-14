@@ -1060,12 +1060,12 @@ body.app-shell h1,body.app-shell h2,body.app-shell h3{font-weight:800}
 .square-home .choice-stack,.square-home .verdict-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 body.has-player-dock:has(.dock-play) .journey-hint{display:none}
 .player-dock .dock-play:not(.dock-card-play) .card{margin:0;padding:0;border:0;background:transparent;box-shadow:none}
-.player-dock .dock-row{flex:none;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));align-items:stretch;gap:2px;padding:6px 8px max(8px,env(safe-area-inset-bottom));border-top:1px solid #80663f88;background:#0c0e0df8;pointer-events:auto}
+.player-dock .dock-row{flex:none;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));align-items:stretch;gap:2px;padding:6px 8px max(8px,env(safe-area-inset-bottom));border-top:1px solid #80663f88;background:#0c0e0df8;pointer-events:auto}
 .player-dock .dock-item{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;min-height:54px;height:54px;margin:0;padding:4px 2px;border:1px solid transparent;border-radius:12px;background:transparent;color:#e8d3a4;font:700 10px/1.15 Tahoma,Arial;white-space:nowrap;cursor:pointer}
 .player-dock .dock-item span:not(.dock-icon){max-width:100%;overflow:hidden;text-overflow:ellipsis}
-.player-dock .dock-item.dock-card-tab{background:transparent;color:#f0ca7c;border-color:#c9a227;font-weight:800;box-shadow:none}
-.player-dock .dock-item.dock-card-tab .dock-icon{font-size:20px}
-.player-dock .dock-item.dock-card-tab.is-on,.player-dock .dock-item.is-on{color:#f0ca7c;background:#c9a22722;border-color:#c9a227}
+.player-dock .dock-item.dock-home-tab{background:transparent;color:#f0ca7c;border-color:#c9a227;font-weight:800;box-shadow:none}
+.player-dock .dock-item.dock-home-tab .dock-icon{font-size:20px}
+.player-dock .dock-item.dock-home-tab.is-on,.player-dock .dock-item.is-on{color:#f0ca7c;background:#c9a22722;border-color:#c9a227}
 .player-dock .dock-item.dock-chat-on{background:transparent;color:#f0ca7c}
 .player-dock .dock-item.dock-chat-on .dock-badge{box-shadow:0 0 0 2px #0c0e0d}
 .player-dock .dock-item:disabled{opacity:.45}
@@ -1075,7 +1075,7 @@ body.has-player-dock:has(.dock-play) .journey-hint{display:none}
 body.has-player-dock .shell{padding-bottom:calc(80px + env(safe-area-inset-bottom))!important}
 body.light .player-dock:has(.dock-play){background:#f4ebd8f5}
 body.light .player-dock .dock-item{color:#5a431c}
-body.light .player-dock .dock-item.dock-card-tab{background:transparent;color:#8a5a12;border-color:#b8892a}
+body.light .player-dock .dock-item.dock-home-tab{background:transparent;color:#8a5a12;border-color:#b8892a}
 body.light .player-dock .dock-item.dock-chat-on{color:#8a5a12;background:transparent}
 body.light .player-dock .dock-play{background:#fff8ea;border-color:#b19767}
 @media(min-width:700px){

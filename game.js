@@ -1260,7 +1260,8 @@ function extractDockAction(html){
   return (card||box).innerHTML;
 }
 function selectDockTab(tab){
-  pendingDockPlay.tab=pendingDockPlay.tab===tab?'none':tab;
+  if(tab==='home')pendingDockPlay.tab='none';
+  else pendingDockPlay.tab=pendingDockPlay.tab===tab?'none':tab;
   document.querySelector('.player-dock')?.remove();
   document.body.classList.remove('has-player-dock');
   mountPlayerTools();
@@ -1277,13 +1278,15 @@ function mountPlayerTools(){
     play=`<section class="dock-play dock-card-play">${personalRoleCard(true,{reveal:true})}</section>`;
   }
   const chatOn=canChat?' dock-chat-on':'';
-  const on=name=>tab===name?' is-on':'';
+  const homeOn=tab==='none'||tab==='home'||!tab;
+  const on=name=>name==='home'?(homeOn?' is-on':''):(tab===name?' is-on':'');
   const dock=document.createElement('nav');
   dock.className='player-dock';
   dock.setAttribute('aria-label',discussionText('شريط اللاعب','Player bar'));
   dock.innerHTML=`${play}<div class="dock-row">
     <button type="button" class="dock-item${on('ability')}" onclick="selectDockTab('ability')"><span class="dock-icon">⚡</span><span>${discussionText('قدرتي','Ability')}</span></button>
-    <button type="button" class="dock-item dock-card-tab${on('card')}" onclick="selectDockTab('card')"><span class="dock-icon">🃏</span><span>${discussionText('كرتي','My card')}</span></button>
+    <button type="button" class="dock-item${on('card')}" onclick="selectDockTab('card')"><span class="dock-icon">🃏</span><span>${discussionText('كرتي','My card')}</span></button>
+    <button type="button" class="dock-item dock-home-tab${on('home')}" onclick="selectDockTab('home')"><span class="dock-icon">🏠</span><span>${discussionText('الرئيسية','Home')}</span></button>
     <button type="button" class="dock-item${chatOn}" data-chat-button ${canChat?'':'disabled'} onclick="openChat()"><span class="dock-icon">💬</span><span>${discussionText('محادثة','Chat')}</span><i class="dock-badge" ${unread?'':'hidden'}></i></button>
     <button type="button" class="dock-item" onclick="openDockMore()"><span class="dock-icon">⋯</span><span>${discussionText('المزيد','More')}</span></button>
   </div>`;
@@ -1618,7 +1621,7 @@ function wrapCyclePlay(cycle, actionHtml) {
   if(pendingDockPlay.tab==='square'||pendingDockPlay.tab==='vote')pendingDockPlay.tab='none';
   pendingDockPlay={...pendingDockPlay,abilityTitle,abilityBody,voteBody,squareBody};
   if(pendingDockPlay.tab!=='none'&&!pendingDockPlay.tab)pendingDockPlay.tab=auto;
-  return `${phaseBar()}<div class="phase-play ${cycle}-play square-home"><h2 class="role-act-title" data-no-translate>${discussionText('الرئيسية','Home')}</h2>${squareBody}</div>`;
+  return `${phaseBar()}<div class="phase-play ${cycle}-play square-home">${squareBody}</div>`;
 }
 function morningBriefPanel(embedded=false) {
   const deaths = (game.lastDeaths || []).map((id) => `<div class="event danger-text">☠️ ${escapeHtml(nameOf(id))}</div>`).join('');
