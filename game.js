@@ -1200,7 +1200,7 @@ function renderPlayerContent() {
   if (!me) { $('#app').innerHTML = '<div class="card hero"><h2>فقدنا جلسة اللاعب</h2><button class="btn" onclick="home()">دخول من جديد</button></div>'; return; }
   if (!me.alive) { delegatedHostMode=false; if(document.querySelector('.game-sheet'))closeSheet(); renderSpectator(); return; }
   setTimeout(mountPlayerTools, 0);
-  if (game.phase === 'paused') { $('#app').innerHTML = `${phaseBar()}<div class="card hero"><div class="role-title">⏸️ المباراة متوقفة</div><p>المضيف سيكمل المباراة من المرحلة نفسها.</p>${me.isHost?`<button class="btn gold wide" type="button" onclick="returnToLobby()">${discussionText('إيقاف والرجوع للوبي','Stop and return to lobby')}</button>`:''}</div>`; return; }
+  if (game.phase === 'paused') { pendingDockPlay={title:'',body:''}; $('#app').innerHTML = `${phaseBar()}<div class="card hero"><div class="role-title">⏸️ المباراة متوقفة</div><p>المضيف سيكمل المباراة من المرحلة نفسها.</p>${me.isHost?`<button class="btn gold wide" type="button" onclick="returnToLobby()">${discussionText('إيقاف والرجوع للوبي','Stop and return to lobby')}</button>`:''}</div>`; return; }
   if (game.phase === 'finished') {
     $('#app').innerHTML = `${phaseBar()}<div class="card hero"><div class="role-title">${winnerTitle()}</div><p>${discussionText('دورك','Your role')}: ${roleLabel(me.role)}</p><p class="muted">${me.isHost ? discussionText('افتح تحكم المضيف لإعادة المباراة.','Open host controls to play again.') : discussionText('انتظر المضيف لإعادة المباراة.','Wait for the host to play again.')}</p></div>`;
     return;
@@ -1230,16 +1230,25 @@ function dockChatLabel(){
   if(game?.me?.jailed||game?.me?.role==='jailer')return discussionText('محادثة السجن','Jail chat');
   return discussionText('محادثة المافيا','Mafia chat');
 }
+let pendingDockPlay={title:'',body:''};
+function extractDockAction(html){
+  const box=document.createElement('div');
+  box.innerHTML=html||'';
+  if(box.querySelector('.wait-only')&&!box.querySelector('button,.pick'))return '';
+  const card=box.querySelector(':scope > .card');
+  return (card||box).innerHTML;
+}
 function mountPlayerTools(){
   if(!game?.me?.alive||['lobby','reveal','finished'].includes(game.phase)||document.querySelector('.player-dock'))return;
   const canChat=chatAllowed();
   const unread=canChat&&chatHasUnread();
   const host=game.me.isHost?`<button type="button" class="dock-item" onclick="toggleDelegatedHost()"><span class="dock-icon">👑</span><span>${discussionText('تحكم','Host')}</span></button>`:'';
+  const play=pendingDockPlay.body?`<section class="dock-play">${pendingDockPlay.title?`<h2 class="role-act-title" data-no-translate>${pendingDockPlay.title}</h2>`:''}${pendingDockPlay.body}</section>`:'';
   const chat=canChat?`<button type="button" class="dock-chat" data-chat-button onclick="openChat()">${unread?'🔴 ':''}💬 ${dockChatLabel()}</button>`:'';
   const dock=document.createElement('nav');
   dock.className='player-dock';
   dock.setAttribute('aria-label',discussionText('شريط اللاعب','Player bar'));
-  dock.innerHTML=`${chat}<div class="dock-row">
+  dock.innerHTML=`${play}${chat}<div class="dock-row">
     <button type="button" class="dock-item" onclick="openMyRole()"><span class="dock-icon">🃏</span><span>${discussionText('دوري','Role')}</span></button>
     <button type="button" class="dock-item" onclick="openWill()"><span class="dock-icon">📜</span><span>${discussionText('وصية','Will')}</span></button>
     <button type="button" class="dock-item" onclick="openReport()"><span class="dock-icon">🚩</span><span>${discussionText('بلاغ','Report')}</span></button>${host}
@@ -1505,8 +1514,10 @@ function wrapCyclePlay(cycle, actionHtml) {
   const talkBlock = !talk ? '' : (draw ? talk : `<details class="cycle-talk" data-disclosure-key="cycle-talk"${hasPick?'':' open'}><summary>${discussionText('النقاش','Discussion')}</summary>${talk}</details>`);
   const extra = isNight || isDay ? bossDiscussionChoice() : '';
   const title=roleActTitle();
-  const detect=game.me?.role==='detective'?investigationPanel():'';
-  return `${phaseBar()}<div class="phase-play ${cycle}-play">${personalRoleCard(true)}<section class="role-action-tray">${title?`<h2 class="role-act-title" data-no-translate>${title}</h2>`:''}${isDay?detect:''}${extra}<div class="cycle-action">${actionHtml}</div></section>${isDay?morningBriefPanel():''}${talkBlock}</div>`;
+  const detect=isDay&&game.me?.role==='detective'?investigationPanel():'';
+  const action=extractDockAction(actionHtml);
+  pendingDockPlay={title,body:[detect,extra,action].filter(Boolean).join('')};
+  return `${phaseBar()}<div class="phase-play ${cycle}-play">${personalRoleCard(true)}${isDay?morningBriefPanel():''}${talkBlock}</div>`;
 }
 function morningBriefPanel(embedded=false) {
   const deaths = (game.lastDeaths || []).map((id) => `<div class="event danger-text">☠️ ${escapeHtml(nameOf(id))}</div>`).join('');
