@@ -1256,6 +1256,7 @@ function mountPlayerTools(){
   }else if(tab==='vote'){
     play=`<section class="dock-play"><h2 class="role-act-title" data-no-translate>${discussionText('التصويت','Vote')}</h2>${pendingDockPlay.voteBody||`<p class="muted">${discussionText('ما فيه نتيجة تصويت بعد.','No vote result yet.')}</p>`}</section>`;
   }
+  const chatOn=canChat?' dock-chat-on':'';
   const on=name=>tab===name?' is-on':'';
   const dock=document.createElement('nav');
   dock.className='player-dock';
@@ -1263,14 +1264,16 @@ function mountPlayerTools(){
   dock.innerHTML=`${play}<div class="dock-row">
     <button type="button" class="dock-item${on('ability')}" onclick="selectDockTab('ability')"><span class="dock-icon">⚡</span><span>${discussionText('قدرتي','Ability')}</span></button>
     <button type="button" class="dock-item${on('vote')}" onclick="selectDockTab('vote')"><span class="dock-icon">🗳️</span><span>${discussionText('التصويت','Vote')}</span></button>
-    <button type="button" class="dock-item" data-chat-button ${canChat?'':'disabled'} onclick="openChat()"><span class="dock-icon">💬</span><span>${canChat?dockChatLabel():discussionText('محادثة','Chat')}</span><i class="dock-badge" ${unread?'':'hidden'}></i></button>
-    <button type="button" class="dock-item" onclick="openWill()"><span class="dock-icon">📜</span><span>${discussionText('وصية','Will')}</span></button>
-    <button type="button" class="dock-item" onclick="openReport()"><span class="dock-icon">🚩</span><span>${discussionText('بلاغ','Report')}</span></button>
+    <button type="button" class="dock-item${chatOn}" data-chat-button ${canChat?'':'disabled'} onclick="openChat()"><span class="dock-icon">💬</span><span>${discussionText('محادثة','Chat')}</span><i class="dock-badge" ${unread?'':'hidden'}></i></button>
+    <button type="button" class="dock-item" onclick="openDockMore()"><span class="dock-icon">⋯</span><span>${discussionText('المزيد','More')}</span></button>
   </div>`;
   document.body.append(dock);
   document.body.classList.add('has-player-dock');
 }
-function openMyRole(){
+function openDockMore(){
+  const host=game?.me?.isHost?`<button class="btn gold wide" type="button" onclick="toggleDelegatedHost()">👑 ${discussionText('تحكم','Host')}</button><button class="btn wide" type="button" onclick="returnToLobby()">🏠 ${discussionText('اللوبي','Lobby')}</button>`:'';
+  openSheet(discussionText('المزيد','More'),`<div class="player-tools-list" data-no-translate><button class="btn wide" type="button" onclick="openWill()">📜 ${discussionText('وصية','Will')}</button><button class="btn wide" type="button" onclick="openReport()">🚩 ${discussionText('بلاغ','Report')}</button>${host}</div>`);
+}
   if(!game?.me?.role)return;
   openSheet(discussionText('دوري','My role'), interactiveRoleCard(game.me.role,{personal:true,reveal:true}));
 }
@@ -1307,8 +1310,9 @@ function paintChatDock(){
       const badge=button.querySelector('.dock-badge');
       if(badge)badge.hidden=!unread;
       const label=button.querySelector('span:not(.dock-icon)');
-      if(label)label.textContent=chatAllowed()?dockChatLabel():discussionText('محادثة','Chat');
+      if(label)label.textContent=discussionText('محادثة','Chat');
       button.disabled=!chatAllowed();
+      button.classList.toggle('dock-chat-on',chatAllowed());
     }else button.textContent=`${unread?'🔴 ':''}💬 ${dockChatLabel()}`;
   }
 }
