@@ -1259,6 +1259,11 @@ function extractDockAction(html){
   const card=box.querySelector(':scope > .card');
   return (card||box).innerHTML;
 }
+function dockHasAction(html){
+  const box=document.createElement('div');
+  box.innerHTML=html||'';
+  return !!box.querySelector('button,.pick');
+}
 function selectDockTab(tab){
   if(tab==='home')pendingDockPlay.tab='none';
   else pendingDockPlay.tab=pendingDockPlay.tab===tab?'none':tab;
@@ -1615,7 +1620,7 @@ function wrapCyclePlay(cycle, actionHtml) {
   const abilityBody=voteNeed?detect:[detect,extra,action].filter(Boolean).join('');
   const voteBody=voteNeed?[action,votes].filter(Boolean).join(''):votes;
   const squareBody=squarePanelHtml(voteBody);
-  const auto=detectHits.length?'ability':'none';
+  const auto=detectHits.length||dockHasAction(voteNeed?detect:[extra,action].join(''))?'ability':'none';
   const key=[game.matchId,game.round,game.phase,detectHits.length,!!game.voteSummary,(game.lastDeaths||[]).join(',')].join('|');
   if(key!==dockAutoKey){dockAutoKey=key;pendingDockPlay.tab=auto;}
   if(pendingDockPlay.tab==='square'||pendingDockPlay.tab==='vote')pendingDockPlay.tab='none';
