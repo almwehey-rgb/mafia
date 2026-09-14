@@ -1612,7 +1612,7 @@ function publicNewsEvents(){
 function squareEventLine(event){
   const named=(game.eliminations||[]).filter(p=>p.reason===event).map(p=>p.name).filter(Boolean);
   const who=named.join('، ');
-  if(event==='mafia_kill')return who?discussionText(`المافيا اغتالت ${who}.`,`Mafia killed ${who}.`):eventLabel(event);
+  if(event==='mafia_kill')return who?discussionText(`خرج ${who} هذه الليلة.` , `${who} left tonight.`):discussionText('خرج لاعب هذه الليلة.','A player left tonight.');
   if(event==='doctor_saved')return discussionText('الطبيب حمى الهدف، وما صار اغتيال.','The Doctor protected the target, so there was no kill.');
   if(event==='jail_saved')return discussionText('السجن حمى الهدف من اغتيال المافيا.','Jail protected the target from the Mafia kill.');
   if(event==='witch_saved')return discussionText('الساحرة أنقذت لاعبًا بجرعة الحياة.','The Witch saved a player with the life potion.');
@@ -1691,7 +1691,7 @@ function squarePanelHtml(voteBody=''){
   const roundTalkDone=game.phase==='day'&&view.round===game.round&&view.id&&(view.complete||view.status==='done');
   const waiting=roundTalkDone?`<p class="pick-hint is-set">${discussionText('النقاش انتهى. انتظر بدء التصويت.','Discussion is over. Wait for voting to start.')}</p>`:'';
   const causes={
-    mafia_kill:['اغتالته المافيا','Killed by Mafia'], vote_eliminated:['استُبعد بالتصويت','Voted out'], trial_guilty:['أُدين بالحكم','Voted guilty'],
+    mafia_kill:['خرج في الليل','Left at night'], vote_eliminated:['استُبعد بالتصويت','Voted out'], trial_guilty:['أُدين بالحكم','Voted guilty'],
     vigilante_kill:['طلقة القناص','Sniper shot'], serial_kill:['اغتيال القاتل المتسلسل','Serial Killer'], witch_poison:['سم الساحرة','Witch poison'],
     jailer_executed:['إعدام السجّان','Jailer execution'], lovers_died:['مات مع شريكه','Linked partner'], host_expelled:['استبعده المضيف','Host expelled'], eliminated:['خرج','Eliminated']
   };
@@ -1803,7 +1803,7 @@ home();
 
 function eliminationNotice() {
   const causes = {
-    mafia_kill:['اغتيال المافيا','Killed by Mafia'], vote_eliminated:['الاستبعاد بالتصويت','Voted out'], trial_guilty:['حكم التصويت بالإدانة','Voted guilty'],
+    mafia_kill:['خرج في الليل','Left at night'], vote_eliminated:['الاستبعاد بالتصويت','Voted out'], trial_guilty:['حكم التصويت بالإدانة','Voted guilty'],
     vigilante_kill:['طلقة القناص الأخيرة','Sniper final shot'], serial_kill:['اغتيال القاتل المتسلسل','Killed by Serial Killer'], witch_poison:['سم الساحرة','Witch poison'],
     jailer_executed:['إعدام السجّان','Jailer execution'], lovers_died:['الارتباط بلاعب مستبعد','Linked partner eliminated'], host_expelled:['استبعاد من المضيف','Expelled by host'], eliminated:['الاستبعاد','Eliminated']
   };
