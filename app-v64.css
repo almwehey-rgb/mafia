@@ -1034,19 +1034,21 @@ body.app-shell h1,body.app-shell h2,body.app-shell h3{font-weight:800}
 .role-act-title{margin:0 0 8px;font-size:16px;color:#e8c37a;text-align:center}
 .phase-play>.role-presentation{margin-bottom:8px}
 .player-dock{position:fixed;inset-inline:0;bottom:0;z-index:60;display:flex;flex-direction:column;gap:6px;padding:8px 10px max(10px,env(safe-area-inset-bottom));border-top:1px solid #80663f88;background:#0c0e0df5;backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px)}
-.player-dock .dock-play{max-height:34dvh;overflow:auto;padding:10px;border-radius:14px;background:#121614;border:1px solid #80663f66}
-.player-dock .dock-play[open]{max-height:48dvh}
-.player-dock .dock-play>summary{cursor:pointer;list-style:none}
-.player-dock .dock-play>summary::-webkit-details-marker{display:none}
+.player-dock .dock-play{max-height:40dvh;overflow:auto;padding:10px;border-radius:14px;background:#121614;border:1px solid #80663f66}
 .player-dock .dock-play h2:not(.role-act-title),.player-dock .dock-play .role-title{display:none}
 .player-dock .dock-play h3{margin:10px 0 6px;font-size:14px;color:#e8c37a;text-align:center}
 .player-dock .dock-play .card{margin:0;padding:0;border:0;background:transparent;box-shadow:none}
-.player-dock .dock-chat{width:100%;min-height:46px;margin:0;border:0;border-radius:12px;background:#c9a227;color:#1a1408;font:800 15px Tahoma,Arial;cursor:pointer}
-body.has-player-dock .shell{padding-bottom:calc(88px + env(safe-area-inset-bottom))!important}
-body.has-player-dock:has(.dock-chat) .shell,body.has-player-dock:has(.dock-play) .shell{padding-bottom:calc(38dvh + env(safe-area-inset-bottom))!important}
+.player-dock .dock-row{display:grid;grid-template-columns:repeat(5,1fr)}
+.player-dock .dock-item.is-on{color:#f0ca7c}
+.player-dock .dock-item{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;min-height:48px;margin:0;padding:4px 2px;border:0;background:transparent;color:#e8d3a4;font:600 11px Tahoma,Arial;cursor:pointer}
+.player-dock .dock-item:disabled{opacity:.38}
+.player-dock .dock-icon{font-size:18px;line-height:1}
+.player-dock .dock-badge{position:absolute;top:4px;inset-inline-end:calc(50% - 18px);width:8px;height:8px;border-radius:50%;background:#e23d4a;box-shadow:0 0 0 2px #0c0e0d}
+.player-dock .dock-item.has-unread{color:#f3e0b4}
+body.has-player-dock .shell{padding-bottom:calc(84px + env(safe-area-inset-bottom))!important}
+body.has-player-dock:has(.dock-play) .shell{padding-bottom:calc(46dvh + env(safe-area-inset-bottom))!important}
 body.light .player-dock{background:#f4ebd8f5;border-color:#b19767}
 body.light .player-dock .dock-item{color:#5a431c}
-body.light .player-dock .dock-chat{background:#b8892a;color:#1a1408}
 body.light .player-dock .dock-play{background:#fff8ea;border-color:#b19767}
 @media(min-width:700px){
   .player-dock{inset-inline:auto;left:50%;transform:translateX(-50%);width:min(560px,100%);border-radius:16px 16px 0 0}

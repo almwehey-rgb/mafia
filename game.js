@@ -1200,7 +1200,7 @@ function renderPlayerContent() {
   if (!me) { $('#app').innerHTML = '<div class="card hero"><h2>فقدنا جلسة اللاعب</h2><button class="btn" onclick="home()">دخول من جديد</button></div>'; return; }
   if (!me.alive) { delegatedHostMode=false; if(document.querySelector('.game-sheet'))closeSheet(); renderSpectator(); return; }
   setTimeout(mountPlayerTools, 0);
-  if (game.phase === 'paused') { pendingDockPlay={title:'',body:'',open:false}; $('#app').innerHTML = `${phaseBar()}<div class="card hero"><div class="role-title">⏸️ المباراة متوقفة</div><p>المضيف سيكمل المباراة من المرحلة نفسها.</p>${me.isHost?`<button class="btn gold wide" type="button" onclick="returnToLobby()">${discussionText('إيقاف والرجوع للوبي','Stop and return to lobby')}</button>`:''}</div>`; return; }
+  if (game.phase === 'paused') { pendingDockPlay={abilityTitle:'',abilityBody:'',voteBody:'',tab:''}; $('#app').innerHTML = `${phaseBar()}<div class="card hero"><div class="role-title">⏸️ المباراة متوقفة</div><p>المضيف سيكمل المباراة من المرحلة نفسها.</p>${me.isHost?`<button class="btn gold wide" type="button" onclick="returnToLobby()">${discussionText('إيقاف والرجوع للوبي','Stop and return to lobby')}</button>`:''}</div>`; return; }
   if (game.phase === 'finished') {
     $('#app').innerHTML = `${phaseBar()}<div class="card hero"><div class="role-title">${winnerTitle()}</div><p>${discussionText('دورك','Your role')}: ${roleLabel(me.role)}</p><p class="muted">${me.isHost ? discussionText('افتح تحكم المضيف لإعادة المباراة.','Open host controls to play again.') : discussionText('انتظر المضيف لإعادة المباراة.','Wait for the host to play again.')}</p></div>`;
     return;
@@ -1230,7 +1230,8 @@ function dockChatLabel(){
   if(game?.me?.jailed||game?.me?.role==='jailer')return discussionText('محادثة السجن','Jail chat');
   return discussionText('محادثة المافيا','Mafia chat');
 }
-let pendingDockPlay={title:'',body:'',open:false};
+let pendingDockPlay={abilityTitle:'',abilityBody:'',voteBody:'',tab:''};
+let dockAutoKey='';
 function extractDockAction(html){
   const box=document.createElement('div');
   box.innerHTML=html||'';
@@ -1238,25 +1239,36 @@ function extractDockAction(html){
   const card=box.querySelector(':scope > .card');
   return (card||box).innerHTML;
 }
+function selectDockTab(tab){
+  pendingDockPlay.tab=tab;
+  document.querySelector('.player-dock')?.remove();
+  document.body.classList.remove('has-player-dock');
+  mountPlayerTools();
+}
 function mountPlayerTools(){
-  if(!game?.me?.alive||['lobby','reveal','finished'].includes(game.phase))return;
+  if(!game?.me?.alive||['lobby','reveal','finished'].includes(game.phase)||document.querySelector('.player-dock'))return;
   const canChat=chatAllowed();
   const unread=canChat&&chatHasUnread();
-  if(!document.querySelector('.player-dock') && (pendingDockPlay.body||canChat)){
-    const play=pendingDockPlay.body?`<details class="dock-play"${pendingDockPlay.open?' open':''}><summary class="role-act-title" data-no-translate>${pendingDockPlay.title||discussionText('الإجراء','Action')}</summary>${pendingDockPlay.body}</details>`:'';
-    const chat=canChat?`<button type="button" class="dock-chat" data-chat-button onclick="openChat()">${unread?'🔴 ':''}💬 ${dockChatLabel()}</button>`:'';
-    const dock=document.createElement('nav');
-    dock.className='player-dock';
-    dock.setAttribute('aria-label',discussionText('شريط اللاعب','Player bar'));
-    dock.innerHTML=`${play}${chat}`;
-    document.body.append(dock);
-    document.body.classList.add('has-player-dock');
+  const tab=pendingDockPlay.tab;
+  let play='';
+  if(tab==='ability'){
+    play=`<section class="dock-play">${pendingDockPlay.abilityTitle?`<h2 class="role-act-title" data-no-translate>${pendingDockPlay.abilityTitle}</h2>`:''}${pendingDockPlay.abilityBody||`<p class="muted">${discussionText('ما فيه إجراء الحين.','No action right now.')}</p>`}</section>`;
+  }else if(tab==='vote'){
+    play=`<section class="dock-play"><h2 class="role-act-title" data-no-translate>${discussionText('التصويت','Vote')}</h2>${pendingDockPlay.voteBody||`<p class="muted">${discussionText('ما فيه نتيجة تصويت بعد.','No vote result yet.')}</p>`}</section>`;
   }
-  if(document.querySelector('.player-tools'))return;
-  const tools=document.createElement('details');
-  tools.className='player-tools';
-  tools.innerHTML=`<summary>${discussionText('أدوات','Tools')}</summary><div class="player-tools-list">${game.me.isHost?`<button type="button" onclick="toggleDelegatedHost()">👑 ${discussionText('تحكم','Host')}</button><button type="button" onclick="returnToLobby()">🏠 ${discussionText('اللوبي','Lobby')}</button>`:''}<button type="button" onclick="openMyRole()">🃏 ${discussionText('دوري','Role')}</button><button type="button" onclick="openWill()">📜 ${discussionText('وصية','Will')}</button><button type="button" onclick="openReport()">🚩 ${discussionText('بلاغ','Report')}</button></div>`;
-  document.querySelector('#app')?.appendChild(tools);
+  const on=name=>tab===name?' is-on':'';
+  const dock=document.createElement('nav');
+  dock.className='player-dock';
+  dock.setAttribute('aria-label',discussionText('شريط اللاعب','Player bar'));
+  dock.innerHTML=`${play}<div class="dock-row">
+    <button type="button" class="dock-item${on('ability')}" onclick="selectDockTab('ability')"><span class="dock-icon">⚡</span><span>${discussionText('قدرتي','Ability')}</span></button>
+    <button type="button" class="dock-item${on('vote')}" onclick="selectDockTab('vote')"><span class="dock-icon">🗳️</span><span>${discussionText('التصويت','Vote')}</span></button>
+    <button type="button" class="dock-item" data-chat-button ${canChat?'':'disabled'} onclick="openChat()"><span class="dock-icon">💬</span><span>${canChat?dockChatLabel():discussionText('محادثة','Chat')}</span><i class="dock-badge" ${unread?'':'hidden'}></i></button>
+    <button type="button" class="dock-item" onclick="openWill()"><span class="dock-icon">📜</span><span>${discussionText('وصية','Will')}</span></button>
+    <button type="button" class="dock-item" onclick="openReport()"><span class="dock-icon">🚩</span><span>${discussionText('بلاغ','Report')}</span></button>
+  </div>`;
+  document.body.append(dock);
+  document.body.classList.add('has-player-dock');
 }
 function openMyRole(){
   if(!game?.me?.role)return;
@@ -1290,9 +1302,14 @@ function chatButtonLabel(unread=false){return `💬 ${discussionText('محادث
 function paintChatDock(){
   const unread=chatHasUnread();
   for(const button of document.querySelectorAll('[data-chat-button]')){
-    if(button.classList.contains('dock-chat')||button.classList.contains('chat-launch')){
-      button.textContent=`${unread?'🔴 ':''}💬 ${dockChatLabel()}`;
-    }else button.textContent=chatButtonLabel(unread);
+    if(button.classList.contains('dock-item')){
+      button.classList.toggle('has-unread',unread);
+      const badge=button.querySelector('.dock-badge');
+      if(badge)badge.hidden=!unread;
+      const label=button.querySelector('span:not(.dock-icon)');
+      if(label)label.textContent=chatAllowed()?dockChatLabel():discussionText('محادثة','Chat');
+      button.disabled=!chatAllowed();
+    }else button.textContent=`${unread?'🔴 ':''}💬 ${dockChatLabel()}`;
   }
 }
 function markChatRead(messages){const latest=messages?.at(-1);if(latest)localStorage.setItem(chatReadKey(),String(latest.id));unreadChat=false;paintChatDock();}
@@ -1515,13 +1532,19 @@ function wrapCyclePlay(cycle, actionHtml) {
   const hasPick = /class="[^"]*\bpick\b/.test(actionHtml);
   const talkBlock = !talk ? '' : (draw ? talk : `<details class="cycle-talk" data-disclosure-key="cycle-talk"${hasPick?'':' open'}><summary>${discussionText('النقاش','Discussion')}</summary>${talk}</details>`);
   const extra = isNight || isDay ? bossDiscussionChoice() : '';
-  const title=roleActTitle();
+  const detectHits=(game.me?.investigationResults||[]).filter(r=>r.round===game.round);
   const detect=isDay&&game.me?.role==='detective'?investigationPanel():'';
   const action=extractDockAction(actionHtml);
   const votes=voteSummaryCard();
-  const heading=title||(votes?discussionText('نتيجة التصويت','Vote result'):'');
   const voteNeed=['nomination','vote','verdict','trial'].includes(game.phase);
-  pendingDockPlay={title:heading,body:[detect,extra,action,votes].filter(Boolean).join(''),open:voteNeed||!!votes||hasPick||!!detect};
+  const abilityTitle=voteNeed?(detectHits.length?discussionText('نتيجة الفحص','Investigation result'):discussionText('قدرتي','Ability')):(roleActTitle()||discussionText('قدرتي','Ability'));
+  const abilityBody=voteNeed?detect:[detect,extra,action].filter(Boolean).join('');
+  const voteBody=voteNeed?[action,votes].filter(Boolean).join(''):votes;
+  const auto=detectHits.length?'ability':(votes||voteNeed?'vote':(abilityBody?'ability':''));
+  const key=[game.matchId,game.round,game.phase,detectHits.length,!!game.voteSummary].join('|');
+  if(key!==dockAutoKey){dockAutoKey=key;pendingDockPlay.tab=auto;}
+  pendingDockPlay={...pendingDockPlay,abilityTitle,abilityBody,voteBody};
+  if(!pendingDockPlay.tab)pendingDockPlay.tab=auto;
   return `${phaseBar()}<div class="phase-play ${cycle}-play">${personalRoleCard(true)}${isDay?morningBriefPanel():''}${talkBlock}</div>`;
 }
 function morningBriefPanel(embedded=false) {
