@@ -392,7 +392,7 @@ async function api(payload) {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
-    signal: AbortSignal.timeout(20000),
+    signal: AbortSignal.timeout(12000),
   });}catch(error){throw requestError(error.name==='TimeoutError'?'REQUEST_TIMEOUT':'NETWORK_ERROR');}
   let data;
   try {data=await response.json();}catch{throw requestError('INVALID_RESPONSE',response.status);}
@@ -748,7 +748,7 @@ function renderSpectatorContent() {
   setRoomTag(`👁️ ${game.code}`);
   $('#app').innerHTML = `${phaseBar()}<div class="grid"><div class="card hero"><div class="role-title">${phaseIcon()}</div><h1>${phaseName()}</h1><p class="muted" data-no-translate>${discussionText(game.me?.alive===false?'خرجت من المباراة. تتابع فقط، بدون كلام أو تصويت أو قدرات.':'متابعة الأحداث العامة فقط، بدون كشف الأدوار السرية.','Watch public events only. No talking, voting or role actions.')}</p>${game.phase==='finished'?`<h2>${winnerTitle()}</h2>`:''}${eventCards()}${game.phase==='day'?discussionPanel(false):''}</div><div class="card"><h2>اللاعبون (${game.players.length})</h2><div class="players">${playerList()}</div></div></div>`;
 }
-function startSpectatorPolling(){clearTimeout(pollTimer);pollFails=0;const epoch=++pollingEpoch;const tick=async()=>{try{const next=await api({action:'spectatorState',code:game.code,id:spectatorId,spectatorToken});if(epoch!==pollingEpoch)return;pollFails=0;const changed=renderStateKey(next)!==renderStateKey(game);const prevAlive=game?.me?.alive;game=next;maybeImpact(prevAlive);setReconnect(false);if(changed)renderSpectator()}catch{if(epoch===pollingEpoch){pollFails++;if(pollFails>=2)setReconnect(true)}}finally{if(epoch===pollingEpoch)pollTimer=setTimeout(tick,2000)}};pollTimer=setTimeout(tick,700)}
+function startSpectatorPolling(){clearTimeout(pollTimer);pollFails=0;const epoch=++pollingEpoch;const tick=async()=>{const started=Date.now();try{const next=await api({action:'spectatorState',code:game.code,id:spectatorId,spectatorToken});if(epoch!==pollingEpoch)return;pollFails=0;const changed=renderStateKey(next)!==renderStateKey(game);const prevAlive=game?.me?.alive;game=next;maybeImpact(prevAlive);setReconnect(false);if(changed)renderSpectator()}catch{if(epoch===pollingEpoch){pollFails++;if(pollFails>=2)setReconnect(true)}}finally{if(epoch===pollingEpoch)pollTimer=setTimeout(tick,Math.max(200,900-(Date.now()-started)))}};pollTimer=setTimeout(tick,200)}
 function replacementForm() {
   setRoomTag('🔄');
   $('#app').innerHTML = noirPageFrame(`<h1>${discussionText('استبدال لاعب','Replace player')}</h1><p class="muted">${discussionText('خذ رمز الاستبدال من المضيف.','Get the replacement code from the host.')}</p><label for="roomCode">${discussionText('كود الغرفة','Room code')}</label><input class="input" id="roomCode" inputmode="numeric" maxlength="4" dir="ltr" placeholder="1234"><label for="replacementCode">${discussionText('رمز الاستبدال','Replacement code')}</label><input class="input" id="replacementCode" maxlength="8" dir="ltr"><label for="playerName">${discussionText('اسم اللاعب الجديد','New player name')}</label><input class="input" id="playerName" maxlength="20" autocomplete="name"><button class="btn red wide" type="button" onclick="claimSeat()">${discussionText('استلام مكان اللاعب','Take player seat')}</button>`);
@@ -857,11 +857,18 @@ function renderStateKey(state) {
   return JSON.stringify({ ...view, discussion: stableDiscussion });
 }
 
+function pollDelay(){
+  const phase=game?.phase;
+  if(phase==='lobby')return 1100;
+  if(['night','vote','nomination','verdict','trial','reveal'].includes(phase))return 650;
+  return 850;
+}
 function startPolling(host) {
   clearTimeout(pollTimer);
   pollFails = 0;
   const epoch=++pollingEpoch;
   const tick = async () => {
+    const started=Date.now();
     try {
       const next = await api({ action: 'state', code: game.code, id: playerId, playerToken, hostToken });
       if(epoch!==pollingEpoch)return;
@@ -892,10 +899,10 @@ function startPolling(host) {
       pollFails++;
       if (pollFails >= 2) setReconnect(true);
     } finally {
-      if(epoch===pollingEpoch)pollTimer = setTimeout(tick, game?.phase === 'lobby' ? 2500 : 2200);
+      if(epoch===pollingEpoch)pollTimer = setTimeout(tick, Math.max(150, pollDelay()-(Date.now()-started)));
     }
   };
-  pollTimer = setTimeout(tick, game?.phase === 'lobby' ? 250 : 500);
+  pollTimer = setTimeout(tick, 150);
 }
 
 function syncHistoryMatch() {
@@ -1269,7 +1276,7 @@ function renderPlayerContent() {
   }
   if (!me) { $('#app').innerHTML = '<div class="card hero"><h2>فقدنا جلسة اللاعب</h2><button class="btn" onclick="home()">دخول من جديد</button></div>'; return; }
   if (!me.alive) { delegatedHostMode=false; if(document.querySelector('.game-sheet'))closeSheet(); renderSpectator(); return; }
-  setTimeout(mountPlayerTools, 0);
+  mountPlayerTools();
   if (game.phase === 'paused') { pendingDockPlay={abilityTitle:'',abilityBody:'',voteBody:'',squareBody:'',tab:''}; $('#app').innerHTML = `${phaseBar()}<div class="card hero"><div class="role-title">⏸️ المباراة متوقفة</div><p>المضيف سيكمل المباراة من المرحلة نفسها.</p>${me.isHost?`<button class="btn gold wide" type="button" onclick="returnToLobby()">${discussionText('إيقاف والرجوع للوبي','Stop and return to lobby')}</button>`:''}</div>`; return; }
   if (game.phase === 'finished') {
     $('#app').innerHTML = `${phaseBar()}<div class="card hero"><div class="role-title">${winnerTitle()}</div><p>${discussionText('دورك','Your role')}: ${roleLabel(me.role)}</p><p class="muted">${me.isHost ? discussionText('افتح تحكم المضيف لإعادة المباراة.','Open host controls to play again.') : discussionText('انتظر المضيف لإعادة المباراة.','Wait for the host to play again.')}</p></div>`;
@@ -1402,7 +1409,7 @@ function paintChatDock(){
 }
 function markChatRead(messages){const latest=messages?.at(-1);if(latest)localStorage.setItem(chatReadKey(),String(latest.id));unreadChat=false;paintChatDock();}
 async function pollChatNotification(){
- if(!chatAllowed()||document.querySelector('.chat-list')||chatNoticePending||Date.now()-chatNoticeAt<5000)return;
+ if(!chatAllowed()||document.querySelector('.chat-list')||chatNoticePending||Date.now()-chatNoticeAt<2500)return;
  chatNoticeAt=Date.now();chatNoticePending=true;const key=chatReadKey(),epoch=pollingEpoch;
  try{const result=await api({action:'messages',code:game.code,id:playerId,playerToken});
   if(epoch!==pollingEpoch||key!==chatReadKey()||!chatAllowed())return;
@@ -1449,9 +1456,9 @@ function startChatPolling(){
    if(epoch!==chatEpoch)return;
    if(['UNAUTHORIZED','INVALID_ACTION'].includes(error.code)){closeSheet();return;}
    const status=document.querySelector('.chat-status');if(status)status.textContent=discussionText('انقطع الاتصال، نحاول نرجع…','Reconnecting…');
-  }finally{if(epoch===chatEpoch&&document.querySelector('.chat-list'))chatTimer=setTimeout(tick,1000);}
+  }finally{if(epoch===chatEpoch&&document.querySelector('.chat-list'))chatTimer=setTimeout(tick,600);}
  };
- chatTimer=setTimeout(tick,1000);
+ chatTimer=setTimeout(tick,400);
 }
 async function openChat(){
  stopChatPolling();const epoch=chatEpoch;
