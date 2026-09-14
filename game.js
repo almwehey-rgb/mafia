@@ -1240,7 +1240,7 @@ function extractDockAction(html){
   return (card||box).innerHTML;
 }
 function selectDockTab(tab){
-  pendingDockPlay.tab=tab;
+  pendingDockPlay.tab=pendingDockPlay.tab===tab?'none':tab;
   document.querySelector('.player-dock')?.remove();
   document.body.classList.remove('has-player-dock');
   mountPlayerTools();
@@ -1549,7 +1549,7 @@ function wrapCyclePlay(cycle, actionHtml) {
   const key=[game.matchId,game.round,game.phase,detectHits.length,!!game.voteSummary].join('|');
   if(key!==dockAutoKey){dockAutoKey=key;pendingDockPlay.tab=auto;}
   pendingDockPlay={...pendingDockPlay,abilityTitle,abilityBody,voteBody};
-  if(!pendingDockPlay.tab)pendingDockPlay.tab=auto;
+  if(pendingDockPlay.tab!=='none'&&!pendingDockPlay.tab)pendingDockPlay.tab=auto;
   return `${phaseBar()}<div class="phase-play ${cycle}-play">${personalRoleCard(true)}${isDay?morningBriefPanel():''}${talkBlock}</div>`;
 }
 function morningBriefPanel(embedded=false) {
