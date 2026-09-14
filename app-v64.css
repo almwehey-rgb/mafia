@@ -1043,7 +1043,10 @@ body.app-shell h1,body.app-shell h2,body.app-shell h3{font-weight:800}
 .player-dock .choice-stack .pick,.player-dock .verdict-grid .pick,.player-dock .pick{min-height:48px;width:100%;padding:10px 8px;font-size:16px;font-weight:700}
 .player-dock .pick.skip{grid-column:1/-1}
 .player-dock .dock-play.dock-card-play{display:grid;place-items:center;overflow:auto}
-.player-dock .dock-play h3{margin:10px 0 6px;font-size:14px;color:#e8c37a;text-align:center}
+.player-dock .square-block{margin:0 0 14px;padding:0 0 12px;border-bottom:1px solid #80663f55}
+.player-dock .square-block:last-child{border:0;margin:0;padding:0}
+.player-dock .square-block h3{margin:0 0 8px;font-size:13px;color:#e8c37a;text-align:start}
+.player-dock .square-line{margin:0;font-size:18px;font-weight:800;text-align:center}
 .player-dock .dock-play:not(.dock-card-play) .card{margin:0;padding:0;border:0;background:transparent;box-shadow:none}
 .player-dock .dock-row{flex:none;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));align-items:stretch;gap:2px;padding:6px 8px max(8px,env(safe-area-inset-bottom));border-top:1px solid #80663f88;background:#0c0e0df8;pointer-events:auto}
 .player-dock .dock-item{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;min-height:54px;height:54px;margin:0;padding:4px 2px;border:1px solid transparent;border-radius:12px;background:transparent;color:#e8d3a4;font:700 10px/1.15 Tahoma,Arial;white-space:nowrap;cursor:pointer}

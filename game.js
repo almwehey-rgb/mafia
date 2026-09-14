@@ -1200,7 +1200,7 @@ function renderPlayerContent() {
   if (!me) { $('#app').innerHTML = '<div class="card hero"><h2>فقدنا جلسة اللاعب</h2><button class="btn" onclick="home()">دخول من جديد</button></div>'; return; }
   if (!me.alive) { delegatedHostMode=false; if(document.querySelector('.game-sheet'))closeSheet(); renderSpectator(); return; }
   setTimeout(mountPlayerTools, 0);
-  if (game.phase === 'paused') { pendingDockPlay={abilityTitle:'',abilityBody:'',voteBody:'',tab:''}; $('#app').innerHTML = `${phaseBar()}<div class="card hero"><div class="role-title">⏸️ المباراة متوقفة</div><p>المضيف سيكمل المباراة من المرحلة نفسها.</p>${me.isHost?`<button class="btn gold wide" type="button" onclick="returnToLobby()">${discussionText('إيقاف والرجوع للوبي','Stop and return to lobby')}</button>`:''}</div>`; return; }
+  if (game.phase === 'paused') { pendingDockPlay={abilityTitle:'',abilityBody:'',voteBody:'',squareBody:'',tab:''}; $('#app').innerHTML = `${phaseBar()}<div class="card hero"><div class="role-title">⏸️ المباراة متوقفة</div><p>المضيف سيكمل المباراة من المرحلة نفسها.</p>${me.isHost?`<button class="btn gold wide" type="button" onclick="returnToLobby()">${discussionText('إيقاف والرجوع للوبي','Stop and return to lobby')}</button>`:''}</div>`; return; }
   if (game.phase === 'finished') {
     $('#app').innerHTML = `${phaseBar()}<div class="card hero"><div class="role-title">${winnerTitle()}</div><p>${discussionText('دورك','Your role')}: ${roleLabel(me.role)}</p><p class="muted">${me.isHost ? discussionText('افتح تحكم المضيف لإعادة المباراة.','Open host controls to play again.') : discussionText('انتظر المضيف لإعادة المباراة.','Wait for the host to play again.')}</p></div>`;
     return;
@@ -1230,7 +1230,7 @@ function dockChatLabel(){
   if(game?.me?.jailed||game?.me?.role==='jailer')return discussionText('محادثة السجن','Jail chat');
   return discussionText('محادثة المافيا','Mafia chat');
 }
-let pendingDockPlay={abilityTitle:'',abilityBody:'',voteBody:'',tab:''};
+let pendingDockPlay={abilityTitle:'',abilityBody:'',voteBody:'',squareBody:'',tab:''};
 let dockAutoKey='';
 function extractDockAction(html){
   const box=document.createElement('div');
@@ -1253,8 +1253,8 @@ function mountPlayerTools(){
   let play='';
   if(tab==='ability'){
     play=`<section class="dock-play">${pendingDockPlay.abilityTitle?`<h2 class="role-act-title" data-no-translate>${pendingDockPlay.abilityTitle}</h2>`:''}${pendingDockPlay.abilityBody||`<p class="muted">${discussionText('ما فيه إجراء الحين.','No action right now.')}</p>`}</section>`;
-  }else if(tab==='vote'){
-    play=`<section class="dock-play"><h2 class="role-act-title" data-no-translate>${discussionText('التصويت','Vote')}</h2>${pendingDockPlay.voteBody||`<p class="muted">${discussionText('ما فيه نتيجة تصويت بعد.','No vote result yet.')}</p>`}</section>`;
+  }else if(tab==='square'){
+    play=`<section class="dock-play"><h2 class="role-act-title" data-no-translate>${discussionText('الساحة','Square')}</h2>${pendingDockPlay.squareBody||`<p class="muted">${discussionText('ما فيه خبر الحين.','Nothing to show yet.')}</p>`}</section>`;
   }else if(tab==='card'){
     play=`<section class="dock-play dock-card-play">${personalRoleCard(true,{reveal:true})}</section>`;
   }
@@ -1265,7 +1265,7 @@ function mountPlayerTools(){
   dock.setAttribute('aria-label',discussionText('شريط اللاعب','Player bar'));
   dock.innerHTML=`${play}<div class="dock-row">
     <button type="button" class="dock-item${on('ability')}" onclick="selectDockTab('ability')"><span class="dock-icon">⚡</span><span>${discussionText('قدرتي','Ability')}</span></button>
-    <button type="button" class="dock-item${on('vote')}" onclick="selectDockTab('vote')"><span class="dock-icon">🗳️</span><span>${discussionText('التصويت','Vote')}</span></button>
+    <button type="button" class="dock-item${on('square')}" onclick="selectDockTab('square')"><span class="dock-icon">📢</span><span>${discussionText('الساحة','Square')}</span></button>
     <button type="button" class="dock-item dock-card-tab${on('card')}" onclick="selectDockTab('card')"><span class="dock-icon">🃏</span><span>${discussionText('كرتي','My card')}</span></button>
     <button type="button" class="dock-item${chatOn}" data-chat-button ${canChat?'':'disabled'} onclick="openChat()"><span class="dock-icon">💬</span><span>${discussionText('محادثة','Chat')}</span><i class="dock-badge" ${unread?'':'hidden'}></i></button>
     <button type="button" class="dock-item" onclick="openDockMore()"><span class="dock-icon">⋯</span><span>${discussionText('المزيد','More')}</span></button>
@@ -1531,14 +1531,25 @@ function roleActTitle(){
   if(phase==='trial')return discussionText('المحاكمة','Trial');
   return '';
 }
+function squarePanelHtml(voteBody=''){
+  const view=typeof clientDiscussion==='function'?clientDiscussion():{status:'off'};
+  let speaker='';
+  if(['day','trial'].includes(game.phase)){
+    if(typeof openingDrawActive==='function'&&openingDrawActive(view))speaker=`<p class="square-line">${discussionText('قرعة المتحدث جارية…','Speaker draw in progress…')}</p>`;
+    else if(view.mode==='turns'&&view.speakerId)speaker=`<p class="square-line"><b>${discussionText('المتحدث','Speaking')}</b> ${escapeHtml(nameOf(view.speakerId))}${view.remainingMs?` · ${formatDiscussionTime(view.remainingMs)}`:''}</p>`;
+    else if(view.mode==='group'&&view.status==='active')speaker=`<p class="square-line">${discussionText('الجميع يتكلم','Everyone can speak')}</p>`;
+  }
+  const deathIds=game.lastDeaths||[];
+  const deathRows=deathIds.map(id=>`<p>☠️ ${escapeHtml(nameOf(id))}</p>`).join('');
+  const dead=`<div class="square-block"><h3>${discussionText('من مات','Who died')}</h3>${deathRows||`<p>${discussionText('لم يمت أحد','Nobody died')}</p>`}</div>`;
+  const news=typeof eventCards==='function'?eventCards():'';
+  const announce=news?`<div class="square-block"><h3>${discussionText('الإعلان','Announcements')}</h3>${news}</div>`:'';
+  const vote=voteBody?`<div class="square-block"><h3>${discussionText('التصويت','Vote')}</h3>${voteBody}</div>`:'';
+  return [speaker&&`<div class="square-block">${speaker}</div>`,announce,dead,vote].filter(Boolean).join('')||`<p class="muted">${discussionText('ما فيه خبر الحين.','Nothing to show yet.')}</p>`;
+}
 function wrapCyclePlay(cycle, actionHtml) {
   const isDay = cycle === 'day';
   const isNight = cycle === 'night';
-  const view = typeof clientDiscussion === 'function' ? clientDiscussion() : {status:'off'};
-  const draw = isDay && typeof openingDrawActive === 'function' && openingDrawActive(view);
-  const talk = isDay ? discussionPanel(false) : '';
-  const hasPick = /class="[^"]*\bpick\b/.test(actionHtml);
-  const talkBlock = !talk ? '' : (draw ? talk : `<details class="cycle-talk" data-disclosure-key="cycle-talk"${hasPick?'':' open'}><summary>${discussionText('النقاش','Discussion')}</summary>${talk}</details>`);
   const extra = isNight || isDay ? bossDiscussionChoice() : '';
   const detectHits=(game.me?.investigationResults||[]).filter(r=>r.round===game.round);
   const detect=isDay&&game.me?.role==='detective'?investigationPanel():'';
@@ -1548,12 +1559,14 @@ function wrapCyclePlay(cycle, actionHtml) {
   const abilityTitle=voteNeed?(detectHits.length?discussionText('نتيجة الفحص','Investigation result'):discussionText('قدرتي','Ability')):(roleActTitle()||discussionText('قدرتي','Ability'));
   const abilityBody=voteNeed?detect:[detect,extra,action].filter(Boolean).join('');
   const voteBody=voteNeed?[action,votes].filter(Boolean).join(''):votes;
-  const auto=detectHits.length?'ability':(votes||voteNeed?'vote':(abilityBody?'ability':''));
-  const key=[game.matchId,game.round,game.phase,detectHits.length,!!game.voteSummary].join('|');
+  const squareBody=squarePanelHtml(voteBody);
+  const auto=detectHits.length?'ability':(voteNeed||votes||isDay||(game.lastDeaths||[]).length?'square':(abilityBody?'ability':'square'));
+  const key=[game.matchId,game.round,game.phase,detectHits.length,!!game.voteSummary,(game.lastDeaths||[]).join(',')].join('|');
   if(key!==dockAutoKey){dockAutoKey=key;pendingDockPlay.tab=auto;}
-  pendingDockPlay={...pendingDockPlay,abilityTitle,abilityBody,voteBody};
+  if(pendingDockPlay.tab==='vote')pendingDockPlay.tab='square';
+  pendingDockPlay={...pendingDockPlay,abilityTitle,abilityBody,voteBody,squareBody};
   if(pendingDockPlay.tab!=='none'&&!pendingDockPlay.tab)pendingDockPlay.tab=auto;
-  return `${phaseBar()}<div class="phase-play ${cycle}-play">${isDay?morningBriefPanel():''}${talkBlock}</div>`;
+  return `${phaseBar()}<div class="phase-play ${cycle}-play"></div>`;
 }
 function morningBriefPanel(embedded=false) {
   const deaths = (game.lastDeaths || []).map((id) => `<div class="event danger-text">☠️ ${escapeHtml(nameOf(id))}</div>`).join('');
