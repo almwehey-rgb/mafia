@@ -1521,7 +1521,7 @@ function wrapCyclePlay(cycle, actionHtml) {
   const votes=voteSummaryCard();
   const heading=title||(votes?discussionText('نتيجة التصويت','Vote result'):'');
   const voteNeed=['nomination','vote','verdict','trial'].includes(game.phase);
-  pendingDockPlay={title:heading,body:[detect,extra,action,votes].filter(Boolean).join(''),open:voteNeed||!!votes||hasPick};
+  pendingDockPlay={title:heading,body:[detect,extra,action,votes].filter(Boolean).join(''),open:voteNeed||!!votes||hasPick||!!detect};
   return `${phaseBar()}<div class="phase-play ${cycle}-play">${personalRoleCard(true)}${isDay?morningBriefPanel():''}${talkBlock}</div>`;
 }
 function morningBriefPanel(embedded=false) {
