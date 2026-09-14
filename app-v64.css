@@ -585,9 +585,9 @@ body.light .flip-card .role-team,body.light .flip-card .personal-card-properties
 .role-reveal-only{display:grid;justify-items:center;align-content:start;gap:8px;width:min(400px,100%);margin:0 auto;padding:0 0 max(12px,env(safe-area-inset-bottom))}
 .role-reveal-only .role-presentation{width:100%;margin:0;display:grid;gap:8px}
 .role-reveal-only .personal-role-card,.role-reveal-only .reveal-card{width:100%;max-width:none;margin:0}
-.role-reveal-only .reveal-ack{display:grid;grid-template-columns:auto minmax(0,1fr);gap:8px;align-items:center;width:100%;position:sticky;bottom:max(6px,env(safe-area-inset-bottom));z-index:3}
-.role-reveal-only .reveal-ack .phase-timer{min-width:52px;min-height:48px;margin:0;display:grid;place-items:center;border-radius:12px;font-size:18px;font-weight:800}
-.role-reveal-only .reveal-ack .btn{width:auto;min-height:48px;margin:0;position:static}
+.role-reveal-only .reveal-ack{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;min-height:52px;margin:0;position:sticky;bottom:max(6px,env(safe-area-inset-bottom));z-index:3}
+.role-reveal-only .reveal-ack .phase-timer{width:auto;height:auto;min-width:auto;min-height:auto;margin:0;padding:0;border:0;border-radius:0;background:transparent;color:inherit;font-size:20px;font-weight:800;line-height:1;animation:none}
+.role-reveal-only .reveal-ack .phase-timer.urgent{background:transparent;color:#ffe7a8}
 .role-reveal-only .role-allies{width:100%;margin:0;padding:8px 10px;border-radius:12px;font-size:14px}
 .role-reveal-only .role-allies h3{font-size:12px;margin:0 0 6px}
 .role-reveal-only .role-turn-hint{font-size:clamp(13px,3.6vw,16px);padding:6px 8px}
