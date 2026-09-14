@@ -1468,7 +1468,7 @@ function wrapCyclePlay(cycle, actionHtml) {
   const hasPick = /class="[^"]*\bpick\b/.test(actionHtml);
   const talkBlock = !talk ? '' : (draw ? talk : `<details class="cycle-talk" data-disclosure-key="cycle-talk"${hasPick?'':' open'}><summary>${discussionText('النقاش','Discussion')}</summary>${talk}</details>`);
   const extra = isNight || isDay ? bossDiscussionChoice() : '';
-  return `${phaseBar()}<div class="phase-play ${cycle}-play">${isNight?nightChatBar():''}${isDay?morningBriefPanel():''}${isDay&&game.me?.role==='detective'?investigationPanel():''}${extra}<section class="cycle-action">${actionHtml}</section>${talkBlock}</div>`;
+  return `${phaseBar()}<div class="phase-play ${cycle}-play">${isDay?morningBriefPanel():''}${isDay&&game.me?.role==='detective'?investigationPanel():''}${extra}<section class="cycle-action">${actionHtml}</section>${talkBlock}</div>`;
 }
 function morningBriefPanel(embedded=false) {
   const deaths = (game.lastDeaths || []).map((id) => `<div class="event danger-text">☠️ ${escapeHtml(nameOf(id))}</div>`).join('');
