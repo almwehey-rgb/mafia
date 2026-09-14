@@ -1618,7 +1618,7 @@ function wrapCyclePlay(cycle, actionHtml) {
   if(pendingDockPlay.tab==='square'||pendingDockPlay.tab==='vote')pendingDockPlay.tab='none';
   pendingDockPlay={...pendingDockPlay,abilityTitle,abilityBody,voteBody,squareBody};
   if(pendingDockPlay.tab!=='none'&&!pendingDockPlay.tab)pendingDockPlay.tab=auto;
-  return `${phaseBar()}<div class="phase-play ${cycle}-play square-home">${squareBody}</div>`;
+  return `${phaseBar()}<div class="phase-play ${cycle}-play square-home"><h2 class="role-act-title" data-no-translate>${discussionText('الرئيسية','Home')}</h2>${squareBody}</div>`;
 }
 function morningBriefPanel(embedded=false) {
   const deaths = (game.lastDeaths || []).map((id) => `<div class="event danger-text">☠️ ${escapeHtml(nameOf(id))}</div>`).join('');
