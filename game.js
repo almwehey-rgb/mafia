@@ -618,11 +618,12 @@ const reviewCardViews = new Map();
 const kidsCardRoles = new Set(['mafia_boss','mafia','detective','doctor','citizen']);
 function roleCardAsset(role,thumbnail=false,kids=false){return `/assets/${kids&&kidsCardRoles.has(role)?'role-cards-kids':'role-cards-v3'}/${role}${thumbnail?'-thumb':''}.webp`;}
 function selectRoleView(card,open){
- card=card.closest('.role-reader');
+ card=card?.closest?.('.role-reader');
+ if(!card)return;
  card.dataset.view=open?'details':'image';
  card.setAttribute('aria-pressed',String(open));
- card.querySelector('.role-image-view').setAttribute('aria-hidden',String(open));
- card.querySelector('.role-details-view').setAttribute('aria-hidden',String(!open));
+ card.querySelector('.role-image-view')?.setAttribute('aria-hidden',String(open));
+ card.querySelector('.role-details-view')?.setAttribute('aria-hidden',String(!open));
  if(card.classList.contains('personal-role-card'))personalCardState.open=open;
  if(card.dataset.reviewRole)reviewCardViews.set(card.dataset.reviewRole,open);
 }
@@ -640,7 +641,7 @@ function interactiveRoleCard(role, {personal=false, compact=false, image='', ope
  const team=personal&&mafiaRoleClient(role)?`<aside class="role-allies" data-no-translate><h3>${discussionText('زملاؤك في المافيا','Your Mafia allies')} <small>${discussionText('خاص بفريقك','Team only')}</small></h3><div>${teammates.map(p=>`<span>${escapeHtml(p.name)}</span>`).join('')||`<p>${discussionText('أنت عضو المافيا الوحيد','You are the only Mafia member')}</p>`}</div></aside>`:'';
  const identity=compact||reveal?'':`<header class="role-identity" data-no-translate><h2>${escapeHtml(title)}</h2><span>${escapeHtml(roleTeamLabel(role))}</span>${review?`<span class="review-role-count" aria-label="${discussionText('عدد اللاعبين','Player count')}">× ${count}</span>`:''}</header>`;
  const flipHint=discussionText('اضغط','Tap');
- return `<section class="role-presentation ${review?'review-role-presentation':''} ${compact?'compact-presentation':''} ${reveal?'reveal-presentation':''}" data-no-translate>${identity}<article class="role-reader turning-role ${kids?'kids-role-card':''} ${personal?'personal-role-card':''} ${compact?'compact':''} ${reveal?'reveal-card':''}" ${review?`data-review-role="${role}"`:''} data-view="${open?'details':'image'}" style="--role-art:url('${image}')" role="button" tabindex="0" aria-label="${label} — ${discussionText('اضغط لقلب الكرت','Tap to flip')}" aria-pressed="${open}" onclick="selectRoleView(this,this.dataset.view!=='details')" onkeydown="if(event.target===this&&(event.key==='Enter'||event.key===' ')){event.preventDefault();selectRoleView(this,this.dataset.view!=='details')}"><div class="role-turn-inner"><div class="role-image-view" aria-hidden="${open}"><img src="${image}" alt="${label}" width="1024" height="1536" loading="lazy" decoding="async"><span class="role-turn-hint">${flipHint}</span></div><div class="role-details-view" aria-hidden="${!open}"><div class="personal-card-properties">${detailedRoleProperties(role,personal)}</div></div></div></article>${team}</section>`;
+ return `<section class="role-presentation ${review?'review-role-presentation':''} ${compact?'compact-presentation':''} ${reveal?'reveal-presentation':''}" data-no-translate>${identity}<button type="button" class="role-reader turning-role ${kids?'kids-role-card':''} ${personal?'personal-role-card':''} ${compact?'compact':''} ${reveal?'reveal-card':''}" ${review?`data-review-role="${role}"`:''} data-view="${open?'details':'image'}" style="--role-art:url('${image}')" aria-label="${label} — ${discussionText('اضغط لقلب الكرت','Tap to flip')}" aria-pressed="${open}" onclick="event.preventDefault();selectRoleView(this,this.dataset.view!=='details')"><div class="role-turn-inner"><div class="role-image-view" aria-hidden="${open}"><img src="${image}" alt="" width="1024" height="1536" loading="lazy" decoding="async"><span class="role-turn-hint">${flipHint}</span></div><div class="role-details-view" aria-hidden="${!open}"><div class="personal-card-properties">${detailedRoleProperties(role,personal)}</div></div></div></button>${team}</section>`;
 }
 let homeGalleryObserver;
 function mountHomeCharacters() {

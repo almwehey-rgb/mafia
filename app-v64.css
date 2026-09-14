@@ -588,7 +588,7 @@ body.light .flip-card .role-team,body.light .flip-card .personal-card-properties
 .role-reveal-only .btn{width:100%;position:sticky;bottom:max(8px,env(safe-area-inset-bottom));z-index:3}
 .role-reveal-only .role-allies{width:100%;margin:0;padding:8px 10px;border-radius:12px;font-size:14px}
 .role-reveal-only .role-allies h3{font-size:12px;margin:0 0 6px}
-.role-reveal-only .role-turn-hint{font-size:clamp(13px,4.6cqw,16px);padding:6px 8px}
+.role-reveal-only .role-turn-hint{font-size:clamp(13px,3.6vw,16px);padding:6px 8px}
 body.showing-role .header,body.showing-role .utility-bar{display:none!important}
 body.showing-role .shell{padding:8px 12px 10px!important}
 body.showing-role .role-reveal-only{width:min(94vw,420px);min-height:calc(100dvh - 20px);grid-template-rows:minmax(0,1fr) auto auto;align-content:stretch}
@@ -599,17 +599,19 @@ body.showing-role .role-reader.turning-role{max-width:none;width:100%;height:min
   .role-reveal-only .personal-role-card .flip-front img,.role-reveal-only .role-image-view img{height:100%;object-fit:contain}
 }.role-reader:before{background-size:100% auto;background-position:center top;filter:blur(4px);opacity:.65}.role-reader .personal-card-properties{padding:22px}.role-reader .role-rule-sections p{font-weight:400!important;text-align:start}.role-reader .role-rules-header h2{font-size:clamp(25px,4vw,40px)}
 
-.role-reader.turning-role{container-type:inline-size;container-name:rolecard;perspective:1400px;overflow:visible;isolation:auto;cursor:pointer;background:transparent!important;border:0!important;aspect-ratio:2/3;width:100%;max-width:440px;margin-inline:auto}
+button.role-reader.turning-role{appearance:none;-webkit-appearance:none;font:inherit;color:inherit;text-align:inherit;padding:0;display:block}
+.role-reader.turning-role{perspective:1400px;-webkit-perspective:1400px;overflow:visible;isolation:auto;cursor:pointer;touch-action:manipulation;background:transparent!important;border:0!important;aspect-ratio:2/3;width:100%;max-width:440px;margin-inline:auto}
 .role-reader.turning-role:before,.role-reader.turning-role:after{display:none}
-.role-turn-inner{position:absolute;inset:0;transform-style:preserve-3d;transition:transform .65s cubic-bezier(.2,.7,.2,1)}
+.role-turn-inner{position:absolute;inset:0;transform:rotateY(0deg);transform-style:preserve-3d;-webkit-transform-style:preserve-3d;transition:transform .65s cubic-bezier(.2,.7,.2,1)}
 .turning-role[data-view="details"] .role-turn-inner{transform:rotateY(180deg)}
-.turning-role .role-image-view,.turning-role .role-details-view{position:absolute;inset:0;backface-visibility:hidden;-webkit-backface-visibility:hidden;border-radius:18px;overflow:hidden;border:1px solid #b38e4c;box-sizing:border-box}
+.turning-role .role-image-view,.turning-role .role-details-view{position:absolute;inset:0;backface-visibility:hidden;-webkit-backface-visibility:hidden;border-radius:18px;overflow:hidden;border:1px solid #b38e4c;box-sizing:border-box;pointer-events:none}
+.turning-role .role-image-view{transform:rotateY(0deg)}
 .turning-role .role-image-view img{width:100%;height:100%;max-height:none;object-fit:contain;background:#101413}
 .turning-role .role-details-view{transform:rotateY(180deg);display:flex;flex-direction:column;background:linear-gradient(#101413b8,#101413ef),var(--role-art) center/cover;color:#f3e8d3}
 .turning-role .personal-card-properties{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:#c9a158 transparent;padding:18px}
 .turning-role .role-rules-header{padding:8px 0 18px}.turning-role .role-rules-header h2{font-size:25px}.turning-role .role-rule-sections{padding:0 14px}.turning-role .role-rule-sections p{font-size:16px!important;line-height:1.85}.turning-role .role-private-team{padding:14px;margin-bottom:16px}.turning-role .role-teammates strong{font-size:18px;padding:8px 12px}
 .turning-role .role-image-view,.turning-role .role-details-view,.turning-role .role-turn-hint{backface-visibility:hidden;-webkit-backface-visibility:hidden}
-.role-turn-hint{position:absolute;bottom:6px;inset-inline:10px;z-index:2;display:block;border:0;border-radius:10px;background:#080c0cc4;color:#f6e3b0;text-align:center;font-size:clamp(13px,4.6cqw,16px);font-weight:800;letter-spacing:0;padding:7px 10px;line-height:1.2;pointer-events:none}
+.role-turn-hint{position:absolute;bottom:6px;inset-inline:10px;z-index:2;display:block;border:0;border-radius:10px;background:#080c0cc4;color:#f6e3b0;text-align:center;font-size:clamp(13px,3.6vw,16px);font-weight:800;letter-spacing:0;padding:7px 10px;line-height:1.2;pointer-events:none}
 .turning-role[data-view="details"] .role-turn-hint{display:none}
 .role-image-view .role-turn-hint,.turning-role .role-image-view .role-turn-hint{position:absolute;bottom:6px;inset-inline:10px;flex:none;min-height:0}
 .turning-role:focus-visible{outline:3px solid #edcd88;outline-offset:5px}.role-gallery>.turning-role[data-view="details"]{grid-column:auto}
@@ -929,7 +931,10 @@ body.light .role-privacy{background:#f4dfd6;color:#74352e!important;border-color
 html[data-text-size="s"]{-webkit-text-size-adjust:92%}
 html[data-text-size="l"]{-webkit-text-size-adjust:112%}
 html[data-text-size="xl"]{-webkit-text-size-adjust:124%}
-html.reduce-motion,html.reduce-motion *{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important;scroll-behavior:auto!important}
+html.reduce-motion,html.reduce-motion *:not(.role-turn-inner){animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important;scroll-behavior:auto!important}
+html[data-text-size="s"] .shell,html[data-text-size="s"] .utility-bar,html[data-text-size="s"] .game-sheet,html[data-text-size="s"] .display-sheet{font-size:19px}
+html[data-text-size="l"] .shell,html[data-text-size="l"] .utility-bar,html[data-text-size="l"] .game-sheet,html[data-text-size="l"] .display-sheet{font-size:24px}
+html[data-text-size="xl"] .shell,html[data-text-size="xl"] .utility-bar,html[data-text-size="xl"] .game-sheet,html[data-text-size="xl"] .display-sheet{font-size:27px}
 .display-sheet{position:fixed;inset:0;z-index:80;display:grid;place-items:end center;padding:12px;background:#0008}
 .display-sheet .display-card{width:min(520px,100%);margin-bottom:env(safe-area-inset-bottom);padding:16px 16px 22px}
 .display-row{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:12px 0}

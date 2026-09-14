@@ -94,7 +94,7 @@ function applyDisplayPrefs(){
   html.classList.toggle('reduce-motion',prefs.reduceMotion);
   html.dataset.textSize=prefs.textSize;
   const zoom={s:'0.92',m:'1',l:'1.12',xl:'1.24'}[prefs.textSize];
-  html.style.zoom=zoom==='1'?'':zoom;
+  html.style.zoom='';
   html.style.setProperty('--text-zoom',zoom);
   applyWakeLock(prefs.keepAwake);
 }
