@@ -928,7 +928,7 @@ body.light .role-privacy{background:#f4dfd6;color:#74352e!important;border-color
   .accused-name{font-size:clamp(26px,8vw,48px)}
 }
 @media(max-width:520px){.next-action-hint p{font-size:16px}.morning-brief h2,.day-action-panel h2{font-size:20px}.day-action-panel{padding:12px}.cycle-kicker{font-size:14px}}
-html[data-text-size="s"]{-webkit-text-size-adjust:92%}
+html.lock-zoom,html.lock-zoom body,html.lock-zoom button,html.lock-zoom a,html.lock-zoom .pick,html.lock-zoom .btn{touch-action:manipulation}
 html[data-text-size="l"]{-webkit-text-size-adjust:112%}
 html[data-text-size="xl"]{-webkit-text-size-adjust:124%}
 html.reduce-motion,html.reduce-motion *:not(.role-turn-inner){animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important;scroll-behavior:auto!important}
@@ -944,4 +944,33 @@ html[data-text-size="xl"] .shell,html[data-text-size="xl"] .utility-bar,html[dat
 .display-sizes{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
 .display-sizes .btn[aria-pressed="true"],.display-row .btn[aria-pressed="true"]{background:#b41420;border-color:#ef3340}
 body .utility-bar .settings-toggle{min-width:44px!important}
+
+/* Native-app chrome: one compact bar, phone column, no website frame. */
+html.app-shell,body.app-shell{height:100%;overscroll-behavior:none;-webkit-tap-highlight-color:transparent}
+body.app-shell{min-height:100dvh;min-height:100svh;font-size:16px;font-weight:600;line-height:1.45}
+body.app-shell:before{display:none}
+body.app-shell .shell{max-width:430px!important;margin-inline:auto!important;padding:0 16px max(18px,env(safe-area-inset-bottom))!important}
+body.app-shell.screen-lobby .shell,body.app-shell:has(.host-lobby) .shell{max-width:920px!important}
+body.app-shell .header{position:sticky;top:0;z-index:50;display:flex;align-items:center;gap:8px;flex-wrap:nowrap;min-height:52px;margin:0 -16px 12px;padding:max(8px,env(safe-area-inset-top)) 12px 8px;border-bottom:1px solid #80663f55;background:#0b0d0ef2;backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px)}
+body.app-shell .brand{gap:8px;min-width:0}
+body.app-shell .brand img{width:32px!important;height:32px!important;border-radius:9px;box-shadow:none;border-width:1px}
+body.app-shell .logo{font-size:17px!important;font-weight:800;line-height:1.1}
+body.app-shell .logo small{display:none}
+body.app-shell .room-tag{margin-inline-start:auto;font-size:11px;font-weight:700;padding:4px 10px;letter-spacing:0}
+body.app-shell .utility-bar,body.app-shell .header .utility-bar{position:static!important;width:auto!important;max-width:none!important;margin:0;padding:0!important;gap:0;flex:none;direction:rtl;background:transparent}
+body.app-shell .utility-bar .lang-toggle,body.app-shell .utility-bar .theme-toggle,body.app-shell .utility-bar .fullscreen-toggle{display:none!important}
+body.app-shell .utility-bar .settings-toggle{width:40px!important;min-width:40px!important;height:40px!important;min-height:40px!important;padding:0!important;font-size:18px!important;border-radius:12px!important}
+body.app-shell h1,body.app-shell h2,body.app-shell h3{font-weight:800}
+body.app-shell .btn,body.app-shell .pick,body.app-shell input{font-weight:700!important;min-height:48px}
+body.app-shell .noir-heading{font-size:26px!important;margin:8px 0 6px}
+body.app-shell .noir-intro,body.app-shell .muted,body.app-shell .entry-hint{font-size:14px;font-weight:500;line-height:1.65}
+body.app-shell .noir-kicker,body.app-shell .noir-caption,body.app-shell .noir-site-footer{font-size:11px;letter-spacing:.04em}
+body.app-shell .card{border-radius:16px;padding:16px;margin-bottom:12px;box-shadow:none}
+body.app-shell .phase-bar{width:100%;margin:0 0 12px;border-radius:14px;position:sticky;top:52px;z-index:30}
+body.app-shell .display-sheet{place-items:end stretch;padding:0}
+body.app-shell .display-sheet .display-card{width:100%;max-width:430px;margin:0 auto;border-radius:18px 18px 0 0;padding-bottom:max(22px,env(safe-area-inset-bottom))}
+body.app-shell .home-emblem{display:none}
+@media(display-mode:standalone),(display-mode:fullscreen){
+  body.app-shell .header{padding-top:max(12px,env(safe-area-inset-top))}
+}
 
