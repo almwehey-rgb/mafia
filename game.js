@@ -1516,7 +1516,9 @@ function wrapCyclePlay(cycle, actionHtml) {
   const title=roleActTitle();
   const detect=isDay&&game.me?.role==='detective'?investigationPanel():'';
   const action=extractDockAction(actionHtml);
-  pendingDockPlay={title,body:[detect,extra,action].filter(Boolean).join('')};
+  const votes=voteSummaryCard();
+  const heading=title||(votes?discussionText('نتيجة التصويت','Vote result'):'');
+  pendingDockPlay={title:heading,body:[detect,extra,action,votes].filter(Boolean).join('')};
   return `${phaseBar()}<div class="phase-play ${cycle}-play">${personalRoleCard(true)}${isDay?morningBriefPanel():''}${talkBlock}</div>`;
 }
 function morningBriefPanel(embedded=false) {
@@ -1662,7 +1664,7 @@ function renderWithNotices(content,controller=false) {
     if(game?.me?.isHost && !controller && !document.getElementById('controllerNotice'))$('#app').insertAdjacentHTML('afterbegin','<section id="controllerNotice" class="status"><p>👑 أنت تدير الغرفة الآن.</p><button class="btn" onclick="toggleDelegatedHost()">فتح تحكم المضيف</button></section>');
     if(!document.getElementById('leaderElectionCard'))$('#app').insertAdjacentHTML('afterbegin',leaderElectionCard());
     if(game?.me?.alive&&game.me.mafiaCountResult&&!document.getElementById('revealerResult')){const result=game.me.mafiaCountResult;$('#app').insertAdjacentHTML('afterbegin',`<section id="revealerResult" class="card" data-no-translate><h3>${discussionText('📡 نتيجة كشف الجولة','📡 Reveal result, round')} ${escapeHtml(result.round)}</h3><p>${discussionText('عدد المافيا الباقين عند إعلان الصباح','Mafia alive at dawn')}: <strong>${escapeHtml(result.count)}</strong></p></section>`);}
-    if(!document.getElementById('voteSummaryNotice'))$('#app').insertAdjacentHTML('afterbegin',voteSummaryCard());
+    if(controller && !document.getElementById('voteSummaryNotice'))$('#app').insertAdjacentHTML('afterbegin',voteSummaryCard());
     if(!document.getElementById('eliminationNotice'))$('#app').insertAdjacentHTML('afterbegin',eliminationNotice());
     if(game?.me?.alive && game.me.warnings?.length && !controller && !document.getElementById('hostWarningNotice')){const warning=game.me.warnings.at(-1);$('#app').insertAdjacentHTML('afterbegin',`<section id="hostWarningNotice" class="status wait" role="alert" data-no-translate><b>${discussionText('⚠️ إنذار من المضيف','⚠️ Warning from the host')}</b><p>${escapeHtml(warning.reason)}</p></section>`);}
     if(game?.me?.promotedBoss&&!controller&&!document.getElementById('bossPromotionNotice'))$('#app').insertAdjacentHTML('afterbegin',`<div id="bossPromotionNotice" class="status" data-no-translate>${discussionText('👑 انتقلت لك زعامة المافيا. قرار الاغتيال النهائي عندك.','👑 You are now Mafia Boss. Your kill choice is final.')}</div>`);
