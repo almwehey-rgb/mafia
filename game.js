@@ -1273,8 +1273,6 @@ function mountPlayerTools(){
   let play='';
   if(tab==='ability'){
     play=`<section class="dock-play">${nowTaskHtml()}${pendingDockPlay.abilityTitle?`<h2 class="role-act-title" data-no-translate>${pendingDockPlay.abilityTitle}</h2>`:''}${pendingDockPlay.abilityBody||`<p class="muted">${discussionText('ما فيه إجراء الحين.','No action right now.')}</p>`}</section>`;
-  }else if(tab==='square'){
-    play=`<section class="dock-play"><h2 class="role-act-title" data-no-translate>${discussionText('الساحة','Square')}</h2>${pendingDockPlay.squareBody||`<p class="muted">${discussionText('ما فيه خبر الحين.','Nothing to show yet.')}</p>`}</section>`;
   }else if(tab==='card'){
     play=`<section class="dock-play dock-card-play">${personalRoleCard(true,{reveal:true})}</section>`;
   }
@@ -1285,7 +1283,6 @@ function mountPlayerTools(){
   dock.setAttribute('aria-label',discussionText('شريط اللاعب','Player bar'));
   dock.innerHTML=`${play}<div class="dock-row">
     <button type="button" class="dock-item${on('ability')}" onclick="selectDockTab('ability')"><span class="dock-icon">⚡</span><span>${discussionText('قدرتي','Ability')}</span></button>
-    <button type="button" class="dock-item${on('square')}" onclick="selectDockTab('square')"><span class="dock-icon">📢</span><span>${discussionText('الساحة','Square')}</span></button>
     <button type="button" class="dock-item dock-card-tab${on('card')}" onclick="selectDockTab('card')"><span class="dock-icon">🃏</span><span>${discussionText('كرتي','My card')}</span></button>
     <button type="button" class="dock-item${chatOn}" data-chat-button ${canChat?'':'disabled'} onclick="openChat()"><span class="dock-icon">💬</span><span>${discussionText('محادثة','Chat')}</span><i class="dock-badge" ${unread?'':'hidden'}></i></button>
     <button type="button" class="dock-item" onclick="openDockMore()"><span class="dock-icon">⋯</span><span>${discussionText('المزيد','More')}</span></button>
@@ -1615,13 +1612,13 @@ function wrapCyclePlay(cycle, actionHtml) {
   const abilityBody=voteNeed?detect:[detect,extra,action].filter(Boolean).join('');
   const voteBody=voteNeed?[action,votes].filter(Boolean).join(''):votes;
   const squareBody=squarePanelHtml(voteBody);
-  const auto=detectHits.length?'ability':(voteNeed||votes||isDay||(game.lastDeaths||[]).length?'square':(abilityBody?'ability':'square'));
+  const auto=detectHits.length?'ability':'none';
   const key=[game.matchId,game.round,game.phase,detectHits.length,!!game.voteSummary,(game.lastDeaths||[]).join(',')].join('|');
   if(key!==dockAutoKey){dockAutoKey=key;pendingDockPlay.tab=auto;}
-  if(pendingDockPlay.tab==='vote')pendingDockPlay.tab='square';
+  if(pendingDockPlay.tab==='square'||pendingDockPlay.tab==='vote')pendingDockPlay.tab='none';
   pendingDockPlay={...pendingDockPlay,abilityTitle,abilityBody,voteBody,squareBody};
   if(pendingDockPlay.tab!=='none'&&!pendingDockPlay.tab)pendingDockPlay.tab=auto;
-  return `${phaseBar()}<div class="phase-play ${cycle}-play"></div>`;
+  return `${phaseBar()}<div class="phase-play ${cycle}-play square-home">${squareBody}</div>`;
 }
 function morningBriefPanel(embedded=false) {
   const deaths = (game.lastDeaths || []).map((id) => `<div class="event danger-text">☠️ ${escapeHtml(nameOf(id))}</div>`).join('');
@@ -1838,7 +1835,8 @@ function enhanceJourney(controller){
   if(!game)return;
   if(!document.querySelector('#app .phase-bar'))$('#app').insertAdjacentHTML('afterbegin',phaseBar());
   const hint=controller?controllerTaskHint():playerTaskHint();
-  if(hint){const node=document.createElement('section');node.className='journey-hint next-action-hint';node.setAttribute('data-no-translate','');node.innerHTML=`<b>${discussionText('المطلوب الآن','Now')}</b><p>${escapeHtml(hint)}</p>`;document.querySelector('#app .phase-bar').insertAdjacentElement('afterend',node);}
+  const playerHome=game.me?.alive&&!controller&&!['lobby','reveal','finished','paused'].includes(game.phase);
+  if(hint&&!playerHome){const node=document.createElement('section');node.className='journey-hint next-action-hint';node.setAttribute('data-no-translate','');node.innerHTML=`<b>${discussionText('المطلوب الآن','Now')}</b><p>${escapeHtml(hint)}</p>`;document.querySelector('#app .phase-bar').insertAdjacentElement('afterend',node);}
   document.querySelectorAll('.setup-tabs button').forEach((button,index)=>{if(index+1===setupStep)button.setAttribute('aria-current','step');});
   paintActionFeedback();updatePhaseTimer();
 }

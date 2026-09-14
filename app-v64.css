@@ -1052,9 +1052,15 @@ body.app-shell h1,body.app-shell h2,body.app-shell h3{font-weight:800}
 .player-dock .square-block h3{margin:0 0 8px;font-size:13px;color:#e8c37a;text-align:start}
 .player-dock .square-now{background:#1a2218;border:1px solid #c9a22766;border-radius:12px;padding:12px;border-bottom:1px solid #c9a22766}
 .player-dock .square-now p{margin:0;font-size:16px;font-weight:700;line-height:1.55}
+.square-home .square-block{margin:0 0 14px;padding:0 0 12px;border-bottom:1px solid #80663f55;text-align:start}
+.square-home .square-block:last-child{border:0;margin:0;padding:0}
+.square-home .square-block h3{margin:0 0 8px;font-size:13px;color:#e8c37a}
+.square-home .square-now{background:#1a2218;border:1px solid #c9a22766;border-radius:12px;padding:12px;border-bottom:1px solid #c9a22766}
+.square-home .square-now p{margin:0;font-size:16px;font-weight:700;line-height:1.55}
+.square-home .choice-stack,.square-home .verdict-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 body.has-player-dock:has(.dock-play) .journey-hint{display:none}
 .player-dock .dock-play:not(.dock-card-play) .card{margin:0;padding:0;border:0;background:transparent;box-shadow:none}
-.player-dock .dock-row{flex:none;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));align-items:stretch;gap:2px;padding:6px 8px max(8px,env(safe-area-inset-bottom));border-top:1px solid #80663f88;background:#0c0e0df8;pointer-events:auto}
+.player-dock .dock-row{flex:none;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));align-items:stretch;gap:2px;padding:6px 8px max(8px,env(safe-area-inset-bottom));border-top:1px solid #80663f88;background:#0c0e0df8;pointer-events:auto}
 .player-dock .dock-item{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;min-height:54px;height:54px;margin:0;padding:4px 2px;border:1px solid transparent;border-radius:12px;background:transparent;color:#e8d3a4;font:700 10px/1.15 Tahoma,Arial;white-space:nowrap;cursor:pointer}
 .player-dock .dock-item span:not(.dock-icon){max-width:100%;overflow:hidden;text-overflow:ellipsis}
 .player-dock .dock-item.dock-card-tab{background:transparent;color:#f0ca7c;border-color:#c9a227;font-weight:800;box-shadow:none}
