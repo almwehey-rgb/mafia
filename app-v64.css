@@ -889,6 +889,7 @@ body.screen-lobby .host-lobby .counter{font-size:clamp(28px,8vw,42px)}
 .phase-play{display:grid;gap:12px;width:min(720px,100%);margin:0 auto 12px}
 .cycle-kicker{margin:0;font-size:15px;font-weight:900;color:var(--ux-accent);letter-spacing:.04em}
 .cycle-action .wait-only{display:none;padding:0;border:0;background:none}
+.cycle-action .card,.cycle-action .card.hero{margin:0;width:100%}
 .cycle-action .pick,.cycle-action .btn.wide{width:100%}
 .cycle-talk>summary{cursor:pointer;min-height:48px;padding:12px 14px;border-radius:14px;background:var(--ux-surface);border:1px solid #caa25c3d;font-size:17px}
 .cycle-talk[open]>summary{margin-bottom:8px}
