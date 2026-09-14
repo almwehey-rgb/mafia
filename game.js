@@ -1531,6 +1531,25 @@ function roleActTitle(){
   if(phase==='trial')return discussionText('المحاكمة','Trial');
   return '';
 }
+function squareEventLine(event){
+  const named=(game.eliminations||[]).filter(p=>p.reason===event).map(p=>p.name).filter(Boolean);
+  const who=named.join('، ');
+  if(event==='mafia_kill')return who?discussionText(`المافيا اغتالت ${who}.`,`Mafia killed ${who}.`):eventLabel(event);
+  if(event==='doctor_saved')return discussionText('الطبيب حمى الهدف، وما صار اغتيال.','The Doctor protected the target, so there was no kill.');
+  if(event==='jail_saved')return discussionText('السجن حمى الهدف من اغتيال المافيا.','Jail protected the target from the Mafia kill.');
+  if(event==='witch_saved')return discussionText('الساحرة أنقذت لاعبًا بجرعة الحياة.','The Witch saved a player with the life potion.');
+  if(event==='serial_kill')return who?discussionText(`القاتل المتسلسل اغتال ${who}.`,`The Serial Killer killed ${who}.`):eventLabel(event);
+  if(event==='witch_poison')return who?discussionText(`سم الساحرة قتل ${who}.`,`Witch poison killed ${who}.`):eventLabel(event);
+  if(event==='jailer_executed')return who?discussionText(`السجّان أعدم ${who}.`,`The Jailer executed ${who}.`):eventLabel(event);
+  if(event==='vigilante_kill')return who?discussionText(`طلقة القناص قتلت ${who}.`,`The sniper killed ${who}.`):eventLabel(event);
+  if(event==='lovers_died')return who?discussionText(`مات الحبيبان: ${who}.`,`The linked pair died: ${who}.`):eventLabel(event);
+  if(event==='vote_eliminated')return who?discussionText(`التصويت استبعد ${who}.`,`The vote eliminated ${who}.`):eventLabel(event);
+  if(event==='trial_guilty')return who?discussionText(`صدر الحكم بإدانة ${who}.`,`The verdict condemned ${who}.`):eventLabel(event);
+  if(event==='player_accused'&&game.accusedPlayer)return discussionText(`المتهم للمحاكمة: ${nameOf(game.accusedPlayer)}.`,`Accused for trial: ${nameOf(game.accusedPlayer)}.`);
+  if(event==='lawyer_saved')return discussionText('المحامي أنقذ اللاعب من نتيجة التصويت.','The Lawyer saved the player from the vote.');
+  if(event==='escort_blocked')return discussionText('المعطّل عطّل قدرة لاعب هذه الليلة.','The Escort blocked a player tonight.');
+  return eventLabel(event);
+}
 function squarePanelHtml(voteBody=''){
   const view=typeof clientDiscussion==='function'?clientDiscussion():{status:'off'};
   let speaker='';
@@ -1539,10 +1558,15 @@ function squarePanelHtml(voteBody=''){
     else if(view.mode==='turns'&&view.speakerId)speaker=`<p class="square-line"><b>${discussionText('المتحدث','Speaking')}</b> ${escapeHtml(nameOf(view.speakerId))}${view.remainingMs?` · ${formatDiscussionTime(view.remainingMs)}`:''}</p>`;
     else if(view.mode==='group'&&view.status==='active')speaker=`<p class="square-line">${discussionText('الجميع يتكلم','Everyone can speak')}</p>`;
   }
-  const deathIds=game.lastDeaths||[];
-  const deathRows=deathIds.map(id=>`<p>☠️ ${escapeHtml(nameOf(id))}</p>`).join('');
+  const causes={
+    mafia_kill:['اغتالته المافيا','Killed by Mafia'], vote_eliminated:['استُبعد بالتصويت','Voted out'], trial_guilty:['أُدين بالحكم','Voted guilty'],
+    vigilante_kill:['طلقة القناص','Sniper shot'], serial_kill:['اغتيال القاتل المتسلسل','Serial Killer'], witch_poison:['سم الساحرة','Witch poison'],
+    jailer_executed:['إعدام السجّان','Jailer execution'], lovers_died:['مات مع شريكه','Linked partner'], host_expelled:['استبعده المضيف','Host expelled'], eliminated:['خرج','Eliminated']
+  };
+  const deathRows=(game.eliminations||[]).map(p=>{const label=causes[p.reason]||causes.eliminated;return `<p>☠️ <b>${escapeHtml(p.name)}</b> — ${discussionText(...label)}</p>`;}).join('')
+    ||(game.lastDeaths||[]).map(id=>`<p>☠️ ${escapeHtml(nameOf(id))}</p>`).join('');
   const dead=`<div class="square-block"><h3>${discussionText('من مات','Who died')}</h3>${deathRows||`<p>${discussionText('لم يمت أحد','Nobody died')}</p>`}</div>`;
-  const news=typeof eventCards==='function'?eventCards():'';
+  const news=String(game.lastEvent||'').split(',').filter(Boolean).map(e=>`<p>${squareEventLine(e)}</p>`).join('');
   const announce=news?`<div class="square-block"><h3>${discussionText('الإعلان','Announcements')}</h3>${news}</div>`:'';
   const vote=voteBody?`<div class="square-block"><h3>${discussionText('التصويت','Vote')}</h3>${voteBody}</div>`:'';
   return [speaker&&`<div class="square-block">${speaker}</div>`,announce,dead,vote].filter(Boolean).join('')||`<p class="muted">${discussionText('ما فيه خبر الحين.','Nothing to show yet.')}</p>`;
