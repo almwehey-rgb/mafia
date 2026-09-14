@@ -1025,31 +1025,34 @@ function renderHostContent() {
     return;
   }
   if (game.phase === 'night') {
-    $('#app').innerHTML = `${phaseBar()}<div class="grid"><div class="card hero"><div class="role-title">🌙 الليلة ${game.round}</div><p>الجميع يثبت اختياره سرًا. بعد المهلة يمكن إعلان الصباح دون اختيارات المتأخرين.</p><div class="status ${game.nightReady ? '' : 'wait'}">${game.nightReady ? 'اكتملت اختيارات الليل ✅' : 'بانتظار اختيارات الليل…'}</div><button class="btn red wide" ${game.nightReady||phaseTimeExpired() ? '' : 'disabled'} data-timeout-action="resolveNight" onclick="hostAction('resolveNight')">إعلان الصباح</button></div><div><div class="card">${eventCards()}<h2>حالة اللاعبين</h2><div class="players">${playerList()}</div></div></div></div>`;
+    $('#app').innerHTML = `${phaseBar()}<div class="grid"><section class="card hero phase-play night-play"><div class="role-title">🌙 ${discussionText('الليلة','Night')} ${game.round}</div><p>${discussionText('الجميع يثبت اختياره سرًا على جواله.','Everyone locks a secret choice on their phone.')}</p><div class="status ${game.nightReady ? '' : 'wait'}">${game.nightReady ? discussionText('اكتملت اختيارات الليل ✅','Night choices complete ✅') : discussionText('بانتظار اختيارات الليل…','Waiting for night choices…')}</div><button class="btn red wide" ${game.nightReady||phaseTimeExpired() ? '' : 'disabled'} data-timeout-action="resolveNight" onclick="hostAction('resolveNight')">${discussionText('إعلان الصباح','Announce morning')}</button></section><div class="card">${eventCards()}<h2>${discussionText('حالة اللاعبين','Player status')}</h2><div class="players">${playerList()}</div></div></div>`;
     return;
   }
   if (game.phase === 'day') {
     const ready = ((game.lawyerReady && game.jailerReady)||phaseTimeExpired()) && clientDiscussion().complete;
-    $('#app').innerHTML = `${phaseBar()}<div class="grid"><div><section class="card hero day-stage"><div class="role-title">☀️ الصباح</div>${morningBriefPanel(true)}${discussionPanel(true)}<section class="day-action-panel" data-no-translate><h2>${discussionText('اختيارات النهار','Day choices')}</h2><div class="status ${game.lawyerReady ? '' : 'wait'}">${game.lawyerReady ? discussionText('المحامي جاهز ✅','Lawyer ready ✅') : discussionText('بانتظار حماية المحامي…','Waiting for Lawyer protection…')}</div><div class="status ${game.jailerReady ? '' : 'wait'}">${game.jailerReady ? discussionText('السجّان اختار السجين ✅','Jailer chose the prisoner ✅') : discussionText('بانتظار اختيار السجّان…','Waiting for the Jailer…')}</div><button class="btn gold wide" data-discussion-vote ${ready ? '' : 'disabled'} onclick="hostAction('startVote')">${discussionText('بدء التصويت','Start voting')}</button></section></section></div><div class="card"><h2>الأحياء</h2><div class="players">${playerList(false, false, alivePlayers())}</div></div></div>`;
+    const draw = typeof openingDrawActive === 'function' && openingDrawActive(clientDiscussion());
+    const talk = discussionPanel(true);
+    const talkBlock = talk && !draw ? `<details class="cycle-talk" open data-disclosure-key="host-day-talk"><summary>${discussionText('النقاش','Discussion')}</summary>${talk}</details>` : talk;
+    $('#app').innerHTML = `${phaseBar()}<div class="grid"><section class="card hero day-stage phase-play day-play"><div class="role-title">☀️ ${discussionText('الصباح','Morning')}</div>${morningBriefPanel(true)}<section class="day-action-panel cycle-action" data-no-translate><h2>${discussionText('اختيارات النهار','Day choices')}</h2><div class="status ${game.lawyerReady ? '' : 'wait'}">${game.lawyerReady ? discussionText('المحامي جاهز ✅','Lawyer ready ✅') : discussionText('بانتظار حماية المحامي…','Waiting for Lawyer protection…')}</div><div class="status ${game.jailerReady ? '' : 'wait'}">${game.jailerReady ? discussionText('السجّان اختار السجين ✅','Jailer chose the prisoner ✅') : discussionText('بانتظار اختيار السجّان…','Waiting for the Jailer…')}</div><button class="btn gold wide" data-discussion-vote ${ready ? '' : 'disabled'} onclick="hostAction('startVote')">${discussionText('بدء التصويت','Start voting')}</button></section>${talkBlock}</section><div class="card"><h2>${discussionText('الأحياء','Alive')}</h2><div class="players">${playerList(false, false, alivePlayers())}</div></div></div>`;
     return;
   }
   if (game.phase === 'nomination') {
     const alive = alivePlayers().length;
-    $('#app').innerHTML = `${phaseBar()}<div class="grid"><div class="card hero"><div class="role-title">☝️ ترشيح متهم</div><div class="counter">${game.voteCount} / ${alive}</div><p>كل لاعب يرشّح شخصًا سرًا. بعد المهلة يُحسب غير المصوّت ممتنعًا.</p><button class="btn red wide" ${game.voteCount<alive&&!phaseTimeExpired()?'disabled':''} data-timeout-action="resolveVote" onclick="hostAction('resolveVote')">اختيار المتهم</button></div><div class="card"><h2>الأحياء</h2><div class="players">${playerList(false, false, alivePlayers())}</div></div></div>`;
+    $('#app').innerHTML = `${phaseBar()}<div class="grid"><section class="card hero phase-play nomination-play"><div class="role-title">☝️ ${discussionText('ترشيح متهم','Nominate')}</div><div class="counter">${game.voteCount} / ${alive}</div><p>${discussionText('كل لاعب يرشّح شخصًا سرًا على جواله.','Everyone nominates secretly on their phone.')}</p><button class="btn red wide" ${game.voteCount<alive&&!phaseTimeExpired()?'disabled':''} data-timeout-action="resolveVote" onclick="hostAction('resolveVote')">${discussionText('اختيار المتهم','Choose the accused')}</button></section><div class="card"><h2>${discussionText('الأحياء','Alive')}</h2><div class="players">${playerList(false, false, alivePlayers())}</div></div></div>`;
     return;
   }
   if (game.phase === 'trial') {
-    $('#app').innerHTML = `${phaseBar()}<div class="card hero trial-stage"><div class="role-title">${discussionText('⚖️ المحاكمة','⚖️ Trial')}</div><div class="accused-name">${escapeHtml(nameOf(game.accusedPlayer))}</div><p>${discussionText('وقت الدفاع. المتهم يتحدث والبقية يستمعون.','Defense time. The accused speaks; everyone else listens.')}</p><p class="muted">${discussionText('يمكنك إنهاء الدفاع مبكراً أو انتظار المؤقت.','You may end defense early or wait for the timer.')}</p><p id="trialTimerHint" class="status wait" hidden></p><button class="btn gold wide" type="button" data-timeout-action="advanceVerdict" onclick="hostAction('advanceVerdict')">${discussionText('الانتقال إلى الحكم','Move to verdict')}</button></div>`;
+    $('#app').innerHTML = `${phaseBar()}<div class="card hero trial-stage phase-play trial-play"><div class="role-title">${discussionText('⚖️ المحاكمة','⚖️ Trial')}</div><div class="accused-name">${escapeHtml(nameOf(game.accusedPlayer))}</div><p>${discussionText('وقت الدفاع. المتهم يتحدث والبقية يستمعون.','Defense time. The accused speaks; everyone else listens.')}</p><p class="muted">${discussionText('يمكنك إنهاء الدفاع مبكراً أو انتظار المؤقت.','You may end defense early or wait for the timer.')}</p><p id="trialTimerHint" class="status wait" hidden></p><button class="btn gold wide" type="button" data-timeout-action="advanceVerdict" onclick="hostAction('advanceVerdict')">${discussionText('الانتقال إلى الحكم','Move to verdict')}</button></div>`;
     return;
   }
   if (game.phase === 'verdict') {
     const alive = Math.max(0,alivePlayers().length-1);
-    $('#app').innerHTML = `${phaseBar()}<div class="grid"><div class="card hero"><div class="role-title">🔨 الحكم</div><h1>${escapeHtml(nameOf(game.accusedPlayer))}</h1><div class="counter">${game.voteCount} / ${alive}</div><p>إدانة أو براءة؟ بعد المهلة يُحسب غير المصوّت ممتنعًا.</p><button class="btn red wide" ${game.voteCount<alive&&!phaseTimeExpired()?'disabled':''} data-timeout-action="resolveVote" onclick="hostAction('resolveVote')">إعلان الحكم</button></div><div class="card"><h2>حالة المصوتين</h2><div class="players">${playerList(false)}</div></div></div>`;
+    $('#app').innerHTML = `${phaseBar()}<div class="grid"><section class="card hero phase-play verdict-play"><div class="role-title">🔨 ${discussionText('الحكم','Verdict')}</div><div class="accused-name">${escapeHtml(nameOf(game.accusedPlayer))}</div><div class="counter">${game.voteCount} / ${alive}</div><p>${discussionText('إدانة أو براءة؟ كل لاعب يصوّت على جواله.','Guilty or innocent? Everyone votes on their phone.')}</p><button class="btn red wide" ${game.voteCount<alive&&!phaseTimeExpired()?'disabled':''} data-timeout-action="resolveVote" onclick="hostAction('resolveVote')">${discussionText('إعلان الحكم','Reveal verdict')}</button></section><div class="card"><h2>${discussionText('حالة المصوتين','Voters')}</h2><div class="players">${playerList(false)}</div></div></div>`;
     return;
   }
   if (game.phase === 'vote') {
     const alive = alivePlayers().length;
-    $('#app').innerHTML = `${phaseBar()}<div class="grid"><div class="card hero"><div class="role-title">🗳️ التصويت السري</div><div class="counter">${game.voteCount} / ${alive}</div><p>بعد انتهاء المهلة يستطيع المضيف كشف النتيجة؛ غير المصوّت يُحسب ممتنعًا.</p><button class="btn red wide" ${game.voteCount < alive && !phaseTimeExpired() ? 'disabled' : ''} data-timeout-action="resolveVote" onclick="hostAction('resolveVote')">كشف النتيجة</button></div><div class="card"><h2>اللاعبون</h2><div class="players">${playerList(false)}</div></div></div>`;
+    $('#app').innerHTML = `${phaseBar()}<div class="grid"><section class="card hero phase-play vote-play"><div class="role-title">🗳️ ${discussionText('التصويت السري','Secret vote')}</div><div class="counter">${game.voteCount} / ${alive}</div><p>${discussionText('كل لاعب يصوّت سرًا على جواله.','Everyone votes secretly on their phone.')}</p><button class="btn red wide" ${game.voteCount < alive && !phaseTimeExpired() ? 'disabled' : ''} data-timeout-action="resolveVote" onclick="hostAction('resolveVote')">${discussionText('كشف النتيجة','Reveal result')}</button></section><div class="card"><h2>${discussionText('اللاعبون','Players')}</h2><div class="players">${playerList(false)}</div></div></div>`;
     return;
   }
   $('#app').innerHTML = `${phaseBar()}<div class="grid"><div class="card hero"><div class="role-title">${winnerTitle()}</div><div class="players final-roles">${game.players.map((player) => `<div class="player"><span>${escapeHtml(player.name)} — ${roleLabel(player.role)}</span></div>`).join('')}</div><div class="actions center"><button class="btn red" onclick="startGame()">🔄 إعادة مباراة</button><button class="btn" onclick="returnToLobby()">👥 العودة للردهة وتغيير اللاعبين</button><button class="btn" onclick="shareResult()">↗ مشاركة النتيجة</button><button class="btn" onclick="home()">الرئيسية</button></div></div><div class="card"><h2>سجل المباراة</h2><div class="timeline">${historyCards()||'<p class="muted">ستظهر أحداث المباراة هنا.</p>'}</div></div></div>`;
@@ -1185,12 +1188,11 @@ function renderPlayerContent() {
   }
   if (game.phase === 'reveal') { if (!roleAcknowledged()) roleReveal(); else $('#app').innerHTML = `${phaseBar()}<div class="card hero"><div class="role-title">✅ جاهز</div><p>انتظر بقية اللاعبين ثم يبدأ الليل.</p><div class="counter">${game.roleReadyCount} / ${game.players.length}</div></div>`; return; }
   if (!roleAcknowledged()) { roleReveal(); return; }
-  if (game.phase === 'night') renderNight();
-  else if (game.phase === 'day') { renderDay(); $('#app').insertAdjacentHTML('afterbegin', morningBriefPanel()+discussionPanel(false)+(me.role==='detective'?investigationPanel():'')); }
-  else if (game.phase === 'trial') renderTrialPlayer();
-  else if (game.phase === 'verdict') renderVerdict();
-  else renderVote();
-  $('#app').insertAdjacentHTML('afterbegin', bossDiscussionChoice());
+  if (game.phase === 'night') { renderNight(); $('#app').innerHTML = wrapCyclePlay('night', $('#app').innerHTML); }
+  else if (game.phase === 'day') { renderDay(); $('#app').innerHTML = wrapCyclePlay('day', $('#app').innerHTML); }
+  else if (game.phase === 'trial') { renderTrialPlayer(); $('#app').innerHTML = wrapCyclePlay('trial', $('#app').innerHTML); }
+  else if (game.phase === 'verdict') { renderVerdict(); $('#app').innerHTML = wrapCyclePlay('verdict', $('#app').innerHTML); }
+  else { renderVote(); $('#app').innerHTML = wrapCyclePlay(game.phase === 'nomination' ? 'nomination' : 'vote', $('#app').innerHTML); }
 }
 
 // VisualViewport follows mobile keyboards that do not resize the layout viewport.
@@ -1325,12 +1327,12 @@ async function sendReport(){try{await api({action:'report',code:game.code,id:pla
 
 function renderTrialPlayer(){
   const accused=game.accusedPlayer===playerId;
-  $('#app').innerHTML=`${phaseBar()}<div class="card hero trial-stage"><div class="role-title">${discussionText('⚖️ المحاكمة','⚖️ Trial')}</div><div class="accused-name">${escapeHtml(nameOf(game.accusedPlayer))}</div><p>${accused?discussionText('أنت المتهم. دافع عن نفسك الآن.','You are accused. Defend yourself now.'):discussionText('استمع إلى دفاع المتهم ثم قرر حكمك.','Listen to the defense, then cast your verdict.')}</p><p id="trialTimerHint" class="status wait" hidden></p></div>`;
+  $('#app').innerHTML=`<div class="card hero trial-stage"><div class="role-title">${discussionText('⚖️ المحاكمة','⚖️ Trial')}</div><div class="accused-name">${escapeHtml(nameOf(game.accusedPlayer))}</div><p>${accused?discussionText('أنت المتهم. دافع عن نفسك الآن.','You are accused. Defend yourself now.'):discussionText('استمع إلى دفاع المتهم ثم قرر حكمك.','Listen to the defense, then cast your verdict.')}</p><p id="trialTimerHint" class="status wait" hidden></p></div>`;
 }
 function renderVerdict(){
   const accused=game.accusedPlayer===playerId;
   const options=`<div class="verdict-grid choice-stack"><button class="pick execute" data-target="GUILTY" aria-pressed="false" onclick="castVote('GUILTY')">${discussionText('🔨 مذنب','🔨 Guilty')}</button><button class="pick innocent" data-target="INNOCENT" aria-pressed="false" onclick="castVote('INNOCENT')">${discussionText('🕊️ بريء','🕊️ Innocent')}</button></div>`;
-  $('#app').innerHTML=`${phaseBar()}<div class="card hero"><div class="role-title">🔨 الحكم</div><h1>${escapeHtml(nameOf(game.accusedPlayer))}</h1>${accused?'<div class="status wait">أنت المتهم ولا تصوّت على حكمك.</div>':(game.me.voted?'<div class="status">تم تسجيل حكمك ويمكنك تغييره.</div>':'')+options}</div>`;
+  $('#app').innerHTML=`<div class="card hero"><div class="role-title">🔨 ${discussionText('الحكم','Verdict')}</div><div class="accused-name">${escapeHtml(nameOf(game.accusedPlayer))}</div>${accused?`<div class="status wait">${discussionText('أنت المتهم ولا تصوّت على حكمك.','You are accused and do not vote.')}</div>`:(game.me.voted?`<div class="status">${discussionText('تم تسجيل حكمك ويمكنك تغييره.','Your verdict is saved and can be changed.')}</div>`:'')+options}</div>`;
 }
 
 function renderNight() {
@@ -1416,6 +1418,26 @@ function renderNight() {
   $('#app').innerHTML = `<div class="card hero"><div class="role-title">${roleLabel(me.role)}</div><p>${discussionText('أغمض عينك وانتظر الصباح.','Close your eyes and wait for morning.')}</p></div>`;
 }
 
+function wrapCyclePlay(cycle, actionHtml) {
+  const isDay = cycle === 'day';
+  const isNight = cycle === 'night';
+  const view = typeof clientDiscussion === 'function' ? clientDiscussion() : {status:'off'};
+  const draw = isDay && typeof openingDrawActive === 'function' && openingDrawActive(view);
+  const talk = isDay ? discussionPanel(false) : '';
+  const hasPick = /class="[^"]*\bpick\b/.test(actionHtml);
+  const talkBlock = !talk ? '' : (draw ? talk : `<details class="cycle-talk" data-disclosure-key="cycle-talk"${hasPick?'':' open'}><summary>${discussionText('النقاش','Discussion')}</summary>${talk}</details>`);
+  const kickers = {
+    night: `🌙 ${discussionText('الليل','Night')} ${game.round}`,
+    day: `☀️ ${discussionText('النهار','Day')} ${game.round}`,
+    nomination: `☝️ ${discussionText('ترشيح','Nomination')}`,
+    trial: `⚖️ ${discussionText('محاكمة','Trial')}`,
+    verdict: `🔨 ${discussionText('حكم','Verdict')}`,
+    vote: `🗳️ ${discussionText('تصويت','Voting')}`,
+  };
+  const kicker = `<p class="cycle-kicker">${kickers[cycle] || ''}</p>`;
+  const extra = isNight || isDay ? bossDiscussionChoice() : '';
+  return `<div class="phase-play ${cycle}-play">${kicker}${isDay?morningBriefPanel():''}${isDay&&game.me?.role==='detective'?investigationPanel():''}${extra}<section class="cycle-action">${actionHtml}</section>${talkBlock}</div>`;
+}
 function morningBriefPanel(embedded=false) {
   const deaths = (game.lastDeaths || []).map((id) => `<div class="event danger-text">☠️ ${escapeHtml(nameOf(id))}</div>`).join('');
   const body = `${eventCards()}${deaths || `<div class="status">${discussionText('لم يمت أحد هذه الليلة','Nobody died tonight')}</div>`}`;
@@ -1442,7 +1464,7 @@ function renderVote() {
   const me = game.me;
   const targets = alivePlayers().filter((player) => player.id !== playerId);
   const nomination=game.phase==='nomination';
-  $('#app').innerHTML = `${phaseBar()}<div class="card"><div class="role-title">${nomination?'☝️ ترشيح متهم':'🗳️ التصويت السري'}</div>${me.voted?`<div class="status">✅ تم تسجيل صوتك ويمكنك تغييره حتى كشف النتيجة.</div>`:`<h2>${nomination?'من تريد محاكمته؟':'اختر لاعبًا للاستبعاد'}</h2>`}${choiceButtons(targets,'castVote')}${game.enabledRoles?.allow_no_vote?'<button class="pick skip" onclick="castVote(\'SKIP\')">✋ لا أريد اختيار أحد</button>':''}</div>`;
+  $('#app').innerHTML = `<div class="card"><div class="role-title">${nomination?discussionText('☝️ ترشيح متهم','☝️ Nominate'):discussionText('🗳️ التصويت السري','🗳️ Secret vote')}</div>${me.voted?`<div class="status">✅ ${discussionText('تم تسجيل صوتك ويمكنك تغييره حتى كشف النتيجة.','Your vote is saved and can be changed until reveal.')}</div>`:`<h2>${nomination?discussionText('من تريد محاكمته؟','Who should stand trial?'):discussionText('اختر لاعبًا للاستبعاد','Choose a player to eliminate')}</h2>`}${choiceButtons(targets,'castVote')}${game.enabledRoles?.allow_no_vote?`<button class="pick skip" onclick="castVote('SKIP')">✋ ${discussionText('لا أريد اختيار أحد','Skip')}</button>`:''}</div>`;
 }
 
 let actionFeedback = null;
@@ -1566,11 +1588,8 @@ function renderPlayer(){
   renderWithNotices(renderPlayerContent);
   enhanceJourney(false);
   if(game?.me?.alive&&roleAcknowledged()&&!['lobby','finished'].includes(game.phase)&&!document.querySelector('.personal-role-card')){
-    const bar=document.querySelector('#app .phase-bar');
-    const anchor=document.querySelector('#app .next-action-hint')||bar;
     const reference=`<details class="role-reference"><summary>${discussionText('مراجعة دوري','Review my role')}: ${roleLabel(game.me.role)}</summary>${personalRoleCard(true)}</details>`;
-    if(anchor)anchor.insertAdjacentHTML('afterend',reference);
-    else $('#app').insertAdjacentHTML('afterbegin',reference);
+    $('#app').insertAdjacentHTML('beforeend',reference);
   }
 }
 function setupSummary(roles, showCounts = true){

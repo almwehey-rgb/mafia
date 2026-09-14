@@ -865,7 +865,13 @@ body.screen-lobby .host-lobby .counter{font-size:clamp(28px,8vw,42px)}
 .next-action-hint{display:grid;gap:4px;border:1px solid #caa25c55;border-inline-start:5px solid var(--ux-accent);background:linear-gradient(135deg,#22261f,#111714)}
 .next-action-hint b{color:var(--ux-accent);font-size:14px}
 .next-action-hint p{margin:0;font-size:17px;line-height:1.7}
-.morning-brief{margin-bottom:14px;text-align:start}
+.phase-play{display:grid;gap:12px;width:min(720px,100%);margin:0 auto 12px}
+.cycle-kicker{margin:0;font-size:15px;font-weight:900;color:var(--ux-accent);letter-spacing:.04em}
+.cycle-action .card,.cycle-action .card.hero{margin:0;width:100%}
+.cycle-action .pick,.cycle-action .btn.wide{width:100%}
+.cycle-talk>summary{cursor:pointer;min-height:48px;padding:12px 14px;border-radius:14px;background:var(--ux-surface);border:1px solid #caa25c3d;font-size:17px}
+.cycle-talk[open]>summary{margin-bottom:8px}
+.morning-brief{margin-bottom:0;text-align:start}
 .morning-brief h2,.day-action-panel h2{margin:0 0 10px;font-size:22px}
 .day-stage{display:grid;gap:14px}
 .day-action-panel{display:grid;gap:8px;padding:14px;border:1px solid #caa25c3d;border-radius:16px;background:#111714b8;text-align:start}
@@ -876,5 +882,15 @@ body.light .next-action-hint{background:linear-gradient(135deg,#fff7e8,#efe1c6)!
 body.light .day-action-panel{background:#f8eedb!important;border-color:#b89a65!important}
 body.light .role-rules-header>p{color:#352b1f!important}
 body.light .role-privacy{background:#f4dfd6;color:#74352e!important;border-color:#b98673}
-@media(max-width:520px){.next-action-hint p{font-size:16px}.morning-brief h2,.day-action-panel h2{font-size:20px}.day-action-panel{padding:12px}}
+.verdict-grid{display:grid;gap:10px}
+@media(max-width:700px){
+  .phase-play{gap:10px}
+  .cycle-action h2{font-size:20px;margin:8px 0}
+  .cycle-action .pick{min-height:52px}
+  .verdict-grid .pick{min-height:56px;font-size:20px}
+  .role-reference{order:9;margin-top:4px}
+  .phase-play .role-reference{margin-bottom:8px}
+  .grid:has(.nomination-play),.grid:has(.verdict-play),.grid:has(.vote-play),.grid:has(.night-play){display:flex;flex-direction:column;gap:12px}
+}
+@media(max-width:520px){.next-action-hint p{font-size:16px}.morning-brief h2,.day-action-panel h2{font-size:20px}.day-action-panel{padding:12px}.cycle-kicker{font-size:14px}}
 
