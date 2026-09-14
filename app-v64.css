@@ -593,7 +593,7 @@ body.light .flip-card .role-team,body.light .flip-card .personal-card-properties
   .role-reveal-only .personal-role-card .flip-front img,.role-reveal-only .role-image-view img{height:min(70dvh,560px);object-fit:contain}
 }.role-reader:before{background-size:100% auto;background-position:center top;filter:blur(4px);opacity:.65}.role-reader .personal-card-properties{padding:22px}.role-reader .role-rule-sections p{font-weight:400!important;text-align:start}.role-reader .role-rules-header h2{font-size:clamp(25px,4vw,40px)}
 
-.role-reader.turning-role{perspective:1400px;overflow:visible;isolation:auto;cursor:pointer;background:transparent!important;border:0!important;aspect-ratio:2/3;width:100%;max-width:440px;margin-inline:auto}
+.role-reader.turning-role{container-type:inline-size;container-name:rolecard;perspective:1400px;overflow:visible;isolation:auto;cursor:pointer;background:transparent!important;border:0!important;aspect-ratio:2/3;width:100%;max-width:440px;margin-inline:auto}
 .role-reader.turning-role:before,.role-reader.turning-role:after{display:none}
 .role-turn-inner{position:absolute;inset:0;transform-style:preserve-3d;transition:transform .65s cubic-bezier(.2,.7,.2,1)}
 .turning-role[data-view="details"] .role-turn-inner{transform:rotateY(180deg)}
@@ -865,10 +865,14 @@ body.light .noir-site-footer a{color:#70501e;border-color:#70501e55}
 #trialTimerHint.urgent{background:#732c35;border-color:#a44;color:#fff}
 .player-tools button{width:auto;min-width:48px;height:48px;padding:8px 12px;font-size:14px;font-weight:800;white-space:nowrap}
 .compact-presentation{max-width:280px;margin:0 auto 10px}
-.turning-role .role-rule-sections section{padding:10px 0}
-.turning-role .role-rule-sections h3{font-size:15px;margin-bottom:4px}
-.turning-role .role-rule-sections p{font-size:15px!important;line-height:1.65}
-.personal-role-card .role-privacy{margin:0 0 8px;font-size:14px!important}
+.turning-role .personal-card-properties{padding:clamp(10px,4.2cqw,22px)}
+.turning-role .role-rules-header h2{font-size:clamp(22px,8.5cqw,38px)!important;line-height:1.25}
+.turning-role .role-rule-sections section{padding:clamp(8px,2.8cqw,16px) 0}
+.turning-role .role-rule-sections h3{font-size:clamp(16px,5.8cqw,24px);margin-bottom:clamp(4px,1.4cqw,8px)}
+.turning-role .role-rule-sections p{font-size:clamp(16px,6.2cqw,24px)!important;line-height:1.5!important}
+.personal-role-card .role-privacy,.turning-role .role-privacy{margin:0 0 8px;font-size:clamp(13px,4.4cqw,18px)!important}
+.turning-role.compact .role-rule-sections h3{font-size:clamp(14px,6cqw,18px)}
+.turning-role.compact .role-rule-sections p{font-size:clamp(14px,6.2cqw,18px)!important}
 body.screen-lobby .host-lobby .counter{font-size:clamp(28px,8vw,42px)}
 
 .next-action-hint{display:grid;gap:4px;border:1px solid #caa25c55;border-inline-start:5px solid var(--ux-accent);background:linear-gradient(135deg,#22261f,#111714)}
