@@ -1255,6 +1255,8 @@ function mountPlayerTools(){
     play=`<section class="dock-play">${pendingDockPlay.abilityTitle?`<h2 class="role-act-title" data-no-translate>${pendingDockPlay.abilityTitle}</h2>`:''}${pendingDockPlay.abilityBody||`<p class="muted">${discussionText('ما فيه إجراء الحين.','No action right now.')}</p>`}</section>`;
   }else if(tab==='vote'){
     play=`<section class="dock-play"><h2 class="role-act-title" data-no-translate>${discussionText('التصويت','Vote')}</h2>${pendingDockPlay.voteBody||`<p class="muted">${discussionText('ما فيه نتيجة تصويت بعد.','No vote result yet.')}</p>`}</section>`;
+  }else if(tab==='card'){
+    play=`<section class="dock-play dock-card-play">${personalRoleCard(false,{reveal:true})}</section>`;
   }
   const chatOn=canChat?' dock-chat-on':'';
   const on=name=>tab===name?' is-on':'';
@@ -1264,6 +1266,7 @@ function mountPlayerTools(){
   dock.innerHTML=`${play}<div class="dock-row">
     <button type="button" class="dock-item${on('ability')}" onclick="selectDockTab('ability')"><span class="dock-icon">⚡</span><span>${discussionText('قدرتي','Ability')}</span></button>
     <button type="button" class="dock-item${on('vote')}" onclick="selectDockTab('vote')"><span class="dock-icon">🗳️</span><span>${discussionText('التصويت','Vote')}</span></button>
+    <button type="button" class="dock-item dock-card-tab${on('card')}" onclick="selectDockTab('card')"><span class="dock-icon">🃏</span><span>${discussionText('كرتي','My card')}</span></button>
     <button type="button" class="dock-item${chatOn}" data-chat-button ${canChat?'':'disabled'} onclick="openChat()"><span class="dock-icon">💬</span><span>${discussionText('محادثة','Chat')}</span><i class="dock-badge" ${unread?'':'hidden'}></i></button>
     <button type="button" class="dock-item" onclick="openDockMore()"><span class="dock-icon">⋯</span><span>${discussionText('المزيد','More')}</span></button>
   </div>`;
@@ -1550,7 +1553,7 @@ function wrapCyclePlay(cycle, actionHtml) {
   if(key!==dockAutoKey){dockAutoKey=key;pendingDockPlay.tab=auto;}
   pendingDockPlay={...pendingDockPlay,abilityTitle,abilityBody,voteBody};
   if(pendingDockPlay.tab!=='none'&&!pendingDockPlay.tab)pendingDockPlay.tab=auto;
-  return `${phaseBar()}<div class="phase-play ${cycle}-play">${personalRoleCard(true)}${isDay?morningBriefPanel():''}${talkBlock}</div>`;
+  return `${phaseBar()}<div class="phase-play ${cycle}-play">${isDay?morningBriefPanel():''}${talkBlock}</div>`;
 }
 function morningBriefPanel(embedded=false) {
   const deaths = (game.lastDeaths || []).map((id) => `<div class="event danger-text">☠️ ${escapeHtml(nameOf(id))}</div>`).join('');
