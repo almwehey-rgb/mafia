@@ -1274,6 +1274,7 @@ function openDockMore(){
   const host=game?.me?.isHost?`<button class="btn gold wide" type="button" onclick="toggleDelegatedHost()">👑 ${discussionText('تحكم','Host')}</button><button class="btn wide" type="button" onclick="returnToLobby()">🏠 ${discussionText('اللوبي','Lobby')}</button>`:'';
   openSheet(discussionText('المزيد','More'),`<div class="player-tools-list" data-no-translate><button class="btn wide" type="button" onclick="openWill()">📜 ${discussionText('وصية','Will')}</button><button class="btn wide" type="button" onclick="openReport()">🚩 ${discussionText('بلاغ','Report')}</button>${host}</div>`);
 }
+function openMyRole(){
   if(!game?.me?.role)return;
   openSheet(discussionText('دوري','My role'), interactiveRoleCard(game.me.role,{personal:true,reveal:true}));
 }
