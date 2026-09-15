@@ -471,9 +471,12 @@ async function routeHostLogin(context:RouteContext) {
       const loginBucket = loginBuckets.get(ip);
       if (!loginBucket || loginBucket.reset < now) loginBuckets.set(ip, { count: 1, reset: now + 15 * 60_000 });
       else if (++loginBucket.count > 5) return out({ error: "LOGIN_RATE_LIMITED" }, 429);
-      const pinHash = await sha256(cleanText(body.pin, 32));
+      const secret = cleanText(body.secret || body.pin, 64).replace(/\s+/g, " ");
+      const pinHash = await sha256(secret);
+      const envSecret = cleanText(Deno.env.get("HOST_SECRET") || Deno.env.get("MAFIA_HOST_SECRET") || "", 64).replace(/\s+/g, " ");
+      const envHash = envSecret ? await sha256(envSecret) : "";
       const { data: auth } = await db.from("mafia_host_auth").select("pin_hash").eq("id", "default").maybeSingle();
-      if (!auth || auth.pin_hash !== pinHash) {
+      if (!secret || ((!auth || auth.pin_hash !== pinHash) && pinHash !== envHash)) {
         await audit(null, action, "denied", started);
         return out({ error: "INVALID_PIN" }, 403);
       }

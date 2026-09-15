@@ -646,22 +646,23 @@ function renderLanding() {
 function renderHostLogin() {
   setRoomTag('🔒');
   $('#app').removeAttribute('data-login-shell');
-  $('#app').innerHTML = `<section class="noir-entry"><div class="noir-content"><p class="noir-kicker">MAFIA · مافيا الليل</p><h2 class="noir-heading">كل وجه يخفي سرًّا</h2><p class="noir-intro">أدخل الرمز السري لإنشاء الغرف وإدارة اللعب.</p><div class="card hero join-card auth-card"><h1>دخول المضيف</h1><p class="muted">الرمز مكوّن من 8 أرقام.</p><label for="hostPin">الرمز السري</label><input class="input auth-pin" id="hostPin" type="password" inputmode="numeric" maxlength="8" autocomplete="current-password" enterkeyhint="go"><button class="btn red wide" type="button" onclick="loginHost()">دخول المضيف</button></div><div class="noir-links"><button class="btn" type="button" onclick="home()">رجوع</button></div></div>${noirEmblem()}</section>${homeCharacters()}`;
-  const input = $('#hostPin');
+  $('#app').innerHTML = `<section class="noir-entry"><div class="noir-content"><p class="noir-kicker">MAFIA · ${discussionText('مافيا الليل','MAFIA NIGHT')}</p><h2 class="noir-heading">${discussionText('كل وجه يخفي سرًّا','Every face hides a secret')}</h2><p class="noir-intro">${discussionText('اكتب الكلمة السرية لإنشاء الغرف وإدارة اللعب.','Enter the secret word to create rooms and run the game.')}</p><div class="card hero join-card auth-card"><h1>${discussionText('دخول المضيف','Host login')}</h1><p class="muted">${discussionText('الدخول بكلمة سرية، مو برقم.','Login uses a secret word, not a number.')}</p><label for="hostSecret">${discussionText('الكلمة السرية','Secret word')}</label><input class="input" id="hostSecret" type="password" maxlength="32" autocomplete="current-password" enterkeyhint="go"><button class="btn red wide" type="button" onclick="loginHost()">${discussionText('دخول المضيف','Host login')}</button></div><div class="noir-links"><button class="btn" type="button" onclick="home()">${discussionText('رجوع','Back')}</button></div></div>${noirEmblem()}</section>${homeCharacters()}`;
+  const input = $('#hostSecret');
   input.addEventListener('keydown', (event) => { if (event.key === 'Enter') loginHost(); });
   input.focus({ preventScroll: true });
 }
+function hostSecretValue(){return String($('#hostSecret')?.value||'').trim().replace(/\s+/g,' ')}
 async function loginHost() {
-  const pin = normalizeEntryDigits($('#hostPin')?.value || '');
-  if (!/^\d{8}$/.test(pin || '')) { notice(discussionText('أدخل الرمز المكوّن من 8 أرقام','Enter the 8-digit code')); return; }
+  const pin = hostSecretValue();
+  if (pin.length < 3 || pin.length > 32) { notice(discussionText('اكتب الكلمة السرية','Enter the secret word')); return; }
   try {
-    const result = await withBusy('جاري تسجيل الدخول…', () => api({ action: 'hostLogin', pin }));
+    const result = await withBusy(discussionText('جاري تسجيل الدخول…','Signing in…'), () => api({ action: 'hostLogin', pin }));
     hostAccessToken = result.hostAccessToken;
     localStorage.setItem('mafia-host-access-token', hostAccessToken);
     applyHostPreferences(result.preferences || {});
     renderHostHome();
   } catch (error) {
-    notice(error.code === 'LOGIN_RATE_LIMITED' ? discussionText('محاولات كثيرة. انتظر 15 دقيقة.','Too many attempts. Wait 15 minutes.') : discussionText('الرمز السري غير صحيح','Incorrect secret code'));
+    notice(error.code === 'LOGIN_RATE_LIMITED' ? discussionText('محاولات كثيرة. انتظر 15 دقيقة.','Too many attempts. Wait 15 minutes.') : discussionText('الكلمة السرية غير صحيحة','Incorrect secret word'));
   }
 }
 async function logoutHost() {
