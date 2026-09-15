@@ -166,7 +166,7 @@ async function toggleFullscreen(){try{if(document.fullscreenElement)await docume
 function addCompactControlStyles(){}
 function syncDeviceLayout(){
   const width=window.innerWidth;
-  const device=width<700?'phone':width<1200?'tablet':'desktop';
+  const device=width<700?'phone':'desktop';
   document.documentElement.dataset.device=device;
   document.body.dataset.device=device;
 }
