@@ -491,17 +491,22 @@ async function readCurrentState(code:string,body:any,now:number) {
 async function routeHostLogin(context:RouteContext) {
   let {body, action, ip, now, started}=context;
   {
-      const loginBucket = loginBuckets.get(ip);
-      if (!loginBucket || loginBucket.reset < now) loginBuckets.set(ip, { count: 1, reset: now + 15 * 60_000 });
-      else if (++loginBucket.count > 5) return out({ error: "LOGIN_RATE_LIMITED" }, 429);
       const pin = cleanText(body.pin, 32);
       const pinHash = await sha256(pin);
       const { data: auth } = await db.from("mafia_host_auth").select("pin_hash").eq("id", "default").maybeSingle();
-      if (!/^\d{8}$/.test(pin) || !auth || auth.pin_hash !== pinHash) {
+      if (/^\d{8}$/.test(pin) && auth && auth.pin_hash === pinHash) {
+        loginBuckets.delete(ip);
+      } else {
+        const loginBucket = loginBuckets.get(ip);
+        if (loginBucket && loginBucket.reset >= now && loginBucket.count >= 5) {
+          await audit(null, action, "denied", started);
+          return out({ error: "LOGIN_RATE_LIMITED" }, 429);
+        }
+        if (!loginBucket || loginBucket.reset < now) loginBuckets.set(ip, { count: 1, reset: now + 15 * 60_000 });
+        else loginBucket.count += 1;
         await audit(null, action, "denied", started);
         return out({ error: "INVALID_PIN" }, 403);
       }
-      loginBuckets.delete(ip);
       const hostAccessToken = `${crypto.randomUUID()}.${crypto.randomUUID()}`;
       const deviceHash = await hostDeviceHash(body.deviceId);
       await persist(db.from("mafia_host_sessions").delete().lt("expires_at", new Date().toISOString()));
