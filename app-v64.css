@@ -1102,9 +1102,28 @@ body.has-player-dock:has(.dock-play) .journey-hint{display:none}
 .public-announcement h2{margin:0 0 8px;color:#f0ca7c;font-size:18px}
 .public-announcement p{margin:0 0 6px;font-size:18px;font-weight:800;line-height:1.55}
 .public-announcement p:last-child{margin:0}
-.death-impact{position:fixed;inset:0;z-index:260;display:grid;place-items:center;align-content:center;gap:16px;margin:0;padding:28px 22px;border:0;border-radius:0;background:#8b0d14;color:#fff;font:800 22px/1.45 Tahoma,Arial;text-align:center;cursor:pointer;animation:impact-shake .9s cubic-bezier(.36,.07,.19,.97) both}
-.death-impact b{max-width:16em;font-size:clamp(26px,7.2vw,40px);line-height:1.45}
+.death-impact{position:fixed;inset:0;z-index:260;display:grid;place-items:center;align-content:center;gap:12px;margin:0;padding:28px 22px;border:0;border-radius:0;color:#fff;font:800 22px/1.45 Tahoma,Arial;text-align:center;cursor:pointer}
+.death-impact i{font-style:normal;font-size:clamp(52px,16vw,84px);line-height:1}
+.death-impact small{font-size:15px;letter-spacing:.06em;opacity:.88}
+.death-impact b{max-width:16em;font-size:clamp(24px,6.6vw,38px);line-height:1.45}
 .death-impact span{font-size:16px;font-weight:700;opacity:.88}
+.death-impact.impact-mafia_kill{background:radial-gradient(circle at 50% 30%,#d31d28,#5a060c 72%);animation:impact-shake .95s both}
+.death-impact.impact-serial_kill{background:radial-gradient(circle at 40% 20%,#3a0508,#090204 70%);animation:impact-slash .85s both}
+.death-impact.impact-witch_poison{background:radial-gradient(circle at 50% 40%,#6b2aad,#1a0c24 75%);animation:impact-pulse 1.2s both}
+.death-impact.impact-jailer_executed{background:linear-gradient(180deg,#3d4248,#16181c);animation:impact-stamp .7s both}
+.death-impact.impact-vigilante_kill{background:#0b0c0e;animation:impact-shot .9s both}
+.death-impact.impact-lovers_died{background:radial-gradient(circle at 50% 35%,#c43b62,#4a1024 78%);animation:impact-heart 1s both}
+.death-impact.impact-vote_eliminated{background:radial-gradient(circle at 50% 25%,#8a6a1e,#1c1608 76%);animation:impact-shake .85s both}
+.death-impact.impact-trial_guilty{background:radial-gradient(circle at 50% 20%,#5b4630,#12100c 78%);animation:impact-stamp .8s both}
+.death-impact.impact-host_expelled{background:radial-gradient(circle at 50% 30%,#35506c,#10161d 76%);animation:impact-shake .7s both}
+.death-impact.impact-jester_won{background:repeating-linear-gradient(135deg,#4b1d6b 0 18px,#c9a227 18px 36px);color:#fff8e6;animation:impact-jester .9s both}
+.death-impact.impact-eliminated{background:#8b0d14;animation:impact-shake .9s both}
+@keyframes impact-slash{0%{transform:translate(0) rotate(0)}18%{transform:translate(-22px,10px) rotate(-4deg)}36%{transform:translate(24px,-12px) rotate(5deg)}100%{transform:none}}
+@keyframes impact-pulse{0%,100%{transform:scale(1)}40%{transform:scale(1.04)}70%{transform:scale(.98)}}
+@keyframes impact-stamp{0%{transform:scale(1.18)}28%{transform:scale(.94)}100%{transform:scale(1)}}
+@keyframes impact-shot{0%{background:#fff}12%{background:#0b0c0e}24%{background:#fff}40%{background:#0b0c0e}100%{background:#0b0c0e}}
+@keyframes impact-heart{0%,100%{transform:scale(1)}25%{transform:scale(1.08)}50%{transform:scale(.96)}}
+@keyframes impact-jester{0%{transform:rotate(-3deg) scale(1.04)}40%{transform:rotate(4deg) scale(.97)}100%{transform:none}}
 body.impact-save{animation:impact-shake .9s cubic-bezier(.36,.07,.19,.97) both}
 body.impact-save::before{content:'';position:fixed;inset:0;z-index:240;pointer-events:none;background:radial-gradient(circle at center,transparent 35%,#c9a22777 100%);animation:impact-flash .9s ease-out both}
 @keyframes impact-shake{

@@ -73,40 +73,43 @@ function deathIdList(){
   return raw.map((id)=>String(id?.id||id||'')).filter(Boolean);
 }
 function samePlayer(a,b){return String(a||'')!==''&&String(a)===String(b);}
-function myDeathReason(){
+function myDeathEvent(){
   const me=impactSelfId();
   const mine=(game?.eliminations||[]).find((p)=>samePlayer(p.id,me)||(game?.me?.name&&p.name===game.me.name));
-  const event=mine?.reason||announcementEvents().find((e)=>IMPACT_DEATH.has(e))||'';
-  const lines={
-    mafia_kill:['المافيا اغتالتك.','Mafia killed you.'],
-    serial_kill:['القاتل المتسلسل اغتالك.','The Serial Killer killed you.'],
-    witch_poison:['سم الساحرة قتلك.','Witch poison killed you.'],
-    jailer_executed:['السجّان أعدمك.','The Jailer executed you.'],
-    vigilante_kill:['طلقة القناص قتلتك.','The sniper killed you.'],
-    lovers_died:['متّ مع شريكك.','You died with your linked partner.'],
-    vote_eliminated:['التصويت استبعدك.','The vote eliminated you.'],
-    trial_guilty:['صدر الحكم بإدانتك.','The verdict found you guilty.'],
-    host_expelled:['المضيف استبعدك.','The host expelled you.'],
-    jester_won:['المهرج فاز بعد استبعادك.','The Jester won after you were voted out.']
+  return mine?.reason||announcementEvents().find((e)=>IMPACT_DEATH.has(e))||'eliminated';
+}
+function deathImpactStyle(event){
+  const pack={
+    mafia_kill:{icon:'🔪',tone:70,wait:480,buzz:[160,40,280,40,420,60,220],title:['اغتيال المافيا','Mafia assassination'],reason:['المافيا اغتالتك.','Mafia killed you.']},
+    serial_kill:{icon:'🩸',tone:55,wait:360,buzz:[80,30,80,30,80,30,300,50,160],title:['القاتل المتسلسل','Serial Killer'],reason:['القاتل المتسلسل اغتالك.','The Serial Killer killed you.']},
+    witch_poison:{icon:'🧪',tone:140,wait:420,buzz:[40,30,40,30,40,30,40,80,220,50,160],title:['سم الساحرة','Witch poison'],reason:['سم الساحرة قتلك.','Witch poison killed you.']},
+    jailer_executed:{icon:'⛓️',tone:90,wait:700,buzz:[400,80,180],title:['إعدام السجّان','Jailer execution'],reason:['السجّان أعدمك.','The Jailer executed you.']},
+    vigilante_kill:{icon:'🎯',tone:210,wait:800,buzz:[30,40,500],title:['طلقة القناص','Sniper shot'],reason:['طلقة القناص قتلتك.','The sniper killed you.']},
+    lovers_died:{icon:'💔',tone:180,wait:540,buzz:[120,50,120,90,220,50,220],title:['موت الشريكين','Linked pair'],reason:['متّ مع شريكك.','You died with your linked partner.']},
+    vote_eliminated:{icon:'🗳️',tone:160,wait:500,buzz:[90,40,90,40,90,70,260],title:['استبعاد بالتصويت','Voted out'],reason:['التصويت استبعدك.','The vote eliminated you.']},
+    trial_guilty:{icon:'⚖️',tone:110,wait:620,buzz:[220,60,90,40,320],title:['حكم الإدانة','Guilty verdict'],reason:['صدر الحكم بإدانتك.','The verdict found you guilty.']},
+    host_expelled:{icon:'🚫',tone:200,wait:450,buzz:[70,30,70,30,70,30,200],title:['استبعاد المضيف','Host expelled'],reason:['المضيف استبعدك.','The host expelled you.']},
+    jester_won:{icon:'🃏',tone:320,wait:380,buzz:[50,25,90,25,50,25,90,25,180],title:['فوز المهرج','Jester win'],reason:['المهرج فاز بعد استبعادك.','The Jester won after you were voted out.']},
+    eliminated:{icon:'☠️',tone:80,wait:520,buzz:[120,40,200,40,280],title:['خروج','Eliminated'],reason:['خرجت من المباراة.','You are out of the match.']}
   };
-  if(lines[event])return discussionText(...lines[event]);
-  if(event&&typeof squareEventLine==='function')return squareEventLine(event);
-  return discussionText('خرجت من المباراة.','You are out of the match.');
+  return pack[event]||pack.eliminated;
 }
 function playImpact(kind){
   const death=kind==='death';
+  const event=death?myDeathEvent():'save';
+  const style=deathImpactStyle(event);
   closeDeathImpact();
   impactArmed=death;
-  const pulse=()=>{if(navigator.vibrate)navigator.vibrate(death?[120,40,200,40,280,50,400,60,220]:[50,40,90,40,140,50,220]);};
+  const pulse=()=>{if(navigator.vibrate)navigator.vibrate(death?style.buzz:[50,40,90,40,140,50,220]);};
   pulse();
   if(death){
-    impactPulseTimer=setInterval(pulse,520);
+    impactPulseTimer=setInterval(pulse,style.wait);
     const overlay=document.createElement('button');
     overlay.id='deathImpact';
     overlay.type='button';
-    overlay.className='death-impact';
+    overlay.className=`death-impact impact-${event}`;
     overlay.setAttribute('aria-label',discussionText('اضغط للخروج','Tap to dismiss'));
-    overlay.innerHTML=`<b>${escapeHtml(myDeathReason())}</b><span>${discussionText('اضغط للخروج','Tap to dismiss')}</span>`;
+    overlay.innerHTML=`<i>${style.icon}</i><small>${discussionText(...style.title)}</small><b>${discussionText(...style.reason)}</b><span>${discussionText('اضغط للخروج','Tap to dismiss')}</span>`;
     overlay.addEventListener('click',closeDeathImpact);
     document.body.appendChild(overlay);
     impactCloseTimer=setTimeout(closeDeathImpact,7000);
@@ -120,12 +123,12 @@ function playImpact(kind){
     const oscillator=context.createOscillator();
     const gain=context.createGain();
     oscillator.type=death?'sawtooth':'triangle';
-    oscillator.frequency.setValueAtTime(death?90:420,context.currentTime);
-    oscillator.frequency.exponentialRampToValueAtTime(death?40:280,context.currentTime+(death?0.45:0.28));
-    gain.gain.setValueAtTime(death?0.16:0.1,context.currentTime);
-    gain.gain.exponentialRampToValueAtTime(.001,context.currentTime+(death?0.5:0.32));
+    oscillator.frequency.setValueAtTime(death?style.tone:420,context.currentTime);
+    oscillator.frequency.exponentialRampToValueAtTime(death?Math.max(30,style.tone-40):280,context.currentTime+(death?0.55:0.28));
+    gain.gain.setValueAtTime(death?0.17:0.1,context.currentTime);
+    gain.gain.exponentialRampToValueAtTime(.001,context.currentTime+(death?0.58:0.32));
     oscillator.connect(gain).connect(context.destination);
-    oscillator.start();oscillator.stop(context.currentTime+(death?0.52:0.34));
+    oscillator.start();oscillator.stop(context.currentTime+(death?0.6:0.34));
   }catch{}
 }
 function impactSelfId(){return String(playerId||game?.me?.id||'');}
