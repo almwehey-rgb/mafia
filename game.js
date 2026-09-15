@@ -700,12 +700,12 @@ function renderHostLogin(reason = '') {
   $('#app').removeAttribute('data-login-shell');
   const device = reason === 'device' || reason === 'resume';
   const intro = device
-    ? discussionText('هذا جهاز جديد. أدخل الرقم السري المكوّن من 8 أرقام لتولي التحكم كمضيف.','This is a new device. Enter the 8-digit secret number to take host control.')
-    : discussionText('أدخل الرمز السري لإنشاء الغرف وإدارة اللعب.','Enter the secret code to create rooms and run the game.');
+    ? discussionText('هذا جهاز جديد. اكتب الرقم السري من 8 أرقام (مو كلمة).','This is a new device. Enter the 8-digit secret number, not a word.')
+    : discussionText('اكتب الرقم السري من 8 أرقام. الدخول مو بكلمة سر.','Enter the 8-digit secret number. Login is not a secret word.');
   const heading = device
     ? discussionText('تأكيد المضيف على جهاز آخر','Confirm host on another device')
     : discussionText('دخول المضيف','Host login');
-  $('#app').innerHTML = `<section class="noir-entry"><div class="noir-content"><p class="noir-kicker">MAFIA · مافيا الليل</p><h2 class="noir-heading">كل وجه يخفي سرًّا</h2><p class="noir-intro">${intro}</p><div class="card hero join-card auth-card"><h1>${heading}</h1><p class="muted">${discussionText('الرقم السري مكوّن من 8 أرقام.','The secret number is 8 digits.')}</p><label for="hostPin">${discussionText('الرقم السري','Secret number')}</label><input class="input auth-pin" id="hostPin" type="password" inputmode="numeric" maxlength="8" autocomplete="current-password" enterkeyhint="go"><button class="btn red wide" type="button" onclick="loginHost()">${discussionText('دخول المضيف','Host login')}</button></div><div class="noir-links"><button class="btn" type="button" onclick="home()">${discussionText('رجوع','Back')}</button></div></div>${noirEmblem()}</section>${homeCharacters()}`;
+  $('#app').innerHTML = `<section class="noir-entry"><div class="noir-content"><p class="noir-kicker">MAFIA · مافيا الليل</p><h2 class="noir-heading">كل وجه يخفي سرًّا</h2><p class="noir-intro">${intro}</p><div class="card hero join-card auth-card"><h1>${heading}</h1><p class="muted">${discussionText('8 أرقام فقط — ليست كلمة سر.','8 digits only — not a secret word.')}</p><label for="hostPin">${discussionText('الرقم السري','Secret number')}</label><input class="input auth-pin" id="hostPin" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="8" autocomplete="current-password" enterkeyhint="go"><button class="btn red wide" type="button" onclick="loginHost()">${discussionText('دخول المضيف','Host login')}</button></div><div class="noir-links"><button class="btn" type="button" onclick="home()">${discussionText('رجوع','Back')}</button></div></div>${noirEmblem()}</section>${homeCharacters()}`;
   const input = $('#hostPin');
   input.addEventListener('keydown', (event) => { if (event.key === 'Enter') loginHost(); });
   input.focus({ preventScroll: true });
