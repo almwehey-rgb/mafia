@@ -1029,6 +1029,21 @@ function godfatherRevealCard() {
 function playerList(showConnection = true, allowKick = false, players = game.players) {
   return players.map((player) => `<div class="player ${player.alive ? '' : 'dead'}">${showConnection ? `<span class="dot ${player.connected ? 'on' : ''}"></span>` : ''}<span>${player.isBot?'🤖':player.alive?'👤':'☠️'} ${escapeHtml(player.name)}${player.role?`<small>${roleLabel(player.role)}</small>`:''}${player.will?`<small>📜 ${escapeHtml(player.will)}</small>`:''}</span>${(hostToken||game.me?.isHost)&&player.alive&&!['lobby','finished'].includes(game.phase)?disciplineButtons(player):''}${allowKick?`<details class="player-management"><summary data-no-translate>${discussionText('إدارة','Manage')}</summary><button class="kick" aria-label="${discussionText('طرد','Remove')} ${escapeHtml(player.name)}" onclick="kickPlayer(${jsArg(player.id)})">${discussionText('طرد','Remove')}</button></details>`:''}${(hostToken||game.me?.isHost)&&game.phase!=='lobby'&&!player.isBot?`<button aria-label="${discussionText(player.muted?'إلغاء كتم':'كتم',player.muted?'Unmute':'Mute')} ${escapeHtml(player.name)}" aria-pressed="${!!player.muted}" class="mute-btn ${player.muted?'on':''}" onclick="mutePlayer(${jsArg(player.id)},${!player.muted})">${player.muted?'🔇':'🔊'}</button>`:''}</div>`).join('');
 }
+function tvRosterRows(players, out=false){
+  const showRole=out&&(game.phase==='finished'||game.enabledRoles?.reveal_dead_roles);
+  return players.map((player)=>`<div class="player ${out?'dead':''}"><span class="dot ${player.connected?'on':''}"></span><b>${escapeHtml(player.name)}</b>${showRole&&player.role?`<small>${roleLabel(player.role)}</small>`:''}</div>`).join('')||`<p class="muted">${out?discussionText('ما في أحد خرج','Nobody is out yet'):discussionText('بانتظار اللاعبين','Waiting for players')}</p>`;
+}
+function hostRosterBoard(){
+  const inside=game.players.filter((p)=>p.alive);
+  const out=game.players.filter((p)=>!p.alive);
+  return `<div class="host-rosters" data-no-translate>
+    <section class="card host-roster host-roster-in"><h2>${discussionText('في القيم','In the game')}<small>${inside.length}</small></h2><div class="players">${tvRosterRows(inside,false)}</div></section>
+    <section class="card host-roster host-roster-out"><h2>${discussionText('خرجوا','Out')}<small>${out.length}</small></h2><div class="players">${tvRosterRows(out,true)}</div></section>
+  </div>`;
+}
+function hostTvFrame(stageHtml){
+  return `${phaseBar()}<div class="host-tv"><section class="card host-tv-stage">${stageHtml}</section>${hostRosterBoard()}</div>`;
+}
 
 function setLobbyPane(pane) {
   if (!['room', 'setup', 'players'].includes(pane)) return;
@@ -1040,7 +1055,8 @@ function changeLobbyPlayerPage(amount) {
   renderHost();
 }
 function lobbyPlayers() {
-  const perPage = innerHeight >= 850 ? 12 : innerHeight >= 680 ? 8 : 4;
+  const tv = innerWidth >= 700;
+  const perPage = tv ? 99 : innerHeight >= 850 ? 12 : innerHeight >= 680 ? 8 : 4;
   const pages = Math.max(1, Math.ceil(game.players.length / perPage));
   lobbyPlayerPage = Math.min(lobbyPlayerPage, pages - 1);
   const players = game.players.slice(lobbyPlayerPage * perPage, (lobbyPlayerPage + 1) * perPage);
@@ -1163,16 +1179,16 @@ function renderHostContent() {
     return;
   }
   if (game.phase === 'paused') {
-    $('#app').innerHTML = `${phaseBar()}<div class="card hero"><div class="role-title">⏸️ المباراة متوقفة</div><p>يمكن متابعة المباراة من المرحلة نفسها.</p><button class="btn red" onclick="hostAction('togglePause')">▶️ متابعة المباراة</button><button class="btn gold wide" type="button" onclick="returnToLobby()">${discussionText('إيقاف والرجوع للوبي','Stop and return to lobby')}</button></div>`;
+    $('#app').innerHTML = hostTvFrame(`<div class="role-title">⏸️ ${discussionText('المباراة متوقفة','Match paused')}</div><p>${discussionText('يمكن متابعة المباراة من المرحلة نفسها.','The match can continue from the same phase.')}</p><button class="btn red wide" onclick="hostAction('togglePause')">▶️ ${discussionText('متابعة المباراة','Resume match')}</button><button class="btn gold wide" type="button" onclick="returnToLobby()">${discussionText('إيقاف والرجوع للوبي','Stop and return to lobby')}</button>`);
     return;
   }
   if (game.phase === 'reveal') {
     const ready = game.roleReadyCount || 0, total = game.players.length;
-    $('#app').innerHTML = `${phaseBar()}<div class="grid"><div class="card hero"><div class="counter">${ready} / ${total}</div><div class="progress"><span style="width:${total?ready/total*100:0}%"></span></div><button class="btn red wide" ${ready<total?'disabled':''} onclick="hostAction('beginNight')">🌙 ${discussionText('بدء الليل','Start night')}</button></div><div class="card"><h2>${discussionText('اللاعبون','Players')}</h2><div class="players">${playerList()}</div></div></div>`;
+    $('#app').innerHTML = hostTvFrame(`<div class="counter">${ready} / ${total}</div><div class="progress"><span style="width:${total?ready/total*100:0}%"></span></div><p class="muted">${discussionText('بانتظار تأكيد الأدوار','Waiting for role confirms')}</p><button class="btn red wide" ${ready<total?'disabled':''} onclick="hostAction('beginNight')">🌙 ${discussionText('بدء الليل','Start night')}</button>`);
     return;
   }
   if (game.phase === 'night') {
-    $('#app').innerHTML = `${phaseBar()}<div class="grid"><section class="card hero phase-play night-play"><div class="status ${game.nightReady ? '' : 'wait'}">${game.nightReady ? discussionText('اكتملت اختيارات الليل ✅','Night choices complete ✅') : discussionText('بانتظار الاختيارات…','Waiting for choices…')}</div><button class="btn red wide" ${game.nightReady||phaseTimeExpired() ? '' : 'disabled'} data-timeout-action="resolveNight" onclick="hostAction('resolveNight')">${discussionText('إعلان الصباح','Announce morning')}</button></section><div class="card">${eventCards()}<h2>${discussionText('اللاعبون','Players')}</h2><div class="players">${playerList()}</div></div></div>`;
+    $('#app').innerHTML = hostTvFrame(`<div class="role-title">🌙 ${discussionText('الليل','Night')}</div><div class="status ${game.nightReady ? '' : 'wait'}">${game.nightReady ? discussionText('اكتملت اختيارات الليل ✅','Night choices complete ✅') : discussionText('بانتظار الاختيارات…','Waiting for choices…')}</div>${eventCards()}<button class="btn red wide" ${game.nightReady||phaseTimeExpired() ? '' : 'disabled'} data-timeout-action="resolveNight" onclick="hostAction('resolveNight')">${discussionText('إعلان الصباح','Announce morning')}</button>`);
     return;
   }
   if (game.phase === 'day') {
@@ -1180,29 +1196,29 @@ function renderHostContent() {
     const draw = typeof openingDrawActive === 'function' && openingDrawActive(clientDiscussion());
     const talk = discussionPanel(true);
     const talkBlock = talk && !draw ? `<details class="cycle-talk" open data-disclosure-key="host-day-talk"><summary>${discussionText('النقاش','Discussion')}</summary>${talk}</details>` : talk;
-    $('#app').innerHTML = `${phaseBar()}<div class="grid"><section class="card hero day-stage phase-play day-play"><div class="role-title">☀️ ${discussionText('الصباح','Morning')}</div>${morningBriefPanel(true)}<section class="day-action-panel cycle-action" data-no-translate><h2>${discussionText('اختيارات النهار','Day choices')}</h2><div class="status ${game.lawyerReady ? '' : 'wait'}">${game.lawyerReady ? discussionText('المحامي جاهز ✅','Lawyer ready ✅') : discussionText('بانتظار حماية المحامي…','Waiting for Lawyer protection…')}</div><div class="status ${game.jailerReady ? '' : 'wait'}">${game.jailerReady ? discussionText('السجّان اختار السجين ✅','Jailer chose the prisoner ✅') : discussionText('بانتظار اختيار السجّان…','Waiting for the Jailer…')}</div><button class="btn gold wide" data-discussion-vote ${ready ? '' : 'disabled'} onclick="hostAction('startVote')">${discussionText('بدء التصويت','Start voting')}</button></section>${talkBlock}</section><div class="card"><h2>${discussionText('الأحياء','Alive')}</h2><div class="players">${playerList(false, false, alivePlayers())}</div></div></div>`;
+    $('#app').innerHTML = hostTvFrame(`<div class="role-title">☀️ ${discussionText('الصباح','Morning')}</div>${morningBriefPanel(true)}<section class="day-action-panel" data-no-translate><h2>${discussionText('اختيارات النهار','Day choices')}</h2><div class="status ${game.lawyerReady ? '' : 'wait'}">${game.lawyerReady ? discussionText('المحامي جاهز ✅','Lawyer ready ✅') : discussionText('بانتظار حماية المحامي…','Waiting for Lawyer protection…')}</div><div class="status ${game.jailerReady ? '' : 'wait'}">${game.jailerReady ? discussionText('السجّان اختار السجين ✅','Jailer chose the prisoner ✅') : discussionText('بانتظار اختيار السجّان…','Waiting for the Jailer…')}</div><button class="btn gold wide" data-discussion-vote ${ready ? '' : 'disabled'} onclick="hostAction('startVote')">${discussionText('بدء التصويت','Start voting')}</button></section>${talkBlock||''}`);
     return;
   }
   if (game.phase === 'nomination') {
     const alive = alivePlayers().length;
-    $('#app').innerHTML = `${phaseBar()}<div class="grid"><section class="card hero phase-play nomination-play"><div class="counter">${game.voteCount} / ${alive}</div><button class="btn red wide" ${game.voteCount<alive&&!phaseTimeExpired()?'disabled':''} data-timeout-action="resolveVote" onclick="hostAction('resolveVote')">${discussionText('اختيار المتهم','Choose the accused')}</button></section><div class="card"><h2>${discussionText('الأحياء','Alive')}</h2><div class="players">${playerList(false, false, alivePlayers())}</div></div></div>`;
+    $('#app').innerHTML = hostTvFrame(`<div class="role-title">${discussionText('الترشيح','Nomination')}</div><div class="counter">${game.voteCount} / ${alive}</div><button class="btn red wide" ${game.voteCount<alive&&!phaseTimeExpired()?'disabled':''} data-timeout-action="resolveVote" onclick="hostAction('resolveVote')">${discussionText('اختيار المتهم','Choose the accused')}</button>`);
     return;
   }
   if (game.phase === 'trial') {
-    $('#app').innerHTML = `${phaseBar()}<div class="card hero trial-stage phase-play trial-play"><div class="accused-name">${escapeHtml(nameOf(game.accusedPlayer))}</div><p id="trialTimerHint" class="status wait" hidden></p><button class="btn gold wide" type="button" data-timeout-action="advanceVerdict" onclick="hostAction('advanceVerdict')">${discussionText('الانتقال إلى الحكم','Move to verdict')}</button></div>`;
+    $('#app').innerHTML = hostTvFrame(`<div class="role-title">${discussionText('المحاكمة','Trial')}</div><div class="accused-name">${escapeHtml(nameOf(game.accusedPlayer))}</div><p id="trialTimerHint" class="status wait" hidden></p><button class="btn gold wide" type="button" data-timeout-action="advanceVerdict" onclick="hostAction('advanceVerdict')">${discussionText('الانتقال إلى الحكم','Move to verdict')}</button>`);
     return;
   }
   if (game.phase === 'verdict') {
     const alive = Math.max(0,alivePlayers().length-1);
-    $('#app').innerHTML = `${phaseBar()}<div class="grid"><section class="card hero phase-play verdict-play"><div class="accused-name">${escapeHtml(nameOf(game.accusedPlayer))}</div><div class="counter">${game.voteCount} / ${alive}</div><button class="btn red wide" ${game.voteCount<alive&&!phaseTimeExpired()?'disabled':''} data-timeout-action="resolveVote" onclick="hostAction('resolveVote')">${discussionText('إعلان الحكم','Reveal verdict')}</button></section><div class="card"><h2>${discussionText('المصوتون','Voters')}</h2><div class="players">${playerList(false)}</div></div></div>`;
+    $('#app').innerHTML = hostTvFrame(`<div class="accused-name">${escapeHtml(nameOf(game.accusedPlayer))}</div><div class="counter">${game.voteCount} / ${alive}</div><button class="btn red wide" ${game.voteCount<alive&&!phaseTimeExpired()?'disabled':''} data-timeout-action="resolveVote" onclick="hostAction('resolveVote')">${discussionText('إعلان الحكم','Reveal verdict')}</button>`);
     return;
   }
   if (game.phase === 'vote') {
     const alive = alivePlayers().length;
-    $('#app').innerHTML = `${phaseBar()}<div class="grid"><section class="card hero phase-play vote-play"><div class="counter">${game.voteCount} / ${alive}</div><button class="btn red wide" ${game.voteCount < alive && !phaseTimeExpired() ? 'disabled' : ''} data-timeout-action="resolveVote" onclick="hostAction('resolveVote')">${discussionText('كشف النتيجة','Reveal result')}</button></section><div class="card"><h2>${discussionText('اللاعبون','Players')}</h2><div class="players">${playerList(false)}</div></div></div>`;
+    $('#app').innerHTML = hostTvFrame(`<div class="role-title">${discussionText('التصويت','Voting')}</div><div class="counter">${game.voteCount} / ${alive}</div><button class="btn red wide" ${game.voteCount < alive && !phaseTimeExpired() ? 'disabled' : ''} data-timeout-action="resolveVote" onclick="hostAction('resolveVote')">${discussionText('كشف النتيجة','Reveal result')}</button>`);
     return;
   }
-    $('#app').innerHTML = `${phaseBar()}<div class="grid"><div class="card hero"><div class="role-title">${winnerTitle()}</div><div class="players final-roles">${game.players.map((player) => `<div class="player"><span>${escapeHtml(player.name)} — ${roleLabel(player.role)}</span></div>`).join('')}</div><div class="actions center"><button class="btn gold wide" onclick="returnToLobby()">👥 ${discussionText('الرجوع للوبي وتغيير اللاعبين','Return to lobby and change players')}</button><button class="btn red" onclick="startGame()">🔄 ${discussionText('إعادة مباراة بنفس اللاعبين','Rematch with the same players')}</button><button class="btn" onclick="shareResult()">↗ ${discussionText('مشاركة النتيجة','Share result')}</button><button class="btn" onclick="home()">${discussionText('الرئيسية','Home')}</button></div></div><div class="card"><h2>${discussionText('سجل المباراة','Match log')}</h2><div class="timeline">${historyCards()||`<p class="muted">${discussionText('ستظهر أحداث المباراة هنا.','Match events will appear here.')}</p>`}</div></div></div>`;
+  $('#app').innerHTML = hostTvFrame(`<div class="role-title">${winnerTitle()}</div><div class="actions center"><button class="btn gold wide" onclick="returnToLobby()">👥 ${discussionText('الرجوع للوبي وتغيير اللاعبين','Return to lobby and change players')}</button><button class="btn red wide" onclick="startGame()">🔄 ${discussionText('إعادة مباراة بنفس اللاعبين','Rematch with the same players')}</button><button class="btn wide" onclick="shareResult()">↗ ${discussionText('مشاركة النتيجة','Share result')}</button></div><h2>${discussionText('سجل المباراة','Match log')}</h2><div class="timeline">${historyCards()||`<p class="muted">${discussionText('ستظهر أحداث المباراة هنا.','Match events will appear here.')}</p>`}</div>`);
 }
 function winnerTitle() {
   if (game.winner === 'draw') return discussionText('⚖️ تعادل — لم يبقَ أحد حيًا','⚖️ Draw — no survivors');
@@ -1975,6 +1991,7 @@ function renderWithNotices(content,controller=false) {
 }
 function renderPlayer(){
   setShowingRole(!!(game?.me?.alive && !roleAcknowledged() && !['lobby','finished'].includes(game.phase)));
+  document.body.classList.remove('host-tv-mode');
   renderWithNotices(renderPlayerContent);
   if(!roleAcknowledged())return;
   enhanceJourney(false);
@@ -2036,7 +2053,7 @@ function enhanceJourney(controller){
   document.querySelectorAll('.setup-tabs button').forEach((button,index)=>{if(index+1===setupStep)button.setAttribute('aria-current','step');});
   paintActionFeedback();updatePhaseTimer();
 }
-function renderHost(){setShowingRole(false);renderWithNotices(renderHostContent,true);enhanceJourney(true);mountHostProgress();}
+function renderHost(){setShowingRole(false);document.body.classList.toggle('host-tv-mode',game?.phase&&game.phase!=='lobby');renderWithNotices(renderHostContent,true);enhanceJourney(true);mountHostProgress();}
 function renderSpectator(){renderWithNotices(renderSpectatorContent);}
 
 function disciplineButtons(player) {
