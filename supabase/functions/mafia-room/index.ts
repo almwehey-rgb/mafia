@@ -100,7 +100,7 @@ function recordResponse(response:Response) {
   return response;
 }
 async function operationsStatus(body:any) {
-  if(!await validHostAccess(body.hostAccessToken))return out({error:'UNAUTHORIZED'},403);
+  {const denied=await denyHostAccess(body);if(denied)return denied;}
   const {data,error}=await db.from('mafia_rooms').select('code,phase,round,phase_started_at,lifecycle_version').in('phase',['reveal','night','day','vote','nomination','trial','verdict']).limit(1000);
   if(error)throw error;
   return out({status:'ok',time:Date.now(),instanceMetrics:{...requestTotals},rooms:data||[],truncated:(data||[]).length===1000});
@@ -209,14 +209,37 @@ const randomItem = <T>(items: T[]) => items[randomInt(items.length)];
 const currentSeason = () => { const d = new Date(); return `${d.getUTCFullYear()}-S${Math.floor(d.getUTCMonth() / 3) + 1}`; };
 const shortCode = (length = 8) => Array.from(crypto.getRandomValues(new Uint8Array(length))).map((x) => "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"[x % 32]).join("");
 const sha256 = async (value: string) => Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value)))).map((x) => x.toString(16).padStart(2, "0")).join("");
-const validHostAccess = async (token: any) => {
+const hostDeviceHash = async (deviceId: any) => {
+  const clean = cleanText(deviceId, 80);
+  if (!/^[A-Za-z0-9_-]{8,80}$/.test(clean)) return "";
+  return sha256(clean);
+};
+const hostAccessStatus = async (token: any, deviceId?: any) => {
   const clean = cleanText(token, 200);
-  if (!clean) return false;
+  if (!clean) return "UNAUTHORIZED";
   const tokenHash = await sha256(clean);
-  const { data } = await db.from("mafia_host_sessions").select("token_hash,expires_at").eq("token_hash", tokenHash).maybeSingle();
-  if (!data || new Date(data.expires_at).getTime() <= Date.now()) return false;
-  await persist(db.from("mafia_host_sessions").update({ last_seen: new Date().toISOString() }).eq("token_hash", tokenHash));
-  return true;
+  const { data } = await db.from("mafia_host_sessions").select("token_hash,expires_at,device_id_hash").eq("token_hash", tokenHash).maybeSingle();
+  if (!data || new Date(data.expires_at).getTime() <= Date.now()) return "UNAUTHORIZED";
+  const incoming = await hostDeviceHash(deviceId);
+  if (data.device_id_hash) {
+    if (!incoming || data.device_id_hash !== incoming) return "DEVICE_MISMATCH";
+    await persist(db.from("mafia_host_sessions").update({ last_seen: new Date().toISOString() }).eq("token_hash", tokenHash));
+    return "ok";
+  }
+  const patch: Record<string, string> = { last_seen: new Date().toISOString() };
+  if (incoming) patch.device_id_hash = incoming;
+  await persist(db.from("mafia_host_sessions").update(patch).eq("token_hash", tokenHash));
+  return "ok";
+};
+const validHostAccess = async (token: any, deviceId?: any) => (await hostAccessStatus(token, deviceId)) === "ok";
+const denyHostAccess = async (body: any) => {
+  const status = await hostAccessStatus(body?.hostAccessToken, body?.deviceId);
+  if (status === "ok") return null;
+  return out({ error: status }, 403);
+};
+const activeHostRooms = async () => {
+  const { data } = await db.from("mafia_rooms").select("code,host_token").neq("phase", "finished").order("created_at", { ascending: false }).limit(30);
+  return (data || []).filter((room: any) => /^\d{4}$/.test(room.code) && room.host_token).map((room: any) => ({ code: room.code, hostToken: room.host_token }));
 };
 const cleanPreferences = (value: any) => ({
   mafiaCount: Math.max(1, Math.min(8, Math.round(Number(value?.mafiaCount) || 2))),
@@ -471,29 +494,28 @@ async function routeHostLogin(context:RouteContext) {
       const loginBucket = loginBuckets.get(ip);
       if (!loginBucket || loginBucket.reset < now) loginBuckets.set(ip, { count: 1, reset: now + 15 * 60_000 });
       else if (++loginBucket.count > 5) return out({ error: "LOGIN_RATE_LIMITED" }, 429);
-      const secret = cleanText(body.secret || body.pin, 64).replace(/\s+/g, " ");
-      const pinHash = await sha256(secret);
-      const envSecret = cleanText(Deno.env.get("HOST_SECRET") || Deno.env.get("MAFIA_HOST_SECRET") || "", 64).replace(/\s+/g, " ");
-      const envHash = envSecret ? await sha256(envSecret) : "";
+      const pin = cleanText(body.pin, 32);
+      const pinHash = await sha256(pin);
       const { data: auth } = await db.from("mafia_host_auth").select("pin_hash").eq("id", "default").maybeSingle();
-      if (!secret || ((!auth || auth.pin_hash !== pinHash) && pinHash !== envHash)) {
+      if (!/^\d{8}$/.test(pin) || !auth || auth.pin_hash !== pinHash) {
         await audit(null, action, "denied", started);
         return out({ error: "INVALID_PIN" }, 403);
       }
       loginBuckets.delete(ip);
       const hostAccessToken = `${crypto.randomUUID()}.${crypto.randomUUID()}`;
+      const deviceHash = await hostDeviceHash(body.deviceId);
       await persist(db.from("mafia_host_sessions").delete().lt("expires_at", new Date().toISOString()));
-      await persist(db.from("mafia_host_sessions").insert({ token_hash: await sha256(hostAccessToken), expires_at: new Date(Date.now() + 90 * 24 * 60 * 60_000).toISOString() }));
+      await persist(db.from("mafia_host_sessions").insert({ token_hash: await sha256(hostAccessToken), device_id_hash: deviceHash || null, expires_at: new Date(Date.now() + 90 * 24 * 60 * 60_000).toISOString() }));
       const { data: prefs } = await db.from("mafia_host_preferences").select("settings").eq("id", "default").maybeSingle();
       await audit(null, action, "ok", started);
-      return out({ hostAccessToken, preferences: cleanPreferences(prefs?.settings || {}) });
+      return out({ hostAccessToken, preferences: cleanPreferences(prefs?.settings || {}), rooms: await activeHostRooms() });
     
   }
 }
 async function routeHostPreferences(context:RouteContext) {
   let {body, action, ip, now, started}=context;
   {
-      if (!await validHostAccess(body.hostAccessToken)) return out({ error: "UNAUTHORIZED" }, 403);
+      {const denied=await denyHostAccess(body);if(denied)return denied;}
       if (body.settings) {
         const settings = cleanPreferences(body.settings);
         await persist(db.from("mafia_host_preferences").upsert({ id: "default", settings, updated_at: new Date().toISOString() }));
@@ -539,7 +561,7 @@ async function routeRecoverProfile(context:RouteContext) {
 async function routeCreate(context:RouteContext) {
   let {body, action, ip, now, started}=context;
   {
-      if (!await validHostAccess(body.hostAccessToken)) return out({ error: "UNAUTHORIZED" }, 403);
+      {const denied=await denyHostAccess(body);if(denied)return denied;}
       let code: string;
       do { code = String(1000 + randomInt(9000)); }
       while ((await db.from("mafia_rooms").select("code").eq("code", code)).data?.length);

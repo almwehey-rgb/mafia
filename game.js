@@ -3,6 +3,38 @@ const $ = (selector) => document.querySelector(selector);
 let game = null;
 let hostToken = '';
 let hostAccessToken = localStorage.getItem('mafia-host-access-token') || '';
+let pendingHostResume = '';
+function hostDeviceId() {
+  let id = localStorage.getItem('mafia-host-device-id') || '';
+  if (!/^[A-Za-z0-9_-]{16,80}$/.test(id)) {
+    id = `${crypto.randomUUID()}${crypto.randomUUID()}`.replace(/-/g, '');
+    localStorage.setItem('mafia-host-device-id', id);
+  }
+  return id;
+}
+function bindHostDevice() {
+  localStorage.setItem('mafia-host-bound-device', hostDeviceId());
+}
+function hostDeviceMatches() {
+  const bound = localStorage.getItem('mafia-host-bound-device');
+  return !bound || bound === hostDeviceId();
+}
+function requireHostPin(reason = '') {
+  hostAccessToken = '';
+  localStorage.removeItem('mafia-host-access-token');
+  renderHostLogin(reason || 'device');
+}
+function adoptHostRooms(rooms) {
+  if (!Array.isArray(rooms)) return;
+  let latest = null;
+  for (const room of rooms) {
+    if (!/^\d{4}$/.test(room?.code || '') || !room.hostToken) continue;
+    const session = { code: room.code, host: true, hostToken: room.hostToken, playerToken: '', playerId: '', profileToken };
+    localStorage.setItem(sessionKey(room.code), JSON.stringify(session));
+    latest = session;
+  }
+  if (latest) localStorage.setItem('mafia-session', JSON.stringify(latest));
+}
 let playerToken = '';
 let playerId = '';
 let mafiaCount = 3;
@@ -168,7 +200,24 @@ function noirEmblem(){return `<aside class="home-emblem" aria-hidden="true"><img
 function noirPageFrame(cardHtml,{wide=false}={}){return `<section class="noir-entry noir-subpage"><div class="noir-content${wide?' noir-content-wide':''}"><div class="card hero join-card auth-card">${cardHtml}</div><div class="noir-links"><button class="btn" type="button" onclick="home()">${discussionText('الرجوع للرئيسية','Back to home')}</button></div></div>${noirEmblem()}</section>`;}
 function removePlayerChrome(){document.querySelector('.player-tools')?.remove();document.querySelector('.player-dock')?.remove();document.body.classList.remove('has-player-dock')}
 function backFromLobby(){pollingEpoch++;clearTimeout(pollTimer);closeSheet();removePlayerChrome();game=null;if(hostAccessToken)renderHostHome();else renderHostLogin()}
-function phaseBar() { const controller=(hostToken||game?.me?.isHost)&&game;const live=controller&&!['lobby','finished'].includes(game.phase);const pause=live?`<button type="button" class="phase-pause phase-icon-btn" aria-label="${discussionText(game.phase==='paused'?'استكمال المباراة':'إيقاف مؤقت',game.phase==='paused'?'Resume game':'Pause game')}" onclick="hostAction('togglePause')">${lobbyIcon(game.phase==='paused'?'play':'pause')}</button>`:'';const toLobby=controller&&game.phase!=='lobby'?`<button type="button" class="phase-pause lobby-action lobby-back" onclick="returnToLobby()">${lobbyIcon('back')}<span class="btn-label">${discussionText('اللوبي','Lobby')}</span></button>`:'';const admin=live?`<button type="button" class="phase-pause phase-icon-btn" aria-label="${discussionText('إدارة المباراة','Game management')}" onclick="showMatchTools()">${lobbyIcon('shield')}</button>`:'';const back=delegatedHostMode?`<button type="button" class="phase-pause phase-icon-btn" aria-label="${discussionText('العودة لدوري','Back to my role')}" onclick="toggleDelegatedHost()">${lobbyIcon('user')}</button>`:'';return `<div class="phase-bar"><span class="phase-symbol">${game?.phase==='lobby'?lobbyIcon('wait'):phaseIcon()}</span><b class="phase-label">${phaseName()}</b>${game?.round ? `<small>${discussionText('الجولة','Round')} ${game.round}</small>` : ''}${game&&!["lobby","finished"].includes(game.phase)?`<span class="phase-timer" id="phaseTimer" role="timer" aria-label="${discussionText('الوقت المتبقي','Time remaining')}">${phaseDuration}</span>`:''}${game?.phase==='lobby'?`<button type="button" class="phase-pause lobby-action lobby-back" onclick="backFromLobby()">${lobbyIcon('back')}<span class="btn-label">${discussionText('الرئيسية','Home')}</span></button>`:''}${pause}${toLobby}${admin}${hostToken?`<button type="button" class="phase-pause lobby-action" onclick="showAdminQR()" aria-label="${discussionText('وضع الأدمن الخاص','Private admin access')}">${lobbyIcon('admin')}<span class="btn-label">${discussionText('أدمن','Admin')}</span></button>`:''}${back}${!spectatorMode ? `<button type="button" class="phase-pause lobby-action lobby-exit" onclick="leaveRoom()" aria-label="${discussionText('مغادرة الغرفة','Leave room')}">${lobbyIcon('leave')}<span class="btn-label">${discussionText('مغادرة','Leave')}</span></button>` : ""}</div>`; }
+function hostOverflowMenu(items) {
+  const extra = items.filter(Boolean).join('');
+  if (!extra) return '';
+  return `<details class="host-overflow"><summary aria-label="${discussionText('المزيد','More')}">⋯</summary><div class="host-overflow-panel">${extra}</div></details>`;
+}
+function phaseBar() {
+  const controller = (hostToken || game?.me?.isHost) && game;
+  const live = controller && !['lobby', 'finished'].includes(game.phase);
+  const pause = live ? `<button type="button" class="phase-pause phase-icon-btn" aria-label="${discussionText(game.phase === 'paused' ? 'استكمال المباراة' : 'إيقاف مؤقت', game.phase === 'paused' ? 'Resume game' : 'Pause game')}" onclick="hostAction('togglePause')">${lobbyIcon(game.phase === 'paused' ? 'play' : 'pause')}</button>` : '';
+  const home = game?.phase === 'lobby' ? `<button type="button" class="phase-pause lobby-action lobby-back" onclick="backFromLobby()">${lobbyIcon('back')}<span class="btn-label">${discussionText('الرئيسية', 'Home')}</span></button>` : '';
+  const toLobby = controller && game.phase !== 'lobby' ? `<button type="button" class="phase-pause lobby-action lobby-back" onclick="returnToLobby()">${lobbyIcon('back')}<span class="btn-label">${discussionText('اللوبي', 'Lobby')}</span></button>` : '';
+  const tools = live ? `<button type="button" class="phase-pause lobby-action" onclick="showMatchTools()">${lobbyIcon('shield')}<span class="btn-label">${discussionText('إدارة', 'Manage')}</span></button>` : '';
+  const admin = hostToken ? `<button type="button" class="phase-pause lobby-action" onclick="showAdminQR()" aria-label="${discussionText('وضع الأدمن الخاص', 'Private admin access')}">${lobbyIcon('admin')}<span class="btn-label">${discussionText('أدمن', 'Admin')}</span></button>` : '';
+  const back = delegatedHostMode ? `<button type="button" class="phase-pause lobby-action" onclick="toggleDelegatedHost()">${lobbyIcon('user')}<span class="btn-label">${discussionText('دوري', 'My role')}</span></button>` : '';
+  const leave = !spectatorMode ? `<button type="button" class="phase-pause lobby-action lobby-exit" onclick="leaveRoom()">${lobbyIcon('leave')}<span class="btn-label">${discussionText('مغادرة', 'Leave')}</span></button>` : '';
+  const extras = controller ? hostOverflowMenu([home, toLobby, tools, admin, back, leave]) : `${home}${toLobby}${tools}${admin}${back}${leave}`;
+  return `<div class="phase-bar${controller ? ' phase-bar-tv' : ''}"><span class="phase-symbol">${game?.phase === 'lobby' ? lobbyIcon('wait') : phaseIcon()}</span><b class="phase-label">${phaseName()}</b>${game?.round ? `<small>${discussionText('الجولة', 'Round')} ${game.round}</small>` : ''}${game && !['lobby', 'finished'].includes(game.phase) ? `<span class="phase-timer" id="phaseTimer" role="timer" aria-label="${discussionText('الوقت المتبقي', 'Time remaining')}">${phaseDuration}</span>` : ''}${pause}${extras}</div>`;
+}
 function clientPhaseRemaining() {
   const clock=game?.phaseClock;
   if(!clock||!Number.isFinite(clock.startedAt))return Infinity;
@@ -452,6 +501,9 @@ async function api(payload) {
   if (payload.code && game?.code === payload.code && payload.lifecycleVersion === undefined) {
     payload = {...payload,lifecycleVersion:game.lifecycleVersion};
   }
+  if (payload.action === 'hostLogin' || payload.hostAccessToken || ['create','hostPreferences','hostLogout','operationsStatus'].includes(payload.action)) {
+    payload = {...payload, deviceId: hostDeviceId()};
+  }
   const key=reading.includes(payload.action)?JSON.stringify(payload):null;
   if(key&&pendingReads.has(key))return structuredClone(await pendingReads.get(key));
   const task=(async()=>{
@@ -643,26 +695,37 @@ function renderLanding() {
   if (!$('#app').querySelector('.cinema-cards')) $('#app').insertAdjacentHTML('beforeend', homeCharacters());
   wireJoinFields(false);
 }
-function renderHostLogin() {
+function renderHostLogin(reason = '') {
   setRoomTag('🔒');
   $('#app').removeAttribute('data-login-shell');
-  $('#app').innerHTML = `<section class="noir-entry"><div class="noir-content"><p class="noir-kicker">MAFIA · ${discussionText('مافيا الليل','MAFIA NIGHT')}</p><h2 class="noir-heading">${discussionText('كل وجه يخفي سرًّا','Every face hides a secret')}</h2><p class="noir-intro">${discussionText('اكتب الكلمة السرية لإنشاء الغرف وإدارة اللعب.','Enter the secret word to create rooms and run the game.')}</p><div class="card hero join-card auth-card"><h1>${discussionText('دخول المضيف','Host login')}</h1><p class="muted">${discussionText('الدخول بكلمة سرية، مو برقم.','Login uses a secret word, not a number.')}</p><label for="hostSecret">${discussionText('الكلمة السرية','Secret word')}</label><input class="input" id="hostSecret" type="password" maxlength="32" autocomplete="current-password" enterkeyhint="go"><button class="btn red wide" type="button" onclick="loginHost()">${discussionText('دخول المضيف','Host login')}</button></div><div class="noir-links"><button class="btn" type="button" onclick="home()">${discussionText('رجوع','Back')}</button></div></div>${noirEmblem()}</section>${homeCharacters()}`;
-  const input = $('#hostSecret');
+  const device = reason === 'device' || reason === 'resume';
+  const intro = device
+    ? discussionText('هذا جهاز جديد. أدخل الرقم السري المكوّن من 8 أرقام لتولي التحكم كمضيف.','This is a new device. Enter the 8-digit secret number to take host control.')
+    : discussionText('أدخل الرمز السري لإنشاء الغرف وإدارة اللعب.','Enter the secret code to create rooms and run the game.');
+  const heading = device
+    ? discussionText('تأكيد المضيف على جهاز آخر','Confirm host on another device')
+    : discussionText('دخول المضيف','Host login');
+  $('#app').innerHTML = `<section class="noir-entry"><div class="noir-content"><p class="noir-kicker">MAFIA · مافيا الليل</p><h2 class="noir-heading">كل وجه يخفي سرًّا</h2><p class="noir-intro">${intro}</p><div class="card hero join-card auth-card"><h1>${heading}</h1><p class="muted">${discussionText('الرقم السري مكوّن من 8 أرقام.','The secret number is 8 digits.')}</p><label for="hostPin">${discussionText('الرقم السري','Secret number')}</label><input class="input auth-pin" id="hostPin" type="password" inputmode="numeric" maxlength="8" autocomplete="current-password" enterkeyhint="go"><button class="btn red wide" type="button" onclick="loginHost()">${discussionText('دخول المضيف','Host login')}</button></div><div class="noir-links"><button class="btn" type="button" onclick="home()">${discussionText('رجوع','Back')}</button></div></div>${noirEmblem()}</section>${homeCharacters()}`;
+  const input = $('#hostPin');
   input.addEventListener('keydown', (event) => { if (event.key === 'Enter') loginHost(); });
   input.focus({ preventScroll: true });
 }
-function hostSecretValue(){return String($('#hostSecret')?.value||'').trim().replace(/\s+/g,' ')}
 async function loginHost() {
-  const pin = hostSecretValue();
-  if (pin.length < 3 || pin.length > 32) { notice(discussionText('اكتب الكلمة السرية','Enter the secret word')); return; }
+  const pin = normalizeEntryDigits($('#hostPin')?.value || '');
+  if (!/^\d{8}$/.test(pin || '')) { notice(discussionText('أدخل الرقم السري المكوّن من 8 أرقام','Enter the 8-digit secret number')); return; }
   try {
-    const result = await withBusy(discussionText('جاري تسجيل الدخول…','Signing in…'), () => api({ action: 'hostLogin', pin }));
+    const result = await withBusy('جاري تسجيل الدخول…', () => api({ action: 'hostLogin', pin }));
     hostAccessToken = result.hostAccessToken;
     localStorage.setItem('mafia-host-access-token', hostAccessToken);
+    bindHostDevice();
     applyHostPreferences(result.preferences || {});
+    adoptHostRooms(result.rooms || []);
+    const resumeCode = pendingHostResume;
+    pendingHostResume = '';
+    if (resumeCode) { await resumeGame(resumeCode); return; }
     renderHostHome();
   } catch (error) {
-    notice(error.code === 'LOGIN_RATE_LIMITED' ? discussionText('محاولات كثيرة. انتظر 15 دقيقة.','Too many attempts. Wait 15 minutes.') : discussionText('الكلمة السرية غير صحيحة','Incorrect secret word'));
+    notice(error.code === 'LOGIN_RATE_LIMITED' ? discussionText('محاولات كثيرة. انتظر 15 دقيقة.','Too many attempts. Wait 15 minutes.') : discussionText('الرقم السري غير صحيح','Incorrect secret number'));
   }
 }
 async function logoutHost() {
@@ -689,12 +752,11 @@ function renderHostHome() {
 async function loadHostPreferences() {
   try {
     const result = await api({ action: 'hostPreferences', hostAccessToken });
+    bindHostDevice();
     applyHostPreferences(result.preferences || {});
     renderHostHome();
-  } catch {
-    hostAccessToken = '';
-    localStorage.removeItem('mafia-host-access-token');
-    renderHostLogin();
+  } catch (error) {
+    requireHostPin(error?.code === 'DEVICE_MISMATCH' ? 'device' : '');
   }
 }
 function readSavedSession(code='') {
@@ -717,6 +779,7 @@ function home() {
   if (/^\d{4}$/.test(roomCode || '')) { joinForm(roomCode); return; }
   const local = JSON.parse(localStorage.getItem('mafia-host-preferences') || 'null');
   if (local) applyHostPreferences(local);
+  if (hostAccessToken && !hostDeviceMatches()) { requireHostPin('device'); return; }
   if (!hostAccessToken) { renderLanding(); return; }
   renderHostHome();
   loadHostPreferences();
@@ -835,7 +898,7 @@ async function createRoom() {
     saveSession(true);
     renderHost();
     startPolling(true);
-  } catch (error) { if (error.code === 'UNAUTHORIZED') { logoutHost(); notice(discussionText('انتهت جلسة المضيف. سجّل الدخول من جديد.','Host session expired. Sign in again.')); } else notice(discussionText('تعذر إنشاء الغرفة','Could not create room')); }
+  } catch (error) { if (error.code === 'UNAUTHORIZED' || error.code === 'DEVICE_MISMATCH') { requireHostPin(error.code === 'DEVICE_MISMATCH' ? 'device' : ''); notice(discussionText('أدخل الرقم السري على هذا الجهاز للمتابعة كمضيف.','Enter the secret number on this device to continue as host.')); } else notice(discussionText('تعذر إنشاء الغرفة','Could not create room')); }
 }
 function joinForm(prefill = '') {
   spectatorMode=false;delegatedHostMode=false;
@@ -897,6 +960,11 @@ async function resumeGame(code='') {
     spectatorMode=false;delegatedHostMode=false;hostToken='';playerToken='';playerId='';
     if (!session?.code) throw new Error('NO_SESSION');
     if(session.spectator){spectatorMode=true;spectatorId=session.spectatorId;spectatorToken=session.spectatorToken;game=await api({action:'spectatorState',code:session.code,id:spectatorId,spectatorToken});renderSpectator();startSpectatorPolling();return}
+    if (session.host && (!hostAccessToken || !hostDeviceMatches())) {
+      pendingHostResume = session.code;
+      requireHostPin('resume');
+      return;
+    }
     hostToken = session.hostToken || '';
     playerToken = session.playerToken || '';
     playerId = session.playerId || '';
@@ -1056,13 +1124,9 @@ function changeLobbyPlayerPage(amount) {
   renderHost();
 }
 function lobbyPlayers() {
-  const tv = innerWidth >= 700;
-  const perPage = tv ? 99 : innerHeight >= 850 ? 12 : innerHeight >= 680 ? 8 : 4;
-  const pages = Math.max(1, Math.ceil(game.players.length / perPage));
-  lobbyPlayerPage = Math.min(lobbyPlayerPage, pages - 1);
-  const players = game.players.slice(lobbyPlayerPage * perPage, (lobbyPlayerPage + 1) * perPage);
-  const en = (localStorage.getItem('mafia-lang') || 'ar') === 'en';
-  return `<div class="players lobby-roster">${playerList(true, true, players) || `<p class="muted lobby-empty" data-no-translate>${en ? 'Waiting for players to join' : 'بانتظار دخول اللاعبين'}</p>`}</div>${pages > 1 ? `<nav class="roster-pages" aria-label="${en ? 'Player pages' : 'صفحات اللاعبين'}" data-no-translate><button type="button" ${lobbyPlayerPage === 0 ? 'disabled' : ''} onclick="changeLobbyPlayerPage(-1)">${en ? 'Previous' : 'السابق'}</button><span>${lobbyPlayerPage + 1} / ${pages}</span><button type="button" ${lobbyPlayerPage === pages - 1 ? 'disabled' : ''} onclick="changeLobbyPlayerPage(1)">${en ? 'Next' : 'التالي'}</button></nav>` : ''}`;
+  const rows = game.players.map((player) => `<div class="player"><span class="dot ${player.connected || player.isBot ? 'on' : ''}"></span><b>${escapeHtml(player.name)}</b></div>`).join('');
+  const kicks = game.players.map((player) => `<button type="button" class="btn wide" onclick="kickPlayer(${jsArg(player.id)})">${discussionText('طرد', 'Remove')} ${escapeHtml(player.name)}</button>`).join('');
+  return `<div class="players lobby-roster">${rows || `<p class="muted lobby-empty">${discussionText('بانتظار دخول اللاعبين', 'Waiting for players to join')}</p>`}</div>${hostOverflowMenu([lobbyJoinActionsHtml(), kicks ? `<div class="host-kick-list">${kicks}</div>` : ''])}`;
 }
 function lobbyPaneTabs() {
   const en = (localStorage.getItem('mafia-lang') || 'ar') === 'en';
@@ -1092,11 +1156,11 @@ function applyPreset(kind) {
   const preset = presets[kind]; if (!preset) return;
   mafiaCount = preset.mafia; detectiveCount = preset.detective;
   enabledRoles = normalizeEnabledRoles({ ...enabledRoles, ...preset.roles, kids_mode: kind === 'kids' });
-  schedulePreferenceSave(); setupStep = 2; renderHost();
+  schedulePreferenceSave(); renderHost();
 }
 function setSetupStep(step){setupStep=Math.min(3,Math.max(1,step));lobbyPane='setup';renderHost()}
 function toggleOption(key){
-  if(key==='kids_mode'&&!enabledRoles.kids_mode){applyPreset('kids');setupStep=3;return}
+  if(key==='kids_mode'&&!enabledRoles.kids_mode){applyPreset('kids');return}
   enabledRoles[key]=!enabledRoles[key];
   enabledRoles=normalizeEnabledRoles(enabledRoles);
   schedulePreferenceSave();renderHost();
@@ -1135,11 +1199,11 @@ function setupRoleCards(roles, review = false) {
   return '<div class="role-preview">' + visible.map(card => roleCard(...card)).join('') + '</div>';
 }
 function setupPanel(roles){
-  if(setupStep===1)return `${setupTabs()}<h2>${discussionText('اختر التشكيلة','Choose a preset')}</h2>${presetButtons()}${discussionSettings()}<details class="advanced-settings" data-disclosure-key="setup-counts"><summary data-no-translate>${discussionText('خيارات متقدمة: الأعداد والتحقيق','Advanced: counts and investigations')}</summary><div class="settings">${settingRow(discussionText('عدد المافيا','Mafia count'), 'mafiaCount', mafiaCount, 1, 8)}${settingRow(discussionText('عدد المحققين','Detective count'), 'detectiveCount', detectiveCount, 0, 8)}${settingRow(discussionText('إجمالي أسئلة كل محقق','Total questions per detective'), 'detectiveQuestions', detectiveQuestions, 1, 5)}<p data-no-translate>${discussionText('سؤال واحد في كل جولة حتى انتهاء العدد المحدد.','One question per round until the selected total is reached.')}</p></div></details><button class="btn red wide" onclick="setSetupStep(2)">${discussionText('التالي','Next')} ←</button>`;
-  if(setupStep===2)return `${setupTabs()}<h3 class="role-picker-title" data-no-translate>${enabledRoles.kids_mode?discussionText('شخصيات وضع الأطفال فقط — اضغط البطاقة لتفعيلها أو إلغائها','Kids mode characters only — tap a card to enable or disable'):discussionText('اضغط البطاقة لتفعيلها أو إلغائها','Tap a card to enable or disable')}</h3>${setupRoleCards(roles)}<div class="actions"><button class="btn" onclick="setSetupStep(1)">رجوع</button><button class="btn red" onclick="setSetupStep(3)">التالي</button></div>`;
   const killStart=Number.isFinite(+enabledRoles.mafia_kill_start_round)?+enabledRoles.mafia_kill_start_round:1;
-  const killLabel=killStart===0?'مغلق':`من الليلة ${killStart}`;
-  return `${setupTabs()}<h3 class="role-picker-title" data-no-translate>${discussionText("الأدوار المختارة — من الأكثر عددًا للأقل","Selected roles — highest count first")}</h3><p class="muted" data-no-translate>${discussionText("اضغط الكرت لقلبه وقراءة خصائصه ومهامه.","Tap a card to flip it and read its abilities and tasks.")}</p>${setupRoleCards(roles,true)}<button class="btn" onclick="setSetupStep(2)" data-no-translate>${discussionText("تعديل الأدوار","Edit roles")}</button>${setupSummary(roles,false)}<details class="advanced-settings" data-disclosure-key="setup-rules" open><summary data-no-translate>${discussionText('خيارات بدء اللعبة','Game start options')}</summary><div class="rule-grid"><button class="rule-chip ${enabledRoles.kids_mode?'on':''}" onclick="toggleOption('kids_mode')">🧒 وضع الأطفال: ${enabledRoles.kids_mode?'مفعّل':'ملغي'}</button><div class="rule-chip kill-range ${killStart>0?'on':''}"><button onclick="changeMafiaKillStart(-1)" aria-label="تقليل ليلة بدء الاغتيال">−</button><span>🌙 اغتيال المافيا<br><b>${killLabel}</b></span><button onclick="changeMafiaKillStart(1)" aria-label="زيادة ليلة بدء الاغتيال">+</button></div>${enabledRoles.kids_mode?'':`<button class="rule-chip ${enabledRoles.godfather_innocent?'on':''}" onclick="toggleGodfatherReveal()">🕵️ العرّاب: ${enabledRoles.godfather_innocent?'يظهر بريئًا':'ينكشف مافيا'}</button>`}<button class="rule-chip ${enabledRoles.reveal_dead_roles?'on':''}" onclick="toggleOption('reveal_dead_roles')">🎭 كشف دور الميت: ${enabledRoles.reveal_dead_roles?'نعم':'لا'}</button><button class="rule-chip ${enabledRoles.allow_no_vote?'on':''}" onclick="toggleOption('allow_no_vote')">✋ عدم التصويت: ${enabledRoles.allow_no_vote?'مسموح':'ممنوع'}</button><button class="rule-chip ${enabledRoles.full_trial?'on':''}" onclick="toggleOption('full_trial')">⚖️ المحاكمة: ${enabledRoles.full_trial?'كاملة':'تصويت مباشر'}</button><button class="rule-chip on" onclick="cycleTimer()">⏱️ المؤقت: ${phaseDuration} ثانية</button><button class="rule-chip ${soundEnabled?'on':''}" onclick="toggleSound()">${soundEnabled?'🔊':'🔇'} الصوت</button></div></details><div class="preference-status" id="prefsStatus">تم حفظ الإعدادات تلقائيًا ✓</div>${enabledRoles.kids_mode?'<div class="status">🧒 لعب بسيط: الفريق الغامض، الحارس، المحقق والأصدقاء فقط.</div>':''}${roles.valid?`<div class="status" data-no-translate>${discussionText(game.players.length<2?'بانتظار لاعبين على الأقل لبدء المباراة.':'✓ عدد الأدوار مناسب للاعبين.',game.players.length<2?'Waiting for at least two players.':'✓ Role counts fit the players.')}</div>`:`<div class="status wait">⚠️ اخترت ${roles.selectedTotal} دورًا ويوجد ${game.players.length} لاعبين فقط</div>`}<button class="btn red wide" ${game.players.length<2||!roles.valid?'disabled':''} onclick="startGame()" data-no-translate>${discussionText("توزيع الأدوار وبدء اللعبة","Deal roles and start game")}</button>`;
+  const killLabel=killStart===0?discussionText('مغلق','Off'):discussionText(`من الليلة ${killStart}`,`From night ${killStart}`);
+  const advanced=`<details class="advanced-settings host-setup-more" data-disclosure-key="setup-more"><summary>${discussionText('خيارات إضافية','More options')}</summary>${discussionSettings()}<div class="settings">${settingRow(discussionText('عدد المافيا','Mafia count'), 'mafiaCount', mafiaCount, 1, 8)}${settingRow(discussionText('عدد المحققين','Detective count'), 'detectiveCount', detectiveCount, 0, 8)}${settingRow(discussionText('أسئلة المحقق','Detective questions'), 'detectiveQuestions', detectiveQuestions, 1, 5)}</div>${setupRoleCards(roles)}<div class="rule-grid"><button class="rule-chip ${enabledRoles.kids_mode?'on':''}" onclick="toggleOption('kids_mode')">${discussionText('وضع الأطفال','Kids mode')}</button><div class="rule-chip kill-range ${killStart>0?'on':''}"><button onclick="changeMafiaKillStart(-1)" aria-label="-">−</button><span>${discussionText('اغتيال المافيا','Mafia kill')}<br><b>${killLabel}</b></span><button onclick="changeMafiaKillStart(1)" aria-label="+">+</button></div>${enabledRoles.kids_mode?'':`<button class="rule-chip ${enabledRoles.godfather_innocent?'on':''}" onclick="toggleGodfatherReveal()">${discussionText('تمويه العرّاب','Godfather disguise')}</button>`}<button class="rule-chip ${enabledRoles.reveal_dead_roles?'on':''}" onclick="toggleOption('reveal_dead_roles')">${discussionText('كشف دور الميت','Reveal dead roles')}</button><button class="rule-chip ${enabledRoles.allow_no_vote?'on':''}" onclick="toggleOption('allow_no_vote')">${discussionText('عدم التصويت','Skip vote')}</button><button class="rule-chip ${enabledRoles.full_trial?'on':''}" onclick="toggleOption('full_trial')">${discussionText('محاكمة كاملة','Full trial')}</button><button class="rule-chip on" onclick="cycleTimer()">${discussionText('المؤقت','Timer')} ${phaseDuration}</button><button class="rule-chip ${soundEnabled?'on':''}" onclick="toggleSound()">${soundEnabled?'🔊':'🔇'}</button></div></details>`;
+  const ready = game.players.length >= 2 && roles.valid;
+  return `<h2>${discussionText('التشكيلة','Preset')}</h2>${presetButtons()}<p class="setup-ready ${ready?'ok':'wait'}">${ready?discussionText(`${game.players.length} لاعبين · جاهز للبدء`,`${game.players.length} players · Ready`):discussionText(roles.valid?'يلزم لاعبان على الأقل':'عدد الأدوار أكبر من اللاعبين',roles.valid?'Need at least two players':'Too many roles for the players')}</p><button class="btn red wide host-start" ${ready?'':'disabled'} onclick="startGame()">${discussionText('بدء اللعبة','Start game')}</button>${advanced}`;
 }
 
 // Keep the QR local and reuse it across lobby updates.
@@ -1176,28 +1240,25 @@ function renderHostContent() {
   if (game.phase === 'lobby') {
     const roles = roleDistribution();
     const joinUrl = `${location.origin}/game.html?room=${game.code}`;
-    $('#app').innerHTML = `${phaseBar()}${lobbyPaneTabs()}<div class="grid host-lobby" data-pane="${lobbyPane}"><aside class="lobby-side"><div class="card hero lobby-join"><div class="lobby-join-details"><div class="code">${game.code}</div></div><div class="lobby-qr-block"><img class="qr" width="420" height="420" src="${roomQrSource(joinUrl)}" alt="${discussionText('باركود الغرفة','Room QR code')}"></div>${lobbyJoinActionsHtml()}</div><div class="card lobby-players"><div class="toolbar"><h2>${discussionText(`اللاعبون (${game.players.length})`,`Players (${game.players.length})`)}</h2><span class="connection-count">${game.players.filter((p)=>p.connected||p.isBot).length} ${discussionText('جاهز','ready')}</span></div>${lobbyPlayers()}</div></aside><section class="card setup-card" data-step="${setupStep}">${setupPanel(roles)}</section></div>`;
+    $('#app').innerHTML = `${phaseBar()}<div class="grid host-lobby" data-pane="room"><aside class="lobby-join card hero"><div class="code">${game.code}</div><img class="qr" width="360" height="360" src="${roomQrSource(joinUrl)}" alt="${discussionText('باركود الغرفة','Room QR code')}"></aside><section class="card lobby-players"><div class="toolbar"><h2>${discussionText('اللاعبون','Players')}</h2><span class="connection-count">${game.players.length}</span></div>${lobbyPlayers()}</section><section class="card setup-card">${setupPanel(roles)}</section></div>`;
     return;
   }
   if (game.phase === 'paused') {
-    $('#app').innerHTML = hostTvFrame(`<div class="role-title">⏸️ ${discussionText('المباراة متوقفة','Match paused')}</div><p>${discussionText('يمكن متابعة المباراة من المرحلة نفسها.','The match can continue from the same phase.')}</p><button class="btn red wide" onclick="hostAction('togglePause')">▶️ ${discussionText('متابعة المباراة','Resume match')}</button><button class="btn gold wide" type="button" onclick="returnToLobby()">${discussionText('إيقاف والرجوع للوبي','Stop and return to lobby')}</button>`);
+    $('#app').innerHTML = hostTvFrame(`<div class="role-title">${discussionText('متوقفة','Paused')}</div><button class="btn red wide" onclick="hostAction('togglePause')">${discussionText('متابعة','Resume')}</button>`);
     return;
   }
   if (game.phase === 'reveal') {
     const ready = game.roleReadyCount || 0, total = game.players.length;
-    $('#app').innerHTML = hostTvFrame(`<div class="counter">${ready} / ${total}</div><div class="progress"><span style="width:${total?ready/total*100:0}%"></span></div><p class="muted">${discussionText('بانتظار تأكيد الأدوار','Waiting for role confirms')}</p><button class="btn red wide" ${ready<total?'disabled':''} onclick="hostAction('beginNight')">🌙 ${discussionText('بدء الليل','Start night')}</button>`);
+    $('#app').innerHTML = hostTvFrame(`<div class="role-title">${discussionText('تأكيد الأدوار','Role confirm')}</div><div class="counter">${ready} / ${total}</div><button class="btn red wide" ${ready<total?'disabled':''} onclick="hostAction('beginNight')">${discussionText('بدء الليل','Start night')}</button>`);
     return;
   }
   if (game.phase === 'night') {
-    $('#app').innerHTML = hostTvFrame(`<div class="role-title">🌙 ${discussionText('الليل','Night')}</div><div class="status ${game.nightReady ? '' : 'wait'}">${game.nightReady ? discussionText('اكتملت اختيارات الليل ✅','Night choices complete ✅') : discussionText('بانتظار الاختيارات…','Waiting for choices…')}</div>${eventCards()}<button class="btn red wide" ${game.nightReady||phaseTimeExpired() ? '' : 'disabled'} data-timeout-action="resolveNight" onclick="hostAction('resolveNight')">${discussionText('إعلان الصباح','Announce morning')}</button>`);
+    $('#app').innerHTML = hostTvFrame(`<div class="role-title">${discussionText('الليل','Night')}</div><p class="host-tv-note">${game.nightReady ? discussionText('الاختيارات اكتملت','Choices complete') : discussionText('بانتظار الاختيارات','Waiting for choices')}</p><button class="btn red wide" ${game.nightReady||phaseTimeExpired() ? '' : 'disabled'} data-timeout-action="resolveNight" onclick="hostAction('resolveNight')">${discussionText('إعلان الصباح','Announce morning')}</button>`);
     return;
   }
   if (game.phase === 'day') {
     const ready = ((game.lawyerReady && game.jailerReady)||phaseTimeExpired()) && clientDiscussion().complete;
-    const draw = typeof openingDrawActive === 'function' && openingDrawActive(clientDiscussion());
-    const talk = discussionPanel(true);
-    const talkBlock = talk && !draw ? `<details class="cycle-talk" open data-disclosure-key="host-day-talk"><summary>${discussionText('النقاش','Discussion')}</summary>${talk}</details>` : talk;
-    $('#app').innerHTML = hostTvFrame(`<div class="role-title">☀️ ${discussionText('الصباح','Morning')}</div>${morningBriefPanel(true)}<section class="day-action-panel" data-no-translate><h2>${discussionText('اختيارات النهار','Day choices')}</h2><div class="status ${game.lawyerReady ? '' : 'wait'}">${game.lawyerReady ? discussionText('المحامي جاهز ✅','Lawyer ready ✅') : discussionText('بانتظار حماية المحامي…','Waiting for Lawyer protection…')}</div><div class="status ${game.jailerReady ? '' : 'wait'}">${game.jailerReady ? discussionText('السجّان اختار السجين ✅','Jailer chose the prisoner ✅') : discussionText('بانتظار اختيار السجّان…','Waiting for the Jailer…')}</div><button class="btn gold wide" data-discussion-vote ${ready ? '' : 'disabled'} onclick="hostAction('startVote')">${discussionText('بدء التصويت','Start voting')}</button></section>${talkBlock||''}`);
+    $('#app').innerHTML = hostTvFrame(`<div class="role-title">${discussionText('الصباح','Morning')}</div><button class="btn gold wide" data-discussion-vote ${ready ? '' : 'disabled'} onclick="hostAction('startVote')">${discussionText('بدء التصويت','Start voting')}</button>`);
     return;
   }
   if (game.phase === 'nomination') {
@@ -1219,7 +1280,7 @@ function renderHostContent() {
     $('#app').innerHTML = hostTvFrame(`<div class="role-title">${discussionText('التصويت','Voting')}</div><div class="counter">${game.voteCount} / ${alive}</div><button class="btn red wide" ${game.voteCount < alive && !phaseTimeExpired() ? 'disabled' : ''} data-timeout-action="resolveVote" onclick="hostAction('resolveVote')">${discussionText('كشف النتيجة','Reveal result')}</button>`);
     return;
   }
-  $('#app').innerHTML = hostTvFrame(`<div class="role-title">${winnerTitle()}</div><div class="actions center"><button class="btn gold wide" onclick="returnToLobby()">👥 ${discussionText('الرجوع للوبي وتغيير اللاعبين','Return to lobby and change players')}</button><button class="btn red wide" onclick="startGame()">🔄 ${discussionText('إعادة مباراة بنفس اللاعبين','Rematch with the same players')}</button><button class="btn wide" onclick="shareResult()">↗ ${discussionText('مشاركة النتيجة','Share result')}</button></div><h2>${discussionText('سجل المباراة','Match log')}</h2><div class="timeline">${historyCards()||`<p class="muted">${discussionText('ستظهر أحداث المباراة هنا.','Match events will appear here.')}</p>`}</div>`);
+  $('#app').innerHTML = hostTvFrame(`<div class="role-title">${winnerTitle()}</div><button class="btn red wide" onclick="startGame()">${discussionText('إعادة بنفس اللاعبين','Rematch')}</button>${hostOverflowMenu([`<button class="btn gold wide" onclick="returnToLobby()">${discussionText('الرجوع للوبي','Return to lobby')}</button>`,`<button class="btn wide" onclick="shareResult()">${discussionText('مشاركة النتيجة','Share result')}</button>`])}`);
 }
 function winnerTitle() {
   if (game.winner === 'draw') return discussionText('⚖️ تعادل — لم يبقَ أحد حيًا','⚖️ Draw — no survivors');
@@ -2050,11 +2111,11 @@ function enhanceJourney(controller){
   if(!document.querySelector('#app .phase-bar'))$('#app').insertAdjacentHTML('afterbegin',phaseBar());
   const hint=controller?controllerTaskHint():playerTaskHint();
   const playerHome=game.me?.alive&&!controller&&!['lobby','reveal','finished','paused'].includes(game.phase);
-  if(hint&&!playerHome){const node=document.createElement('section');node.className='journey-hint next-action-hint';node.setAttribute('data-no-translate','');node.innerHTML=`<b>${discussionText('المطلوب الآن','Now')}</b><p>${escapeHtml(hint)}</p>`;document.querySelector('#app .phase-bar').insertAdjacentElement('afterend',node);}
+  if(hint&&!playerHome&&!controller){const node=document.createElement('section');node.className='journey-hint next-action-hint';node.setAttribute('data-no-translate','');node.innerHTML=`<b>${discussionText('المطلوب الآن','Now')}</b><p>${escapeHtml(hint)}</p>`;document.querySelector('#app .phase-bar').insertAdjacentElement('afterend',node);}
   document.querySelectorAll('.setup-tabs button').forEach((button,index)=>{if(index+1===setupStep)button.setAttribute('aria-current','step');});
   paintActionFeedback();updatePhaseTimer();
 }
-function renderHost(){setShowingRole(false);document.body.classList.toggle('host-tv-mode',game?.phase&&game.phase!=='lobby');renderWithNotices(renderHostContent,true);enhanceJourney(true);mountHostProgress();}
+function renderHost(){setShowingRole(false);document.body.classList.add('host-tv-mode');renderWithNotices(renderHostContent,true);enhanceJourney(true);}
 function renderSpectator(){renderWithNotices(renderSpectatorContent);}
 
 function disciplineButtons(player) {
@@ -2078,38 +2139,8 @@ async function submitDiscipline(target,action) {
 let hostProgressObserver;
 function mountHostProgress() {
   hostProgressObserver?.disconnect();
-  if (game?.phase !== 'lobby') return;
-  const app = document.querySelector('#app');
-  const lobby = true;
-  const actions = {reveal:'beginNight',night:'resolveNight',day:'startVote',nomination:'resolveVote',trial:'advanceVerdict',verdict:'resolveVote',vote:'resolveVote',paused:'togglePause'};
-  const handler = lobby ? (setupStep < 3 ? 'setSetupStep(' + (setupStep + 1) + ')' : 'startGame()') : actions[game?.phase] ? "hostAction('" + actions[game.phase] + "')" : '';
-  const scope = app.querySelector(lobby ? '.setup-card' : '.hero');
-  const primary = [...(scope?.querySelectorAll('button') || [])].find(button => !button.closest('.setup-tabs') && button.getAttribute('onclick') === handler);
-  if (!primary) return;
-  const dock = document.createElement('nav');
-  dock.className = 'host-progress';
-  dock.setAttribute('aria-label', discussionText('متابعة إعداد ومراحل المباراة','Game setup and phase controls'));
-  dock.innerHTML = '<div class="host-progress-info" data-no-translate><strong id="hostProgressTitle"></strong><span id="hostProgressStatus" role="status"></span></div><div class="host-progress-actions"></div>';
-  const controls = dock.querySelector('.host-progress-actions');
-  if (lobby && setupStep > 1) {
-    const back = document.createElement('button');
-    back.type = 'button';back.className = 'btn host-progress-back';
-    back.textContent = discussionText('رجوع','Back');
-    back.setAttribute('data-no-translate','');
-    back.setAttribute('onclick', 'setSetupStep(' + (setupStep - 1) + ')');
-    controls.append(back);
-    // The dock is the single place for setup navigation.
-    for (const button of scope.querySelectorAll('button')) {
-      if (button !== primary && !button.closest('.setup-tabs') && button.getAttribute('onclick') === 'setSetupStep(' + (setupStep - 1) + ')') button.remove();
-    }
-  }
-  primary.dataset.progressPrimary = '';
-  primary.setAttribute('aria-describedby','hostProgressStatus');
-  controls.append(primary);
-  app.append(dock);
-  const measure = () => document.documentElement.style.setProperty('--host-progress-height', Math.ceil(dock.getBoundingClientRect().height) + 'px');
-  hostProgressObserver = new ResizeObserver(measure);hostProgressObserver.observe(dock);
-  updateHostProgress();measure();
+  document.querySelector('.host-progress')?.remove();
+  return;
 }
 function updateHostProgress() {
   const dock = document.querySelector('.host-progress');
