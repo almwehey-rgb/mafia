@@ -215,8 +215,8 @@ function phaseBar() {
   const admin = hostToken ? `<button type="button" class="phase-pause lobby-action" onclick="showAdminQR()" aria-label="${discussionText('وضع الأدمن الخاص', 'Private admin access')}">${lobbyIcon('admin')}<span class="btn-label">${discussionText('أدمن', 'Admin')}</span></button>` : '';
   const back = delegatedHostMode ? `<button type="button" class="phase-pause lobby-action" onclick="toggleDelegatedHost()">${lobbyIcon('user')}<span class="btn-label">${discussionText('دوري', 'My role')}</span></button>` : '';
   const leave = !spectatorMode ? `<button type="button" class="phase-pause lobby-action lobby-exit" onclick="leaveRoom()">${lobbyIcon('leave')}<span class="btn-label">${discussionText('مغادرة', 'Leave')}</span></button>` : '';
-  const extras = controller ? hostOverflowMenu([home, toLobby, tools, admin, back, leave]) : `${home}${toLobby}${tools}${admin}${back}${leave}`;
-  return `<div class="phase-bar${controller ? ' phase-bar-tv' : ''}"><span class="phase-symbol">${game?.phase === 'lobby' ? lobbyIcon('wait') : phaseIcon()}</span><b class="phase-label">${phaseName()}</b>${game?.round ? `<small>${discussionText('الجولة', 'Round')} ${game.round}</small>` : ''}${game && !['lobby', 'finished'].includes(game.phase) ? `<span class="phase-timer" id="phaseTimer" role="timer" aria-label="${discussionText('الوقت المتبقي', 'Time remaining')}">${phaseDuration}</span>` : ''}${pause}${extras}</div>`;
+  const extras = controller && game.phase !== 'lobby' ? hostOverflowMenu([home, toLobby, tools, admin, back, leave]) : `${home}${toLobby}${tools}${admin}${back}${leave}`;
+  return `<div class="phase-bar${controller && game.phase !== 'lobby' ? ' phase-bar-tv' : ''}"><span class="phase-symbol">${game?.phase === 'lobby' ? lobbyIcon('wait') : phaseIcon()}</span><b class="phase-label">${phaseName()}</b>${game?.round ? `<small>${discussionText('الجولة', 'Round')} ${game.round}</small>` : ''}${game && !['lobby', 'finished'].includes(game.phase) ? `<span class="phase-timer" id="phaseTimer" role="timer" aria-label="${discussionText('الوقت المتبقي', 'Time remaining')}">${phaseDuration}</span>` : ''}${pause}${extras}</div>`;
 }
 function clientPhaseRemaining() {
   const clock=game?.phaseClock;
@@ -1125,8 +1125,11 @@ function changeLobbyPlayerPage(amount) {
 }
 function lobbyPlayers() {
   const rows = game.players.map((player) => `<div class="player"><span class="dot ${player.connected || player.isBot ? 'on' : ''}"></span><b>${escapeHtml(player.name)}</b></div>`).join('');
+  return `<div class="players lobby-roster">${rows || `<p class="muted lobby-empty">${discussionText('بانتظار دخول اللاعبين', 'Waiting for players to join')}</p>`}</div>`;
+}
+function lobbyHostTools() {
   const kicks = game.players.map((player) => `<button type="button" class="btn wide" onclick="kickPlayer(${jsArg(player.id)})">${discussionText('طرد', 'Remove')} ${escapeHtml(player.name)}</button>`).join('');
-  return `<div class="players lobby-roster">${rows || `<p class="muted lobby-empty">${discussionText('بانتظار دخول اللاعبين', 'Waiting for players to join')}</p>`}</div>${hostOverflowMenu([lobbyJoinActionsHtml(), kicks ? `<div class="host-kick-list">${kicks}</div>` : ''])}`;
+  return hostOverflowMenu([lobbyJoinActionsHtml(), kicks ? `<div class="host-kick-list">${kicks}</div>` : '']);
 }
 function lobbyPaneTabs() {
   const en = (localStorage.getItem('mafia-lang') || 'ar') === 'en';
@@ -1240,7 +1243,7 @@ function renderHostContent() {
   if (game.phase === 'lobby') {
     const roles = roleDistribution();
     const joinUrl = `${location.origin}/game.html?room=${game.code}`;
-    $('#app').innerHTML = `${phaseBar()}<div class="grid host-lobby" data-pane="room"><aside class="lobby-join card hero"><div class="code">${game.code}</div><img class="qr" width="360" height="360" src="${roomQrSource(joinUrl)}" alt="${discussionText('باركود الغرفة','Room QR code')}"></aside><section class="card lobby-players"><div class="toolbar"><h2>${discussionText('اللاعبون','Players')}</h2><span class="connection-count">${game.players.length}</span></div>${lobbyPlayers()}</section><section class="card setup-card">${setupPanel(roles)}</section></div>`;
+    $('#app').innerHTML = `${phaseBar()}<div class="grid host-lobby" data-pane="room"><aside class="lobby-join card hero"><div class="code">${game.code}</div><img class="qr" width="360" height="360" src="${roomQrSource(joinUrl)}" alt="${discussionText('باركود الغرفة','Room QR code')}"></aside><section class="card lobby-players"><div class="toolbar"><h2>${discussionText('اللاعبون','Players')}</h2><span class="connection-count">${game.players.length}</span>${lobbyHostTools()}</div>${lobbyPlayers()}</section><section class="card setup-card">${setupPanel(roles)}</section></div>`;
     return;
   }
   if (game.phase === 'paused') {
@@ -1258,7 +1261,7 @@ function renderHostContent() {
   }
   if (game.phase === 'day') {
     const ready = ((game.lawyerReady && game.jailerReady)||phaseTimeExpired()) && clientDiscussion().complete;
-    $('#app').innerHTML = hostTvFrame(`<div class="role-title">${discussionText('الصباح','Morning')}</div><button class="btn gold wide" data-discussion-vote ${ready ? '' : 'disabled'} onclick="hostAction('startVote')">${discussionText('بدء التصويت','Start voting')}</button>`);
+    $('#app').innerHTML = hostTvFrame(`${announcementHtml()}<div class="role-title">${discussionText('الصباح','Morning')}</div><button class="btn gold wide" data-discussion-vote ${ready ? '' : 'disabled'} onclick="hostAction('startVote')">${discussionText('بدء التصويت','Start voting')}</button>`);
     return;
   }
   if (game.phase === 'nomination') {
@@ -2115,7 +2118,7 @@ function enhanceJourney(controller){
   document.querySelectorAll('.setup-tabs button').forEach((button,index)=>{if(index+1===setupStep)button.setAttribute('aria-current','step');});
   paintActionFeedback();updatePhaseTimer();
 }
-function renderHost(){setShowingRole(false);document.body.classList.add('host-tv-mode');renderWithNotices(renderHostContent,true);enhanceJourney(true);}
+function renderHost(){setShowingRole(false);document.body.classList.toggle('host-tv-mode',!!(game?.phase&&game.phase!=='lobby'));renderWithNotices(renderHostContent,true);enhanceJourney(true);if(game?.phase==='lobby')mountHostProgress();}
 function renderSpectator(){renderWithNotices(renderSpectatorContent);}
 
 function disciplineButtons(player) {
