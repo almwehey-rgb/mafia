@@ -1153,8 +1153,20 @@ async function routeElectMafiaLeader(context:RoomRouteContext) {
  let election=room.enabled_roles?.leader_election;
  if(body.target==='RESIGN'){
   if(me.role!=='mafia_boss'||election?.pending)return out({error:'INVALID_ACTION'},409);
-  if(!players.some(p=>p.alive&&p.role==='mafia'&&p.id!==me.id))return out({error:'NO_CANDIDATES'},409);
-  election={pending:true,former:me.id,deadline:now+30000,votes:{}};
+  const candidates=players.filter(p=>p.alive&&p.role==='mafia'&&p.id!==me.id);
+  if(!candidates.length)return out({error:'NO_CANDIDATES'},409);
+  // The current mafia boss may hand leadership to a chosen living mafia member immediately.
+  // When no successor is supplied, retain the existing timed team-election flow.
+  if(body.successor){
+   const successor=candidates.find(p=>p.id===body.successor);
+   if(!successor)return out({error:'INVALID_ACTION'},400);
+   for(const player of players.filter(p=>mafiaRole(p.role))){
+    await persist(db.from('mafia_players').update({role:player.id===successor.id?'mafia_boss':'mafia'}).eq('room_code',code).eq('id',player.id));
+   }
+   election={pending:false,former:me.id,winner:successor.id,direct:true};
+  }else{
+   election={pending:true,former:me.id,deadline:now+30000,votes:{}};
+  }
  }else{
   if(!election?.pending||!election.former)return out({error:'INVALID_ACTION'},409);
   election={...election,votes:{...election.votes}};
