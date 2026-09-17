@@ -1387,8 +1387,29 @@ async function hostAction(action) {
   catch (error) { notice(error.code === 'STALE_GAME' ? 'تغيّرت حالة الغرفة أثناء الطلب. انتظر تحديث الشاشة ثم حاول مجددًا.' : error.code === 'WAITING_ACTIONS' ? 'بانتظار بقية اختيارات الليل' : 'بانتظار بقية اللاعبين'); }
 }
 async function kickPlayer(target){if(!confirm(discussionText('طرد اللاعب ','Remove player ')+nameOf(target)+discussionText(' من الغرفة؟ سيحتاج إلى الدخول مجددًا.',' from the room? They will need to rejoin.')))return;try{game=await api({action:'kick',code:game.code,hostToken,id:playerId,playerToken,target});renderHost()}catch{notice('تعذر طرد اللاعب')}}
-async function addBot(){try{game=await api({action:'addBot',code:game.code,hostToken,id:playerId,playerToken});renderHost()}catch{notice('تعذر إضافة البوت')}}
-async function fillBots(){while(game.players.length<8){await addBot()}renderHost()}
+async function addBot(){
+ try{
+  const before=game.players.length;
+  game=await api({action:'addBot',code:game.code,hostToken,id:playerId,playerToken});
+  renderHost();
+  return game.players.length>before;
+ }catch{
+  notice('تعذر إضافة البوت');
+  return false;
+ }
+}
+async function fillBots(){
+ const remaining=Math.max(0,8-game.players.length);
+ const raw=prompt('كم عدد البوتات؟ (1 إلى '+remaining+')',String(remaining));
+ if(raw===null)return;
+ const count=Math.max(1,Math.min(remaining,Math.round(Number(raw))));
+ let attempts=0;
+ while(attempts<count&&attempts<8){
+  attempts++;
+  if(!await addBot())break;
+ }
+ renderHost();
+}
 async function mutePlayer(target,muted){try{game=await api({action:'mute',code:game.code,hostToken,id:playerId,playerToken,target,muted});renderHost()}catch{notice('تعذر تعديل الكتم')}}
 async function endGame(){if(!confirm(discussionText('إنهاء المباراة نهائيًا؟ لن تتمكن من استكمال هذه الجولة. للإيقاف المؤقت استخدم زر الإيقاف.','End this match permanently? This round cannot be resumed. Use Pause for a temporary break.')))return;try{game=await api({action:'endGame',code:game.code,hostToken,id:playerId,playerToken});closeSheet();renderHost()}catch{notice('تعذر إنهاء المباراة')}}
 async function transferHost(target){if(!confirm(discussionText('تسليم تحكم المضيف لهذا اللاعب؟','Transfer host control to this player?')))return;try{game=await api({action:'transferHost',code:game.code,hostToken,id:playerId,playerToken,target});notice(discussionText('تم تسليم التحكم ✅','Control transferred ✅'));renderHost()}catch{notice(discussionText('تعذر نقل التحكم','Could not transfer control'))}}
@@ -2004,10 +2025,16 @@ async function electMafiaLeader(target){
 }
 function resignOfferKey(){return `mafia-resign:${game?.matchId||game?.code||''}:${playerId}`;}
 function dismissResignOffer(){try{localStorage.setItem(resignOfferKey(),'done');}catch{}document.getElementById('leaderElectionCard')?.remove();}
-async function resignMafiaLeader(){
- if(!confirm('التنازل وفتح تصويت سري لمدة 30 ثانية لاختيار زعيم بديل؟'))return;
+async function resignMafiaLeader(successor){
+ if(!successor)return;
+ const target=(game.me.mafiaTeam||[]).find(p=>p.id===successor);
+ if(!target)return;
+ if(!confirm('تسليم قيادة المافيا إلى '+target.name+'؟'))return;
  dismissResignOffer();
- await electMafiaLeader('RESIGN');
+ try{
+  game=await api({action:'electMafiaLeader',code:game.code,id:playerId,playerToken,target:'RESIGN',successor});
+  renderPlayer();
+ }catch{notice(discussionText('تعذر تسليم القيادة.','Could not transfer leadership.'));}
 }
 function leaderElectionCard(){
  if(!game?.me?.alive||!roleAcknowledged()||['lobby','finished','paused'].includes(game.phase))return '';
@@ -2017,7 +2044,8 @@ function leaderElectionCard(){
  }
  if(game.me.role!=='mafia_boss'||!(game.me.mafiaTeam||[]).some(p=>p.id!==game.me.id&&p.alive!==false))return '';
  if(localStorage.getItem(resignOfferKey())==='done')return '';
- return `<section id="leaderElectionCard" class="card" data-no-translate><button class="btn red wide" onclick="resignMafiaLeader()">التنازل عن القيادة</button><button class="btn wide" type="button" onclick="dismissResignOffer()">${discussionText('إخفاء — يظهر مرة واحدة','Hide — shown once')}</button></section>`;
+ const successors=(game.me.mafiaTeam||[]).filter(p=>p.id!==game.me.id&&p.alive!==false);
+ return `<section id="leaderElectionCard" class="card" data-no-translate><h3>${discussionText('تسليم قيادة المافيا','Transfer Mafia leadership')}</h3><p>${discussionText('اختر فرد المافيا الذي يستلم الزعامة مباشرة.','Choose the Mafia member who will become the Boss immediately.')}</p>${successors.map(p=>`<button class="btn red wide" onclick="resignMafiaLeader('${String(p.id).replace(/'/g,'&#39;')}')">👑 ${escapeHtml(p.name)}</button>`).join('')}<button class="btn wide" type="button" onclick="dismissResignOffer()">${discussionText('إخفاء — يظهر مرة واحدة','Hide — shown once')}</button></section>`;
 }
 function voteSummaryCard() {
   const summary=game?.voteSummary;
