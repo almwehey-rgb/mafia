@@ -3,6 +3,38 @@ const $ = (selector) => document.querySelector(selector);
 let game = null;
 let hostToken = '';
 let hostAccessToken = localStorage.getItem('mafia-host-access-token') || '';
+let pendingHostResume = '';
+function hostDeviceId() {
+  let id = localStorage.getItem('mafia-host-device-id') || '';
+  if (!/^[A-Za-z0-9_-]{16,80}$/.test(id)) {
+    id = `${crypto.randomUUID()}${crypto.randomUUID()}`.replace(/-/g, '');
+    localStorage.setItem('mafia-host-device-id', id);
+  }
+  return id;
+}
+function bindHostDevice() {
+  localStorage.setItem('mafia-host-bound-device', hostDeviceId());
+}
+function hostDeviceMatches() {
+  const bound = localStorage.getItem('mafia-host-bound-device');
+  return !bound || bound === hostDeviceId();
+}
+function requireHostPin(reason = '') {
+  hostAccessToken = '';
+  localStorage.removeItem('mafia-host-access-token');
+  renderHostLogin(reason || 'device');
+}
+function adoptHostRooms(rooms) {
+  if (!Array.isArray(rooms)) return;
+  let latest = null;
+  for (const room of rooms) {
+    if (!/^\d{4}$/.test(room?.code || '') || !room.hostToken) continue;
+    const session = { code: room.code, host: true, hostToken: room.hostToken, playerToken: '', playerId: '', profileToken };
+    localStorage.setItem(sessionKey(room.code), JSON.stringify(session));
+    latest = session;
+  }
+  if (latest) localStorage.setItem('mafia-session', JSON.stringify(latest));
+}
 let playerToken = '';
 let playerId = '';
 let mafiaCount = 3;
@@ -33,6 +65,7 @@ let preferenceSaveTimer;
 
 function signalPhase() {
   phaseStartedAt = Date.now();
+  if (impactArmed) return;
   if (navigator.vibrate) navigator.vibrate([120, 60, 120]);
   if (!soundEnabled) return;
   try {
@@ -46,6 +79,120 @@ function signalPhase() {
     oscillator.start(); oscillator.stop(context.currentTime + .28);
   } catch {}
 }
+const IMPACT_DEATH=new Set(['mafia_kill','serial_kill','witch_poison','jailer_executed','vigilante_kill','lovers_died','vote_eliminated','trial_guilty','host_expelled','jester_won']);
+const IMPACT_SAVE=new Set(['doctor_saved','jail_saved','witch_saved','lawyer_saved']);
+let lastImpactSig='';
+let impactArmed=false;
+let impactCloseTimer=0;
+let impactPulseTimer=0;
+function closeDeathImpact(){
+  clearTimeout(impactCloseTimer);
+  clearInterval(impactPulseTimer);
+  impactCloseTimer=0;
+  impactPulseTimer=0;
+  impactArmed=false;
+  document.getElementById('deathImpact')?.remove();
+  document.documentElement.classList.remove('impact-death','impact-save');
+  document.body.classList.remove('impact-death','impact-save');
+  if(navigator.vibrate)navigator.vibrate(0);
+}
+function deathIdList(){
+  let raw=game?.lastDeaths;
+  if(typeof raw==='string'){
+    try{raw=JSON.parse(raw);}catch{raw=String(raw).split(/[,\s]+/);}
+  }
+  if(!Array.isArray(raw))raw=raw==null?[]:[raw];
+  return raw.map((id)=>String(id?.id||id||'')).filter(Boolean);
+}
+function samePlayer(a,b){return String(a||'')!==''&&String(a)===String(b);}
+function myDeathEvent(){
+  const me=impactSelfId();
+  const mine=(game?.eliminations||[]).find((p)=>samePlayer(p.id,me)||(game?.me?.name&&p.name===game.me.name));
+  return mine?.reason||announcementEvents().find((e)=>IMPACT_DEATH.has(e))||'eliminated';
+}
+function deathImpactStyle(event){
+  const pack={
+    mafia_kill:{icon:'🔪',tone:70,wait:480,buzz:[160,40,280,40,420,60,220],title:['اغتيال المافيا','Mafia assassination'],reason:['المافيا اغتالتك.','Mafia killed you.']},
+    serial_kill:{icon:'🩸',tone:55,wait:360,buzz:[80,30,80,30,80,30,300,50,160],title:['القاتل المتسلسل','Serial Killer'],reason:['القاتل المتسلسل اغتالك.','The Serial Killer killed you.']},
+    witch_poison:{icon:'🧪',tone:140,wait:420,buzz:[40,30,40,30,40,30,40,80,220,50,160],title:['سم الساحرة','Witch poison'],reason:['سم الساحرة قتلك.','Witch poison killed you.']},
+    jailer_executed:{icon:'⛓️',tone:90,wait:700,buzz:[400,80,180],title:['إعدام السجّان','Jailer execution'],reason:['السجّان أعدمك.','The Jailer executed you.']},
+    vigilante_kill:{icon:'🎯',tone:210,wait:800,buzz:[30,40,500],title:['طلقة القناص','Sniper shot'],reason:['طلقة القناص قتلتك.','The sniper killed you.']},
+    lovers_died:{icon:'💔',tone:180,wait:540,buzz:[120,50,120,90,220,50,220],title:['موت الشريكين','Linked pair'],reason:['متّ مع شريكك.','You died with your linked partner.']},
+    vote_eliminated:{icon:'🗳️',tone:160,wait:500,buzz:[90,40,90,40,90,70,260],title:['استبعاد بالتصويت','Voted out'],reason:['التصويت استبعدك.','The vote eliminated you.']},
+    trial_guilty:{icon:'⚖️',tone:110,wait:620,buzz:[220,60,90,40,320],title:['حكم الإدانة','Guilty verdict'],reason:['صدر الحكم بإدانتك.','The verdict found you guilty.']},
+    host_expelled:{icon:'🚫',tone:200,wait:450,buzz:[70,30,70,30,70,30,200],title:['استبعاد المضيف','Host expelled'],reason:['المضيف استبعدك.','The host expelled you.']},
+    jester_won:{icon:'🃏',tone:320,wait:380,buzz:[50,25,90,25,50,25,90,25,180],title:['فوز المهرج','Jester win'],reason:['المهرج فاز بعد استبعادك.','The Jester won after you were voted out.']},
+    eliminated:{icon:'☠️',tone:80,wait:520,buzz:[120,40,200,40,280],title:['خروج','Eliminated'],reason:['خرجت من المباراة.','You are out of the match.']}
+  };
+  return pack[event]||pack.eliminated;
+}
+function playImpact(kind){
+  const death=kind==='death';
+  const event=death?myDeathEvent():'save';
+  const style=deathImpactStyle(event);
+  closeDeathImpact();
+  impactArmed=death;
+  const pulse=()=>{if(navigator.vibrate)navigator.vibrate(death?style.buzz:[50,40,90,40,140,50,220]);};
+  pulse();
+  if(death){
+    impactPulseTimer=setInterval(pulse,style.wait);
+    const overlay=document.createElement('button');
+    overlay.id='deathImpact';
+    overlay.type='button';
+    overlay.className=`death-impact impact-${event}`;
+    overlay.setAttribute('aria-label',discussionText('اضغط للخروج','Tap to dismiss'));
+    overlay.innerHTML=`<i>${style.icon}</i><small>${discussionText(...style.title)}</small><b>${discussionText(...style.reason)}</b><span>${discussionText('اضغط للخروج','Tap to dismiss')}</span>`;
+    overlay.addEventListener('click',closeDeathImpact);
+    document.body.appendChild(overlay);
+    impactCloseTimer=setTimeout(closeDeathImpact,7000);
+  }else{
+    document.body.classList.add('impact-save');
+    impactCloseTimer=setTimeout(closeDeathImpact,900);
+  }
+  if(!soundEnabled)return;
+  try{
+    const context=new (window.AudioContext || window.webkitAudioContext)();
+    const oscillator=context.createOscillator();
+    const gain=context.createGain();
+    oscillator.type=death?'sawtooth':'triangle';
+    oscillator.frequency.setValueAtTime(death?style.tone:420,context.currentTime);
+    oscillator.frequency.exponentialRampToValueAtTime(death?Math.max(30,style.tone-40):280,context.currentTime+(death?0.55:0.28));
+    gain.gain.setValueAtTime(death?0.17:0.1,context.currentTime);
+    gain.gain.exponentialRampToValueAtTime(.001,context.currentTime+(death?0.58:0.32));
+    oscillator.connect(gain).connect(context.destination);
+    oscillator.start();oscillator.stop(context.currentTime+(death?0.6:0.34));
+  }catch{}
+}
+function impactSelfId(){return String(playerId||game?.me?.id||'');}
+function announcementEvents(){
+  const raw=typeof publicNewsEvents==='function'?publicNewsEvents():String(game?.lastEvent||'').split(',');
+  return raw.map((e)=>String(e||'').trim()).filter(Boolean);
+}
+function announcementNamesMe(){
+  const me=impactSelfId();
+  const myName=String(game?.me?.name||'');
+  if(me&&deathIdList().some((id)=>samePlayer(id,me)))return true;
+  if(me&&samePlayer(game?.lastEliminated,me))return true;
+  return (game?.eliminations||[]).some((p)=>samePlayer(p.id,me)||(myName&&String(p.name||'')===myName));
+}
+function announcementHtml(){
+  const news=announcementEvents().map((e)=>`<p class="${/_saved$/.test(e)?'square-save':''}">${squareEventLine(e)}</p>`).join('');
+  if(!news)return '';
+  return `<section class="card public-announcement" id="publicAnnouncement" role="status" data-no-translate><h2>${discussionText('الإعلان','Announcements')}</h2>${news}</section>`;
+}
+function maybeImpact(prevAlive){
+  const events=announcementEvents();
+  if(!events.length && prevAlive!==true)return;
+  const sig=`${game.matchId||game.code}|${game.round}|${events.join(',')}|${deathIdList().join(',')}|${game.lastSaved||''}`;
+  if(sig===lastImpactSig)return;
+  const first=!lastImpactSig;
+  lastImpactSig=sig;
+  const deathNews=events.some((e)=>IMPACT_DEATH.has(e));
+  const saveNews=events.some((e)=>IMPACT_SAVE.has(e));
+  const named=announcementNamesMe()||prevAlive===true&&game.me?.alive===false;
+  if(deathNews&&named)playImpact('death');
+  else if(saveNews&&!first)playImpact('save');
+}
 function phaseIcon(phase = game?.phase) { return ({ lobby: '🎴', reveal: '👁️', night: '🌙', day: '☀️', nomination: '☝️', trial: '⚖️', verdict: '🔨', vote: '🗳️', paused: '⏸️', finished: '🏆' })[phase] || '🎭'; }
 function phaseName(phase = game?.phase) { return ({ lobby: discussionText('الانتظار','Lobby'), reveal: discussionText('كشف الأدوار','Role reveal'), night: discussionText('الليل','Night'), day: discussionText('الصباح','Morning'), nomination: discussionText('الترشيح','Nomination'), trial: discussionText('المحاكمة','Trial'), verdict: discussionText('الحكم','Verdict'), vote: discussionText('التصويت','Voting'), paused: discussionText('متوقفة مؤقتًا','Paused'), finished: discussionText('النهاية','Results') })[phase] || ''; }
 function lobbyIcon(name){const paths={wait:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',admin:'<path d="M12 3 4 6v6c0 5 8 9 8 9s8-4 8-9V6z"/><path d="m8 12 3 3 5-6"/>',shield:'<path d="M12 3 4 6v6c0 5 8 9 8 9s8-4 8-9V6z"/>',leave:'<path d="M9 4H4v16h5M10 12h11m-4-4 4 4-4 4"/>',back:'<path d="M5 12h14m-6-6 6 6-6 6"/>',share:'<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>',bots:'<rect x="3" y="3" width="18" height="18" rx="3"/><path d="M7 7h.1M17 7h.1M12 12h.1M7 17h.1M17 17h.1"/>',user:'<circle cx="12" cy="7" r="4"/><path d="M4 21v-2a8 8 0 0 1 16 0v2"/>',play:'<path d="m7 3 14 9L7 21V3Z"/>',pause:'<path d="M7 4v16M17 4v16"/>',camera:'<rect x="6" y="2" width="12" height="20" rx="2"/><path d="M10 18h4"/>'};return '<svg class="lobby-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+paths[name]+'</svg>'}
@@ -53,7 +200,24 @@ function noirEmblem(){return `<aside class="home-emblem" aria-hidden="true"><img
 function noirPageFrame(cardHtml,{wide=false}={}){return `<section class="noir-entry noir-subpage"><div class="noir-content${wide?' noir-content-wide':''}"><div class="card hero join-card auth-card">${cardHtml}</div><div class="noir-links"><button class="btn" type="button" onclick="home()">${discussionText('الرجوع للرئيسية','Back to home')}</button></div></div>${noirEmblem()}</section>`;}
 function removePlayerChrome(){document.querySelector('.player-tools')?.remove();document.querySelector('.player-dock')?.remove();document.body.classList.remove('has-player-dock')}
 function backFromLobby(){pollingEpoch++;clearTimeout(pollTimer);closeSheet();removePlayerChrome();game=null;if(hostAccessToken)renderHostHome();else renderHostLogin()}
-function phaseBar() { const controller=(hostToken||game?.me?.isHost)&&game;const live=controller&&!['lobby','finished'].includes(game.phase);const pause=live?`<button type="button" class="phase-pause phase-icon-btn" aria-label="${discussionText(game.phase==='paused'?'استكمال المباراة':'إيقاف مؤقت',game.phase==='paused'?'Resume game':'Pause game')}" onclick="hostAction('togglePause')">${lobbyIcon(game.phase==='paused'?'play':'pause')}</button>`:'';const toLobby=controller&&game.phase!=='lobby'?`<button type="button" class="phase-pause lobby-action lobby-back" onclick="returnToLobby()">${lobbyIcon('back')}<span class="btn-label">${discussionText('اللوبي','Lobby')}</span></button>`:'';const admin=live?`<button type="button" class="phase-pause phase-icon-btn" aria-label="${discussionText('إدارة المباراة','Game management')}" onclick="showMatchTools()">${lobbyIcon('shield')}</button>`:'';const back=delegatedHostMode?`<button type="button" class="phase-pause phase-icon-btn" aria-label="${discussionText('العودة لدوري','Back to my role')}" onclick="toggleDelegatedHost()">${lobbyIcon('user')}</button>`:'';return `<div class="phase-bar"><span class="phase-symbol">${game?.phase==='lobby'?lobbyIcon('wait'):phaseIcon()}</span><b class="phase-label">${phaseName()}</b>${game?.round ? `<small>${discussionText('الجولة','Round')} ${game.round}</small>` : ''}${game&&!["lobby","finished"].includes(game.phase)?`<span class="phase-timer" id="phaseTimer" role="timer" aria-label="${discussionText('الوقت المتبقي','Time remaining')}">${phaseDuration}</span>`:''}${game?.phase==='lobby'?`<button type="button" class="phase-pause lobby-action lobby-back" onclick="backFromLobby()">${lobbyIcon('back')}<span class="btn-label">${discussionText('الرئيسية','Home')}</span></button>`:''}${pause}${toLobby}${admin}${hostToken?`<button type="button" class="phase-pause lobby-action" onclick="showAdminQR()" aria-label="${discussionText('وضع الأدمن الخاص','Private admin access')}">${lobbyIcon('admin')}<span class="btn-label">${discussionText('أدمن','Admin')}</span></button>`:''}${back}${!spectatorMode ? `<button type="button" class="phase-pause lobby-action lobby-exit" onclick="leaveRoom()" aria-label="${discussionText('مغادرة الغرفة','Leave room')}">${lobbyIcon('leave')}<span class="btn-label">${discussionText('مغادرة','Leave')}</span></button>` : ""}</div>`; }
+function hostOverflowMenu(items) {
+  const extra = items.filter(Boolean).join('');
+  if (!extra) return '';
+  return `<details class="host-overflow"><summary aria-label="${discussionText('المزيد','More')}">⋯</summary><div class="host-overflow-panel">${extra}</div></details>`;
+}
+function phaseBar() {
+  const controller = (hostToken || game?.me?.isHost) && game;
+  const live = controller && !['lobby', 'finished'].includes(game.phase);
+  const pause = live ? `<button type="button" class="phase-pause phase-icon-btn" aria-label="${discussionText(game.phase === 'paused' ? 'استكمال المباراة' : 'إيقاف مؤقت', game.phase === 'paused' ? 'Resume game' : 'Pause game')}" onclick="hostAction('togglePause')">${lobbyIcon(game.phase === 'paused' ? 'play' : 'pause')}</button>` : '';
+  const home = game?.phase === 'lobby' ? `<button type="button" class="phase-pause lobby-action lobby-back" onclick="backFromLobby()">${lobbyIcon('back')}<span class="btn-label">${discussionText('الرئيسية', 'Home')}</span></button>` : '';
+  const toLobby = controller && game.phase !== 'lobby' ? `<button type="button" class="phase-pause lobby-action lobby-back" onclick="returnToLobby()">${lobbyIcon('back')}<span class="btn-label">${discussionText('اللوبي', 'Lobby')}</span></button>` : '';
+  const tools = live ? `<button type="button" class="phase-pause lobby-action" onclick="showMatchTools()">${lobbyIcon('shield')}<span class="btn-label">${discussionText('إدارة', 'Manage')}</span></button>` : '';
+  const admin = hostToken ? `<button type="button" class="phase-pause lobby-action" onclick="showAdminQR()" aria-label="${discussionText('وضع الأدمن الخاص', 'Private admin access')}">${lobbyIcon('admin')}<span class="btn-label">${discussionText('أدمن', 'Admin')}</span></button>` : '';
+  const back = delegatedHostMode ? `<button type="button" class="phase-pause lobby-action" onclick="toggleDelegatedHost()">${lobbyIcon('user')}<span class="btn-label">${discussionText('دوري', 'My role')}</span></button>` : '';
+  const leave = !spectatorMode ? `<button type="button" class="phase-pause lobby-action lobby-exit" onclick="leaveRoom()">${lobbyIcon('leave')}<span class="btn-label">${discussionText('مغادرة', 'Leave')}</span></button>` : '';
+  const extras = controller && game.phase !== 'lobby' ? hostOverflowMenu([home, toLobby, tools, admin, back, leave]) : `${home}${toLobby}${tools}${admin}${back}${leave}`;
+  return `<div class="phase-bar${controller && game.phase !== 'lobby' ? ' phase-bar-tv' : ''}"><span class="phase-symbol">${game?.phase === 'lobby' ? lobbyIcon('wait') : phaseIcon()}</span><b class="phase-label">${phaseName()}</b>${game?.round ? `<small>${discussionText('الجولة', 'Round')} ${game.round}</small>` : ''}${game && !['lobby', 'finished'].includes(game.phase) ? `<span class="phase-timer" id="phaseTimer" role="timer" aria-label="${discussionText('الوقت المتبقي', 'Time remaining')}">${phaseDuration}</span>` : ''}${pause}${extras}</div>`;
+}
 function clientPhaseRemaining() {
   const clock=game?.phaseClock;
   if(!clock||!Number.isFinite(clock.startedAt))return Infinity;
@@ -337,6 +501,9 @@ async function api(payload) {
   if (payload.code && game?.code === payload.code && payload.lifecycleVersion === undefined) {
     payload = {...payload,lifecycleVersion:game.lifecycleVersion};
   }
+  if (payload.action === 'hostLogin' || payload.hostAccessToken || ['create','hostPreferences','hostLogout','operationsStatus'].includes(payload.action)) {
+    payload = {...payload, deviceId: hostDeviceId()};
+  }
   const key=reading.includes(payload.action)?JSON.stringify(payload):null;
   if(key&&pendingReads.has(key))return structuredClone(await pendingReads.get(key));
   const task=(async()=>{
@@ -345,7 +512,7 @@ async function api(payload) {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
-    signal: AbortSignal.timeout(20000),
+    signal: AbortSignal.timeout(12000),
   });}catch(error){throw requestError(error.name==='TimeoutError'?'REQUEST_TIMEOUT':'NETWORK_ERROR');}
   let data;
   try {data=await response.json();}catch{throw requestError('INVALID_RESPONSE',response.status);}
@@ -403,9 +570,29 @@ function investigationResultLabel(result) {
   if (/Ù|Ø/.test(r)) return r.includes('Ø¨') || r.includes('Ø±') ? discussionText('بريء', 'Innocent') : discussionText('مافيا', 'Mafia');
   return discussionText(r, r);
 }
+function selectedTargets(){
+  const me=game?.me||{};
+  const extra=actionFeedback?.context===actionContext()?[actionFeedback.target]:[];
+  if(['nomination','vote','verdict'].includes(game?.phase))return [...new Set([me.voteTarget,...extra].filter(Boolean).map(String))];
+  const ids=[me.actionTarget,me.jailerSelected,...(me.selectedIds||[]),...extra].filter(Boolean).flatMap((value)=>String(value).split(','));
+  return [...new Set(ids.map((id)=>id.replace(/^(SAVE|POISON):/,'')))];
+}
+function isPicked(id){return selectedTargets().includes(String(id));}
+function pickMark(){return `<span class="pick-mark">${discussionText('اختيارك','Your pick')}</span>`;}
+function pickHintHtml(){
+  const has=selectedTargets().length;
+  return `<p class="pick-hint${has?' is-set':''}">${has?discussionText('تم تسجيل اختيارك. اضغط اسمًا آخر لتغييره.','Your choice is saved. Tap another name to change it.'):discussionText('اضغط اسمًا للاختيار. يمكنك تغييره قبل انتهاء المرحلة.','Tap a name to choose. You can change it before the phase ends.')}</p>`;
+}
+function skipPick(action, target, label){
+  const on=isPicked(target);
+  return `<button class="pick skip${on?' is-picked':''}" data-target="${escapeHtml(target)}" aria-pressed="${on}" onclick="${action}(${jsArg(target)})">${label}${on?` ${pickMark()}`:''}</button>`;
+}
 function choiceButtons(players, action, options = {}) {
-  const inner = players.map((player) => `<button class="pick" data-target="${escapeHtml(player.id)}" aria-pressed="false" onclick="${action}(${jsArg(player.id)})">${options.icon || '👤'} ${escapeHtml(player.name)}${player.id === playerId ? ` (${discussionText('أنت','You')})` : ''}</button>`).join('');
-  return `<div class="choice-stack">${inner}</div>`;
+  const inner = players.map((player) => {
+    const on=isPicked(player.id);
+    return `<button class="pick${on?' is-picked':''}" data-target="${escapeHtml(player.id)}" aria-pressed="${on}" onclick="${action}(${jsArg(player.id)})">${options.icon || '👤'} ${escapeHtml(player.name)}${player.id === playerId ? ` (${discussionText('أنت','You')})` : ''}${on?` ${pickMark()}`:''}</button>`;
+  }).join('');
+  return `${options.hint===false?'':pickHintHtml()}<div class="choice-stack">${inner}</div>`;
 }
 function jsArg(value) { return escapeHtml(JSON.stringify(String(value))); }
 function escapeHtml(value) {
@@ -508,25 +695,37 @@ function renderLanding() {
   if (!$('#app').querySelector('.cinema-cards')) $('#app').insertAdjacentHTML('beforeend', homeCharacters());
   wireJoinFields(false);
 }
-function renderHostLogin() {
+function renderHostLogin(reason = '') {
   setRoomTag('🔒');
   $('#app').removeAttribute('data-login-shell');
-  $('#app').innerHTML = `<section class="noir-entry"><div class="noir-content"><p class="noir-kicker">MAFIA · مافيا الليل</p><h2 class="noir-heading">كل وجه يخفي سرًّا</h2><p class="noir-intro">أدخل الرمز السري لإنشاء الغرف وإدارة اللعب.</p><div class="card hero join-card auth-card"><h1>دخول المضيف</h1><p class="muted">الرمز مكوّن من 8 أرقام.</p><label for="hostPin">الرمز السري</label><input class="input auth-pin" id="hostPin" type="password" inputmode="numeric" maxlength="8" autocomplete="current-password" enterkeyhint="go"><button class="btn red wide" type="button" onclick="loginHost()">دخول المضيف</button></div><div class="noir-links"><button class="btn" type="button" onclick="home()">رجوع</button></div></div>${noirEmblem()}</section>${homeCharacters()}`;
+  const device = reason === 'device' || reason === 'resume';
+  const intro = device
+    ? discussionText('هذا جهاز جديد. أدخل الرقم السري المكوّن من 8 أرقام لتولي التحكم كمضيف.','This is a new device. Enter the 8-digit secret number to take host control.')
+    : discussionText('أدخل الرمز السري لإنشاء الغرف وإدارة اللعب.','Enter the secret code to create rooms and run the game.');
+  const heading = device
+    ? discussionText('تأكيد المضيف على جهاز آخر','Confirm host on another device')
+    : discussionText('دخول المضيف','Host login');
+  $('#app').innerHTML = `<section class="noir-entry"><div class="noir-content"><p class="noir-kicker">MAFIA · مافيا الليل</p><h2 class="noir-heading">كل وجه يخفي سرًّا</h2><p class="noir-intro">${intro}</p><div class="card hero join-card auth-card"><h1>${heading}</h1><p class="muted">${discussionText('الرقم السري مكوّن من 8 أرقام.','The secret number is 8 digits.')}</p><label for="hostPin">${discussionText('الرقم السري','Secret number')}</label><input class="input auth-pin" id="hostPin" type="password" inputmode="numeric" maxlength="8" autocomplete="current-password" enterkeyhint="go"><button class="btn red wide" type="button" onclick="loginHost()">${discussionText('دخول المضيف','Host login')}</button></div><div class="noir-links"><button class="btn" type="button" onclick="home()">${discussionText('رجوع','Back')}</button></div></div>${noirEmblem()}</section>${homeCharacters()}`;
   const input = $('#hostPin');
   input.addEventListener('keydown', (event) => { if (event.key === 'Enter') loginHost(); });
   input.focus({ preventScroll: true });
 }
 async function loginHost() {
   const pin = normalizeEntryDigits($('#hostPin')?.value || '');
-  if (!/^\d{8}$/.test(pin || '')) { notice(discussionText('أدخل الرمز المكوّن من 8 أرقام','Enter the 8-digit code')); return; }
+  if (!/^\d{8}$/.test(pin || '')) { notice(discussionText('أدخل الرقم السري المكوّن من 8 أرقام','Enter the 8-digit secret number')); return; }
   try {
     const result = await withBusy('جاري تسجيل الدخول…', () => api({ action: 'hostLogin', pin }));
     hostAccessToken = result.hostAccessToken;
     localStorage.setItem('mafia-host-access-token', hostAccessToken);
+    bindHostDevice();
     applyHostPreferences(result.preferences || {});
+    adoptHostRooms(result.rooms || []);
+    const resumeCode = pendingHostResume;
+    pendingHostResume = '';
+    if (resumeCode) { await resumeGame(resumeCode); return; }
     renderHostHome();
   } catch (error) {
-    notice(error.code === 'LOGIN_RATE_LIMITED' ? discussionText('محاولات كثيرة. انتظر 15 دقيقة.','Too many attempts. Wait 15 minutes.') : discussionText('الرمز السري غير صحيح','Incorrect secret code'));
+    notice(error.code === 'LOGIN_RATE_LIMITED' ? discussionText('محاولات كثيرة. انتظر 15 دقيقة.','Too many attempts. Wait 15 minutes.') : discussionText('الرقم السري غير صحيح','Incorrect secret number'));
   }
 }
 async function logoutHost() {
@@ -553,12 +752,11 @@ function renderHostHome() {
 async function loadHostPreferences() {
   try {
     const result = await api({ action: 'hostPreferences', hostAccessToken });
+    bindHostDevice();
     applyHostPreferences(result.preferences || {});
     renderHostHome();
-  } catch {
-    hostAccessToken = '';
-    localStorage.removeItem('mafia-host-access-token');
-    renderHostLogin();
+  } catch (error) {
+    requireHostPin(error?.code === 'DEVICE_MISMATCH' ? 'device' : '');
   }
 }
 function readSavedSession(code='') {
@@ -581,6 +779,7 @@ function home() {
   if (/^\d{4}$/.test(roomCode || '')) { joinForm(roomCode); return; }
   const local = JSON.parse(localStorage.getItem('mafia-host-preferences') || 'null');
   if (local) applyHostPreferences(local);
+  if (hostAccessToken && !hostDeviceMatches()) { requireHostPin('device'); return; }
   if (!hostAccessToken) { renderLanding(); return; }
   renderHostHome();
   loadHostPreferences();
@@ -679,9 +878,9 @@ async function joinSpectator() {
 function renderSpectatorContent() {
   removePlayerChrome();
   setRoomTag(`👁️ ${game.code}`);
-  $('#app').innerHTML = `${phaseBar()}<div class="grid"><div class="card hero"><div class="role-title">${phaseIcon()}</div><h1>${phaseName()}</h1><p class="muted" data-no-translate>${discussionText(game.me?.alive===false?'خرجت من المباراة. تتابع فقط، بدون كلام أو تصويت أو قدرات.':'متابعة الأحداث العامة فقط، بدون كشف الأدوار السرية.','Watch public events only. No talking, voting or role actions.')}</p>${game.phase==='finished'?`<h2>${winnerTitle()}</h2>`:''}${eventCards()}${game.phase==='day'?discussionPanel(false):''}</div><div class="card"><h2>اللاعبون (${game.players.length})</h2><div class="players">${playerList()}</div></div></div>`;
+  $('#app').innerHTML = `${phaseBar()}${announcementHtml()}<div class="grid"><div class="card hero"><div class="role-title">${phaseIcon()}</div><h1>${phaseName()}</h1><p class="muted" data-no-translate>${discussionText(game.me?.alive===false?'خرجت من المباراة. تتابع فقط، بدون كلام أو تصويت أو قدرات.':'متابعة الأحداث العامة فقط، بدون كشف الأدوار السرية.','Watch public events only. No talking, voting or role actions.')}</p>${game.phase==='finished'?`<h2>${winnerTitle()}</h2>`:''}${eventCards()}${game.phase==='day'?discussionPanel(false):''}</div><div class="card"><h2>اللاعبون (${game.players.length})</h2><div class="players">${playerList()}</div></div></div>`;
 }
-function startSpectatorPolling(){clearTimeout(pollTimer);pollFails=0;const epoch=++pollingEpoch;const tick=async()=>{try{const next=await api({action:'spectatorState',code:game.code,id:spectatorId,spectatorToken});if(epoch!==pollingEpoch)return;pollFails=0;const changed=renderStateKey(next)!==renderStateKey(game);game=next;setReconnect(false);if(changed)renderSpectator()}catch{if(epoch===pollingEpoch){pollFails++;if(pollFails>=2)setReconnect(true)}}finally{if(epoch===pollingEpoch)pollTimer=setTimeout(tick,2000)}};pollTimer=setTimeout(tick,700)}
+function startSpectatorPolling(){clearTimeout(pollTimer);pollFails=0;const epoch=++pollingEpoch;const tick=async()=>{const started=Date.now();try{const next=await api({action:'spectatorState',code:game.code,id:spectatorId,spectatorToken});if(epoch!==pollingEpoch)return;pollFails=0;const changed=renderStateKey(next)!==renderStateKey(game);const prevAlive=game?.me?.alive;game=next;setReconnect(false);if(changed)renderSpectator();maybeImpact(prevAlive);}catch{if(epoch===pollingEpoch){pollFails++;if(pollFails>=2)setReconnect(true)}}finally{if(epoch===pollingEpoch)pollTimer=setTimeout(tick,Math.max(200,900-(Date.now()-started)))}};pollTimer=setTimeout(tick,200)}
 function replacementForm() {
   setRoomTag('🔄');
   $('#app').innerHTML = noirPageFrame(`<h1>${discussionText('استبدال لاعب','Replace player')}</h1><p class="muted">${discussionText('خذ رمز الاستبدال من المضيف.','Get the replacement code from the host.')}</p><label for="roomCode">${discussionText('كود الغرفة','Room code')}</label><input class="input" id="roomCode" inputmode="numeric" maxlength="4" dir="ltr" placeholder="1234"><label for="replacementCode">${discussionText('رمز الاستبدال','Replacement code')}</label><input class="input" id="replacementCode" maxlength="8" dir="ltr"><label for="playerName">${discussionText('اسم اللاعب الجديد','New player name')}</label><input class="input" id="playerName" maxlength="20" autocomplete="name"><button class="btn red wide" type="button" onclick="claimSeat()">${discussionText('استلام مكان اللاعب','Take player seat')}</button>`);
@@ -699,7 +898,7 @@ async function createRoom() {
     saveSession(true);
     renderHost();
     startPolling(true);
-  } catch (error) { if (error.code === 'UNAUTHORIZED') { logoutHost(); notice(discussionText('انتهت جلسة المضيف. سجّل الدخول من جديد.','Host session expired. Sign in again.')); } else notice(discussionText('تعذر إنشاء الغرفة','Could not create room')); }
+  } catch (error) { if (error.code === 'UNAUTHORIZED' || error.code === 'DEVICE_MISMATCH') { requireHostPin(error.code === 'DEVICE_MISMATCH' ? 'device' : ''); notice(discussionText('أدخل الرقم السري على هذا الجهاز للمتابعة كمضيف.','Enter the secret number on this device to continue as host.')); } else notice(discussionText('تعذر إنشاء الغرفة','Could not create room')); }
 }
 function joinForm(prefill = '') {
   spectatorMode=false;delegatedHostMode=false;
@@ -761,6 +960,11 @@ async function resumeGame(code='') {
     spectatorMode=false;delegatedHostMode=false;hostToken='';playerToken='';playerId='';
     if (!session?.code) throw new Error('NO_SESSION');
     if(session.spectator){spectatorMode=true;spectatorId=session.spectatorId;spectatorToken=session.spectatorToken;game=await api({action:'spectatorState',code:session.code,id:spectatorId,spectatorToken});renderSpectator();startSpectatorPolling();return}
+    if (session.host && (!hostAccessToken || !hostDeviceMatches())) {
+      pendingHostResume = session.code;
+      requireHostPin('resume');
+      return;
+    }
     hostToken = session.hostToken || '';
     playerToken = session.playerToken || '';
     playerId = session.playerId || '';
@@ -790,17 +994,25 @@ function renderStateKey(state) {
   return JSON.stringify({ ...view, discussion: stableDiscussion });
 }
 
+function pollDelay(){
+  const phase=game?.phase;
+  if(phase==='lobby')return 1100;
+  if(['night','vote','nomination','verdict','trial','reveal'].includes(phase))return 650;
+  return 850;
+}
 function startPolling(host) {
   clearTimeout(pollTimer);
   pollFails = 0;
   const epoch=++pollingEpoch;
   const tick = async () => {
+    const started=Date.now();
     try {
       const next = await api({ action: 'state', code: game.code, id: playerId, playerToken, hostToken });
       if(epoch!==pollingEpoch)return;
       pollFails = 0;
       setReconnect(false);
       const previousPhase = game?.phase;
+      const prevAlive = game?.me?.alive;
       const previousChatKey=chatReadKey();
       const changed = renderStateKey(next) !== renderStateKey(game);
       if (host && next.canControl === false) { host=false;hostToken='';saveSession(false); }
@@ -811,6 +1023,7 @@ function startPolling(host) {
       if (host) rememberEvent();
       if(!game.me?.isHost)delegatedHostMode=false;
       if (changed) (host || delegatedHostMode) ? renderHost() : renderPlayer();
+      maybeImpact(prevAlive);
       pollChatNotification();
     } catch (error) {
       if (error.code === 'UNAUTHORIZED') {
@@ -823,10 +1036,10 @@ function startPolling(host) {
       pollFails++;
       if (pollFails >= 2) setReconnect(true);
     } finally {
-      if(epoch===pollingEpoch)pollTimer = setTimeout(tick, game?.phase === 'lobby' ? 2500 : 2200);
+      if(epoch===pollingEpoch)pollTimer = setTimeout(tick, Math.max(150, pollDelay()-(Date.now()-started)));
     }
   };
-  pollTimer = setTimeout(tick, game?.phase === 'lobby' ? 250 : 500);
+  pollTimer = setTimeout(tick, 150);
 }
 
 function syncHistoryMatch() {
@@ -885,6 +1098,21 @@ function godfatherRevealCard() {
 function playerList(showConnection = true, allowKick = false, players = game.players) {
   return players.map((player) => `<div class="player ${player.alive ? '' : 'dead'}">${showConnection ? `<span class="dot ${player.connected ? 'on' : ''}"></span>` : ''}<span>${player.isBot?'🤖':player.alive?'👤':'☠️'} ${escapeHtml(player.name)}${player.role?`<small>${roleLabel(player.role)}</small>`:''}${player.will?`<small>📜 ${escapeHtml(player.will)}</small>`:''}</span>${(hostToken||game.me?.isHost)&&player.alive&&!['lobby','finished'].includes(game.phase)?disciplineButtons(player):''}${allowKick?`<details class="player-management"><summary data-no-translate>${discussionText('إدارة','Manage')}</summary><button class="kick" aria-label="${discussionText('طرد','Remove')} ${escapeHtml(player.name)}" onclick="kickPlayer(${jsArg(player.id)})">${discussionText('طرد','Remove')}</button></details>`:''}${(hostToken||game.me?.isHost)&&game.phase!=='lobby'&&!player.isBot?`<button aria-label="${discussionText(player.muted?'إلغاء كتم':'كتم',player.muted?'Unmute':'Mute')} ${escapeHtml(player.name)}" aria-pressed="${!!player.muted}" class="mute-btn ${player.muted?'on':''}" onclick="mutePlayer(${jsArg(player.id)},${!player.muted})">${player.muted?'🔇':'🔊'}</button>`:''}</div>`).join('');
 }
+function tvRosterRows(players, out=false){
+  const showRole=out&&(game.phase==='finished'||game.enabledRoles?.reveal_dead_roles);
+  return players.map((player)=>`<div class="player ${out?'dead':''}"><span class="dot ${player.connected?'on':''}"></span><b>${escapeHtml(player.name)}</b>${showRole&&player.role?`<small>${roleLabel(player.role)}</small>`:''}</div>`).join('')||`<p class="muted">${out?discussionText('ما في أحد خرج','Nobody is out yet'):discussionText('بانتظار اللاعبين','Waiting for players')}</p>`;
+}
+function hostRosterBoard(){
+  const inside=game.players.filter((p)=>p.alive);
+  const out=game.players.filter((p)=>!p.alive);
+  return `<div class="host-rosters" data-no-translate>
+    <section class="card host-roster host-roster-in"><h2>${discussionText('في القيم','In the game')}<small>${inside.length}</small></h2><div class="players">${tvRosterRows(inside,false)}</div></section>
+    <section class="card host-roster host-roster-out"><h2>${discussionText('خرجوا','Out')}<small>${out.length}</small></h2><div class="players">${tvRosterRows(out,true)}</div></section>
+  </div>`;
+}
+function hostTvFrame(stageHtml){
+  return `${phaseBar()}<div class="host-tv"><section class="card host-tv-stage">${stageHtml}</section>${hostRosterBoard()}</div>`;
+}
 
 function setLobbyPane(pane) {
   if (!['room', 'setup', 'players'].includes(pane)) return;
@@ -896,12 +1124,12 @@ function changeLobbyPlayerPage(amount) {
   renderHost();
 }
 function lobbyPlayers() {
-  const perPage = innerHeight >= 850 ? 12 : innerHeight >= 680 ? 8 : 4;
-  const pages = Math.max(1, Math.ceil(game.players.length / perPage));
-  lobbyPlayerPage = Math.min(lobbyPlayerPage, pages - 1);
-  const players = game.players.slice(lobbyPlayerPage * perPage, (lobbyPlayerPage + 1) * perPage);
-  const en = (localStorage.getItem('mafia-lang') || 'ar') === 'en';
-  return `<div class="players lobby-roster">${playerList(true, true, players) || `<p class="muted lobby-empty" data-no-translate>${en ? 'Waiting for players to join' : 'بانتظار دخول اللاعبين'}</p>`}</div>${pages > 1 ? `<nav class="roster-pages" aria-label="${en ? 'Player pages' : 'صفحات اللاعبين'}" data-no-translate><button type="button" ${lobbyPlayerPage === 0 ? 'disabled' : ''} onclick="changeLobbyPlayerPage(-1)">${en ? 'Previous' : 'السابق'}</button><span>${lobbyPlayerPage + 1} / ${pages}</span><button type="button" ${lobbyPlayerPage === pages - 1 ? 'disabled' : ''} onclick="changeLobbyPlayerPage(1)">${en ? 'Next' : 'التالي'}</button></nav>` : ''}`;
+  const rows = game.players.map((player) => `<div class="player"><span class="dot ${player.connected || player.isBot ? 'on' : ''}"></span><b>${escapeHtml(player.name)}</b></div>`).join('');
+  return `<div class="players lobby-roster">${rows || `<p class="muted lobby-empty">${discussionText('بانتظار دخول اللاعبين', 'Waiting for players to join')}</p>`}</div>`;
+}
+function lobbyHostTools() {
+  const kicks = game.players.map((player) => `<button type="button" class="btn wide" onclick="kickPlayer(${jsArg(player.id)})">${discussionText('طرد', 'Remove')} ${escapeHtml(player.name)}</button>`).join('');
+  return hostOverflowMenu([lobbyJoinActionsHtml(), kicks ? `<div class="host-kick-list">${kicks}</div>` : '']);
 }
 function lobbyPaneTabs() {
   const en = (localStorage.getItem('mafia-lang') || 'ar') === 'en';
@@ -931,11 +1159,11 @@ function applyPreset(kind) {
   const preset = presets[kind]; if (!preset) return;
   mafiaCount = preset.mafia; detectiveCount = preset.detective;
   enabledRoles = normalizeEnabledRoles({ ...enabledRoles, ...preset.roles, kids_mode: kind === 'kids' });
-  schedulePreferenceSave(); setupStep = 2; renderHost();
+  schedulePreferenceSave(); renderHost();
 }
 function setSetupStep(step){setupStep=Math.min(3,Math.max(1,step));lobbyPane='setup';renderHost()}
 function toggleOption(key){
-  if(key==='kids_mode'&&!enabledRoles.kids_mode){applyPreset('kids');setupStep=3;return}
+  if(key==='kids_mode'&&!enabledRoles.kids_mode){applyPreset('kids');return}
   enabledRoles[key]=!enabledRoles[key];
   enabledRoles=normalizeEnabledRoles(enabledRoles);
   schedulePreferenceSave();renderHost();
@@ -974,11 +1202,11 @@ function setupRoleCards(roles, review = false) {
   return '<div class="role-preview">' + visible.map(card => roleCard(...card)).join('') + '</div>';
 }
 function setupPanel(roles){
-  if(setupStep===1)return `${setupTabs()}<h2>${discussionText('اختر التشكيلة','Choose a preset')}</h2>${presetButtons()}${discussionSettings()}<details class="advanced-settings" data-disclosure-key="setup-counts"><summary data-no-translate>${discussionText('خيارات متقدمة: الأعداد والتحقيق','Advanced: counts and investigations')}</summary><div class="settings">${settingRow(discussionText('عدد المافيا','Mafia count'), 'mafiaCount', mafiaCount, 1, 8)}${settingRow(discussionText('عدد المحققين','Detective count'), 'detectiveCount', detectiveCount, 0, 8)}${settingRow(discussionText('إجمالي أسئلة كل محقق','Total questions per detective'), 'detectiveQuestions', detectiveQuestions, 1, 5)}<p data-no-translate>${discussionText('سؤال واحد في كل جولة حتى انتهاء العدد المحدد.','One question per round until the selected total is reached.')}</p></div></details><button class="btn red wide" onclick="setSetupStep(2)">${discussionText('التالي','Next')} ←</button>`;
-  if(setupStep===2)return `${setupTabs()}<h3 class="role-picker-title" data-no-translate>${enabledRoles.kids_mode?discussionText('شخصيات وضع الأطفال فقط — اضغط البطاقة لتفعيلها أو إلغائها','Kids mode characters only — tap a card to enable or disable'):discussionText('اضغط البطاقة لتفعيلها أو إلغائها','Tap a card to enable or disable')}</h3>${setupRoleCards(roles)}<div class="actions"><button class="btn" onclick="setSetupStep(1)">رجوع</button><button class="btn red" onclick="setSetupStep(3)">التالي</button></div>`;
   const killStart=Number.isFinite(+enabledRoles.mafia_kill_start_round)?+enabledRoles.mafia_kill_start_round:1;
-  const killLabel=killStart===0?'مغلق':`من الليلة ${killStart}`;
-  return `${setupTabs()}<h3 class="role-picker-title" data-no-translate>${discussionText("الأدوار المختارة — من الأكثر عددًا للأقل","Selected roles — highest count first")}</h3><p class="muted" data-no-translate>${discussionText("اضغط الكرت لقلبه وقراءة خصائصه ومهامه.","Tap a card to flip it and read its abilities and tasks.")}</p>${setupRoleCards(roles,true)}<button class="btn" onclick="setSetupStep(2)" data-no-translate>${discussionText("تعديل الأدوار","Edit roles")}</button>${setupSummary(roles,false)}<details class="advanced-settings" data-disclosure-key="setup-rules" open><summary data-no-translate>${discussionText('خيارات بدء اللعبة','Game start options')}</summary><div class="rule-grid"><button class="rule-chip ${enabledRoles.kids_mode?'on':''}" onclick="toggleOption('kids_mode')">🧒 وضع الأطفال: ${enabledRoles.kids_mode?'مفعّل':'ملغي'}</button><div class="rule-chip kill-range ${killStart>0?'on':''}"><button onclick="changeMafiaKillStart(-1)" aria-label="تقليل ليلة بدء الاغتيال">−</button><span>🌙 اغتيال المافيا<br><b>${killLabel}</b></span><button onclick="changeMafiaKillStart(1)" aria-label="زيادة ليلة بدء الاغتيال">+</button></div>${enabledRoles.kids_mode?'':`<button class="rule-chip ${enabledRoles.godfather_innocent?'on':''}" onclick="toggleGodfatherReveal()">🕵️ العرّاب: ${enabledRoles.godfather_innocent?'يظهر بريئًا':'ينكشف مافيا'}</button>`}<button class="rule-chip ${enabledRoles.reveal_dead_roles?'on':''}" onclick="toggleOption('reveal_dead_roles')">🎭 كشف دور الميت: ${enabledRoles.reveal_dead_roles?'نعم':'لا'}</button><button class="rule-chip ${enabledRoles.allow_no_vote?'on':''}" onclick="toggleOption('allow_no_vote')">✋ عدم التصويت: ${enabledRoles.allow_no_vote?'مسموح':'ممنوع'}</button><button class="rule-chip ${enabledRoles.full_trial?'on':''}" onclick="toggleOption('full_trial')">⚖️ المحاكمة: ${enabledRoles.full_trial?'كاملة':'تصويت مباشر'}</button><button class="rule-chip on" onclick="cycleTimer()">⏱️ المؤقت: ${phaseDuration} ثانية</button><button class="rule-chip ${soundEnabled?'on':''}" onclick="toggleSound()">${soundEnabled?'🔊':'🔇'} الصوت</button></div></details><div class="preference-status" id="prefsStatus">تم حفظ الإعدادات تلقائيًا ✓</div>${enabledRoles.kids_mode?'<div class="status">🧒 لعب بسيط: الفريق الغامض، الحارس، المحقق والأصدقاء فقط.</div>':''}${roles.valid?`<div class="status" data-no-translate>${discussionText(game.players.length<2?'بانتظار لاعبين على الأقل لبدء المباراة.':'✓ عدد الأدوار مناسب للاعبين.',game.players.length<2?'Waiting for at least two players.':'✓ Role counts fit the players.')}</div>`:`<div class="status wait">⚠️ اخترت ${roles.selectedTotal} دورًا ويوجد ${game.players.length} لاعبين فقط</div>`}<button class="btn red wide" ${game.players.length<2||!roles.valid?'disabled':''} onclick="startGame()" data-no-translate>${discussionText("توزيع الأدوار وبدء اللعبة","Deal roles and start game")}</button>`;
+  const killLabel=killStart===0?discussionText('مغلق','Off'):discussionText(`من الليلة ${killStart}`,`From night ${killStart}`);
+  const advanced=`<details class="advanced-settings host-setup-more" data-disclosure-key="setup-more"><summary>${discussionText('خيارات إضافية','More options')}</summary>${discussionSettings()}<div class="settings">${settingRow(discussionText('عدد المافيا','Mafia count'), 'mafiaCount', mafiaCount, 1, 8)}${settingRow(discussionText('عدد المحققين','Detective count'), 'detectiveCount', detectiveCount, 0, 8)}${settingRow(discussionText('أسئلة المحقق','Detective questions'), 'detectiveQuestions', detectiveQuestions, 1, 5)}</div>${setupRoleCards(roles)}<div class="rule-grid"><button class="rule-chip ${enabledRoles.kids_mode?'on':''}" onclick="toggleOption('kids_mode')">${discussionText('وضع الأطفال','Kids mode')}</button><div class="rule-chip kill-range ${killStart>0?'on':''}"><button onclick="changeMafiaKillStart(-1)" aria-label="-">−</button><span>${discussionText('اغتيال المافيا','Mafia kill')}<br><b>${killLabel}</b></span><button onclick="changeMafiaKillStart(1)" aria-label="+">+</button></div>${enabledRoles.kids_mode?'':`<button class="rule-chip ${enabledRoles.godfather_innocent?'on':''}" onclick="toggleGodfatherReveal()">${discussionText('تمويه العرّاب','Godfather disguise')}</button>`}<button class="rule-chip ${enabledRoles.reveal_dead_roles?'on':''}" onclick="toggleOption('reveal_dead_roles')">${discussionText('كشف دور الميت','Reveal dead roles')}</button><button class="rule-chip ${enabledRoles.allow_no_vote?'on':''}" onclick="toggleOption('allow_no_vote')">${discussionText('عدم التصويت','Skip vote')}</button><button class="rule-chip ${enabledRoles.full_trial?'on':''}" onclick="toggleOption('full_trial')">${discussionText('محاكمة كاملة','Full trial')}</button><button class="rule-chip on" onclick="cycleTimer()">${discussionText('المؤقت','Timer')} ${phaseDuration}</button><button class="rule-chip ${soundEnabled?'on':''}" onclick="toggleSound()">${soundEnabled?'🔊':'🔇'}</button></div></details>`;
+  const ready = game.players.length >= 2 && roles.valid;
+  return `<h2>${discussionText('التشكيلة','Preset')}</h2>${presetButtons()}<p class="setup-ready ${ready?'ok':'wait'}">${ready?discussionText(`${game.players.length} لاعبين · جاهز للبدء`,`${game.players.length} players · Ready`):discussionText(roles.valid?'يلزم لاعبان على الأقل':'عدد الأدوار أكبر من اللاعبين',roles.valid?'Need at least two players':'Too many roles for the players')}</p><button class="btn red wide host-start" ${ready?'':'disabled'} onclick="startGame()">${discussionText('بدء اللعبة','Start game')}</button>${advanced}`;
 }
 
 // Keep the QR local and reuse it across lobby updates.
@@ -1015,50 +1243,47 @@ function renderHostContent() {
   if (game.phase === 'lobby') {
     const roles = roleDistribution();
     const joinUrl = `${location.origin}/game.html?room=${game.code}`;
-    $('#app').innerHTML = `${phaseBar()}${lobbyPaneTabs()}<div class="grid host-lobby" data-pane="${lobbyPane}"><aside class="lobby-side"><div class="card hero lobby-join"><div class="lobby-join-details"><div class="code">${game.code}</div></div><div class="lobby-qr-block"><img class="qr" width="420" height="420" src="${roomQrSource(joinUrl)}" alt="${discussionText('باركود الغرفة','Room QR code')}"></div>${lobbyJoinActionsHtml()}</div><div class="card lobby-players"><div class="toolbar"><h2>${discussionText(`اللاعبون (${game.players.length})`,`Players (${game.players.length})`)}</h2><span class="connection-count">${game.players.filter((p)=>p.connected||p.isBot).length} ${discussionText('جاهز','ready')}</span></div>${lobbyPlayers()}</div></aside><section class="card setup-card" data-step="${setupStep}">${setupPanel(roles)}</section></div>`;
+    $('#app').innerHTML = `${phaseBar()}<div class="grid host-lobby" data-pane="room"><aside class="lobby-join card hero"><div class="code">${game.code}</div><img class="qr" width="360" height="360" src="${roomQrSource(joinUrl)}" alt="${discussionText('باركود الغرفة','Room QR code')}"></aside><section class="card lobby-players"><div class="toolbar"><h2>${discussionText('اللاعبون','Players')}</h2><span class="connection-count">${game.players.length}</span>${lobbyHostTools()}</div>${lobbyPlayers()}</section><section class="card setup-card">${setupPanel(roles)}</section></div>`;
     return;
   }
   if (game.phase === 'paused') {
-    $('#app').innerHTML = `${phaseBar()}<div class="card hero"><div class="role-title">⏸️ المباراة متوقفة</div><p>يمكن متابعة المباراة من المرحلة نفسها.</p><button class="btn red" onclick="hostAction('togglePause')">▶️ متابعة المباراة</button><button class="btn gold wide" type="button" onclick="returnToLobby()">${discussionText('إيقاف والرجوع للوبي','Stop and return to lobby')}</button></div>`;
+    $('#app').innerHTML = hostTvFrame(`<div class="role-title">${discussionText('متوقفة','Paused')}</div><button class="btn red wide" onclick="hostAction('togglePause')">${discussionText('متابعة','Resume')}</button>`);
     return;
   }
   if (game.phase === 'reveal') {
     const ready = game.roleReadyCount || 0, total = game.players.length;
-    $('#app').innerHTML = `${phaseBar()}<div class="grid"><div class="card hero"><div class="counter">${ready} / ${total}</div><div class="progress"><span style="width:${total?ready/total*100:0}%"></span></div><button class="btn red wide" ${ready<total?'disabled':''} onclick="hostAction('beginNight')">🌙 ${discussionText('بدء الليل','Start night')}</button></div><div class="card"><h2>${discussionText('اللاعبون','Players')}</h2><div class="players">${playerList()}</div></div></div>`;
+    $('#app').innerHTML = hostTvFrame(`<div class="role-title">${discussionText('تأكيد الأدوار','Role confirm')}</div><div class="counter">${ready} / ${total}</div><button class="btn red wide" ${ready<total?'disabled':''} onclick="hostAction('beginNight')">${discussionText('بدء الليل','Start night')}</button>`);
     return;
   }
   if (game.phase === 'night') {
-    $('#app').innerHTML = `${phaseBar()}<div class="grid"><section class="card hero phase-play night-play"><div class="status ${game.nightReady ? '' : 'wait'}">${game.nightReady ? discussionText('اكتملت اختيارات الليل ✅','Night choices complete ✅') : discussionText('بانتظار الاختيارات…','Waiting for choices…')}</div><button class="btn red wide" ${game.nightReady||phaseTimeExpired() ? '' : 'disabled'} data-timeout-action="resolveNight" onclick="hostAction('resolveNight')">${discussionText('إعلان الصباح','Announce morning')}</button></section><div class="card">${eventCards()}<h2>${discussionText('اللاعبون','Players')}</h2><div class="players">${playerList()}</div></div></div>`;
+    $('#app').innerHTML = hostTvFrame(`<div class="role-title">${discussionText('الليل','Night')}</div><p class="host-tv-note">${game.nightReady ? discussionText('الاختيارات اكتملت','Choices complete') : discussionText('بانتظار الاختيارات','Waiting for choices')}</p><button class="btn red wide" ${game.nightReady||phaseTimeExpired() ? '' : 'disabled'} data-timeout-action="resolveNight" onclick="hostAction('resolveNight')">${discussionText('إعلان الصباح','Announce morning')}</button>`);
     return;
   }
   if (game.phase === 'day') {
     const ready = ((game.lawyerReady && game.jailerReady)||phaseTimeExpired()) && clientDiscussion().complete;
-    const draw = typeof openingDrawActive === 'function' && openingDrawActive(clientDiscussion());
-    const talk = discussionPanel(true);
-    const talkBlock = talk && !draw ? `<details class="cycle-talk" open data-disclosure-key="host-day-talk"><summary>${discussionText('النقاش','Discussion')}</summary>${talk}</details>` : talk;
-    $('#app').innerHTML = `${phaseBar()}<div class="grid"><section class="card hero day-stage phase-play day-play"><div class="role-title">☀️ ${discussionText('الصباح','Morning')}</div>${morningBriefPanel(true)}<section class="day-action-panel cycle-action" data-no-translate><h2>${discussionText('اختيارات النهار','Day choices')}</h2><div class="status ${game.lawyerReady ? '' : 'wait'}">${game.lawyerReady ? discussionText('المحامي جاهز ✅','Lawyer ready ✅') : discussionText('بانتظار حماية المحامي…','Waiting for Lawyer protection…')}</div><div class="status ${game.jailerReady ? '' : 'wait'}">${game.jailerReady ? discussionText('السجّان اختار السجين ✅','Jailer chose the prisoner ✅') : discussionText('بانتظار اختيار السجّان…','Waiting for the Jailer…')}</div><button class="btn gold wide" data-discussion-vote ${ready ? '' : 'disabled'} onclick="hostAction('startVote')">${discussionText('بدء التصويت','Start voting')}</button></section>${talkBlock}</section><div class="card"><h2>${discussionText('الأحياء','Alive')}</h2><div class="players">${playerList(false, false, alivePlayers())}</div></div></div>`;
+    $('#app').innerHTML = hostTvFrame(`${announcementHtml()}<div class="role-title">${discussionText('الصباح','Morning')}</div><button class="btn gold wide" data-discussion-vote ${ready ? '' : 'disabled'} onclick="hostAction('startVote')">${discussionText('بدء التصويت','Start voting')}</button>`);
     return;
   }
   if (game.phase === 'nomination') {
     const alive = alivePlayers().length;
-    $('#app').innerHTML = `${phaseBar()}<div class="grid"><section class="card hero phase-play nomination-play"><div class="counter">${game.voteCount} / ${alive}</div><button class="btn red wide" ${game.voteCount<alive&&!phaseTimeExpired()?'disabled':''} data-timeout-action="resolveVote" onclick="hostAction('resolveVote')">${discussionText('اختيار المتهم','Choose the accused')}</button></section><div class="card"><h2>${discussionText('الأحياء','Alive')}</h2><div class="players">${playerList(false, false, alivePlayers())}</div></div></div>`;
+    $('#app').innerHTML = hostTvFrame(`<div class="role-title">${discussionText('الترشيح','Nomination')}</div><div class="counter">${game.voteCount} / ${alive}</div><button class="btn red wide" ${game.voteCount<alive&&!phaseTimeExpired()?'disabled':''} data-timeout-action="resolveVote" onclick="hostAction('resolveVote')">${discussionText('اختيار المتهم','Choose the accused')}</button>`);
     return;
   }
   if (game.phase === 'trial') {
-    $('#app').innerHTML = `${phaseBar()}<div class="card hero trial-stage phase-play trial-play"><div class="accused-name">${escapeHtml(nameOf(game.accusedPlayer))}</div><p id="trialTimerHint" class="status wait" hidden></p><button class="btn gold wide" type="button" data-timeout-action="advanceVerdict" onclick="hostAction('advanceVerdict')">${discussionText('الانتقال إلى الحكم','Move to verdict')}</button></div>`;
+    $('#app').innerHTML = hostTvFrame(`<div class="role-title">${discussionText('المحاكمة','Trial')}</div><div class="accused-name">${escapeHtml(nameOf(game.accusedPlayer))}</div><p id="trialTimerHint" class="status wait" hidden></p><button class="btn gold wide" type="button" data-timeout-action="advanceVerdict" onclick="hostAction('advanceVerdict')">${discussionText('الانتقال إلى الحكم','Move to verdict')}</button>`);
     return;
   }
   if (game.phase === 'verdict') {
     const alive = Math.max(0,alivePlayers().length-1);
-    $('#app').innerHTML = `${phaseBar()}<div class="grid"><section class="card hero phase-play verdict-play"><div class="accused-name">${escapeHtml(nameOf(game.accusedPlayer))}</div><div class="counter">${game.voteCount} / ${alive}</div><button class="btn red wide" ${game.voteCount<alive&&!phaseTimeExpired()?'disabled':''} data-timeout-action="resolveVote" onclick="hostAction('resolveVote')">${discussionText('إعلان الحكم','Reveal verdict')}</button></section><div class="card"><h2>${discussionText('المصوتون','Voters')}</h2><div class="players">${playerList(false)}</div></div></div>`;
+    $('#app').innerHTML = hostTvFrame(`<div class="accused-name">${escapeHtml(nameOf(game.accusedPlayer))}</div><div class="counter">${game.voteCount} / ${alive}</div><button class="btn red wide" ${game.voteCount<alive&&!phaseTimeExpired()?'disabled':''} data-timeout-action="resolveVote" onclick="hostAction('resolveVote')">${discussionText('إعلان الحكم','Reveal verdict')}</button>`);
     return;
   }
   if (game.phase === 'vote') {
     const alive = alivePlayers().length;
-    $('#app').innerHTML = `${phaseBar()}<div class="grid"><section class="card hero phase-play vote-play"><div class="counter">${game.voteCount} / ${alive}</div><button class="btn red wide" ${game.voteCount < alive && !phaseTimeExpired() ? 'disabled' : ''} data-timeout-action="resolveVote" onclick="hostAction('resolveVote')">${discussionText('كشف النتيجة','Reveal result')}</button></section><div class="card"><h2>${discussionText('اللاعبون','Players')}</h2><div class="players">${playerList(false)}</div></div></div>`;
+    $('#app').innerHTML = hostTvFrame(`<div class="role-title">${discussionText('التصويت','Voting')}</div><div class="counter">${game.voteCount} / ${alive}</div><button class="btn red wide" ${game.voteCount < alive && !phaseTimeExpired() ? 'disabled' : ''} data-timeout-action="resolveVote" onclick="hostAction('resolveVote')">${discussionText('كشف النتيجة','Reveal result')}</button>`);
     return;
   }
-    $('#app').innerHTML = `${phaseBar()}<div class="grid"><div class="card hero"><div class="role-title">${winnerTitle()}</div><div class="players final-roles">${game.players.map((player) => `<div class="player"><span>${escapeHtml(player.name)} — ${roleLabel(player.role)}</span></div>`).join('')}</div><div class="actions center"><button class="btn gold wide" onclick="returnToLobby()">👥 ${discussionText('الرجوع للوبي وتغيير اللاعبين','Return to lobby and change players')}</button><button class="btn red" onclick="startGame()">🔄 ${discussionText('إعادة مباراة بنفس اللاعبين','Rematch with the same players')}</button><button class="btn" onclick="shareResult()">↗ ${discussionText('مشاركة النتيجة','Share result')}</button><button class="btn" onclick="home()">${discussionText('الرئيسية','Home')}</button></div></div><div class="card"><h2>${discussionText('سجل المباراة','Match log')}</h2><div class="timeline">${historyCards()||`<p class="muted">${discussionText('ستظهر أحداث المباراة هنا.','Match events will appear here.')}</p>`}</div></div></div>`;
+  $('#app').innerHTML = hostTvFrame(`<div class="role-title">${winnerTitle()}</div><button class="btn red wide" onclick="startGame()">${discussionText('إعادة بنفس اللاعبين','Rematch')}</button>${hostOverflowMenu([`<button class="btn gold wide" onclick="returnToLobby()">${discussionText('الرجوع للوبي','Return to lobby')}</button>`,`<button class="btn wide" onclick="shareResult()">${discussionText('مشاركة النتيجة','Share result')}</button>`])}`);
 }
 function winnerTitle() {
   if (game.winner === 'draw') return discussionText('⚖️ تعادل — لم يبقَ أحد حيًا','⚖️ Draw — no survivors');
@@ -1150,6 +1375,7 @@ async function startGame() {
   enabledRoles.phase_seconds=phaseDuration;
   try {
     game = await withBusy(discussionText('جاري توزيع الأدوار…','Dealing roles…'), () => api({ action: 'start', code: game.code, lifecycleVersion:game.lifecycleVersion, hostToken, id:playerId, playerToken, mafiaCount, detectiveCount, detectiveQuestions, enabledRoles }));
+    lastImpactSig='';
     localHistory = []; localStorage.removeItem(`mafia-history-${game.code}`);
     signalPhase(); rememberEvent();
     renderHost();
@@ -1157,7 +1383,7 @@ async function startGame() {
   finally { lifecycleRequestPending = false; }
 }
 async function hostAction(action) {
-  try { const previous=game.phase; game = await api({ action, code: game.code, hostToken, id:playerId, playerToken }); if(previous!==game.phase)signalPhase(); rememberEvent(); renderHost(); }
+  try { const previous=game.phase; const prevAlive=game?.me?.alive; game = await api({ action, code: game.code, hostToken, id: playerId, playerToken }); if(previous!==game.phase)signalPhase(); rememberEvent(); renderHost(); maybeImpact(prevAlive); }
   catch (error) { notice(error.code === 'STALE_GAME' ? 'تغيّرت حالة الغرفة أثناء الطلب. انتظر تحديث الشاشة ثم حاول مجددًا.' : error.code === 'WAITING_ACTIONS' ? 'بانتظار بقية اختيارات الليل' : 'بانتظار بقية اللاعبين'); }
 }
 async function kickPlayer(target){if(!confirm(discussionText('طرد اللاعب ','Remove player ')+nameOf(target)+discussionText(' من الغرفة؟ سيحتاج إلى الدخول مجددًا.',' from the room? They will need to rejoin.')))return;try{game=await api({action:'kick',code:game.code,hostToken,id:playerId,playerToken,target});renderHost()}catch{notice('تعذر طرد اللاعب')}}
@@ -1186,7 +1412,7 @@ function personalRoleCard(compact=false, extra={}) {
 function setShowingRole(on){document.body.classList.toggle('showing-role',!!on)}
 function roleReveal() {
   setShowingRole(true);
-  $('#app').innerHTML=`${phaseBar()}<section class="role-reveal-only">${personalRoleCard(false,{reveal:true})}<button class="btn red wide" onclick="acknowledgeRole()">${discussionText('فهمت','Got it')}</button></section>`;
+  $('#app').innerHTML=`<section class="role-reveal-only">${personalRoleCard(false,{reveal:true})}<button class="btn red reveal-ack" onclick="acknowledgeRole()"><span class="phase-timer" id="phaseTimer" role="timer" aria-label="${discussionText('الوقت المتبقي','Time remaining')}">${phaseDuration}</span><span>${discussionText('فهمت','Got it')}</span></button></section>`;
 }
 function mafiaRoleClient(role){return role==='mafia'||role==='mafia_boss'}
 function renderPlayerContent() {
@@ -1199,8 +1425,8 @@ function renderPlayerContent() {
   }
   if (!me) { $('#app').innerHTML = '<div class="card hero"><h2>فقدنا جلسة اللاعب</h2><button class="btn" onclick="home()">دخول من جديد</button></div>'; return; }
   if (!me.alive) { delegatedHostMode=false; if(document.querySelector('.game-sheet'))closeSheet(); renderSpectator(); return; }
-  setTimeout(mountPlayerTools, 0);
-  if (game.phase === 'paused') { pendingDockPlay={abilityTitle:'',abilityBody:'',voteBody:'',tab:''}; $('#app').innerHTML = `${phaseBar()}<div class="card hero"><div class="role-title">⏸️ المباراة متوقفة</div><p>المضيف سيكمل المباراة من المرحلة نفسها.</p>${me.isHost?`<button class="btn gold wide" type="button" onclick="returnToLobby()">${discussionText('إيقاف والرجوع للوبي','Stop and return to lobby')}</button>`:''}</div>`; return; }
+  mountPlayerTools();
+  if (game.phase === 'paused') { pendingDockPlay={abilityTitle:'',abilityBody:'',voteBody:'',squareBody:'',tab:''}; $('#app').innerHTML = `${phaseBar()}<div class="card hero"><div class="role-title">⏸️ المباراة متوقفة</div><p>المضيف سيكمل المباراة من المرحلة نفسها.</p>${me.isHost?`<button class="btn gold wide" type="button" onclick="returnToLobby()">${discussionText('إيقاف والرجوع للوبي','Stop and return to lobby')}</button>`:''}</div>`; return; }
   if (game.phase === 'finished') {
     $('#app').innerHTML = `${phaseBar()}<div class="card hero"><div class="role-title">${winnerTitle()}</div><p>${discussionText('دورك','Your role')}: ${roleLabel(me.role)}</p><p class="muted">${me.isHost ? discussionText('افتح تحكم المضيف لإعادة المباراة.','Open host controls to play again.') : discussionText('انتظر المضيف لإعادة المباراة.','Wait for the host to play again.')}</p></div>`;
     return;
@@ -1230,7 +1456,7 @@ function dockChatLabel(){
   if(game?.me?.jailed||game?.me?.role==='jailer')return discussionText('محادثة السجن','Jail chat');
   return discussionText('محادثة المافيا','Mafia chat');
 }
-let pendingDockPlay={abilityTitle:'',abilityBody:'',voteBody:'',tab:''};
+let pendingDockPlay={abilityTitle:'',abilityBody:'',voteBody:'',squareBody:'',tab:''};
 let dockAutoKey='';
 function extractDockAction(html){
   const box=document.createElement('div');
@@ -1239,8 +1465,14 @@ function extractDockAction(html){
   const card=box.querySelector(':scope > .card');
   return (card||box).innerHTML;
 }
+function dockHasAction(html){
+  const box=document.createElement('div');
+  box.innerHTML=html||'';
+  return !!box.querySelector('button,.pick');
+}
 function selectDockTab(tab){
-  pendingDockPlay.tab=pendingDockPlay.tab===tab?'none':tab;
+  if(tab==='home')pendingDockPlay.tab='none';
+  else pendingDockPlay.tab=pendingDockPlay.tab===tab?'none':tab;
   document.querySelector('.player-dock')?.remove();
   document.body.classList.remove('has-player-dock');
   mountPlayerTools();
@@ -1252,26 +1484,26 @@ function mountPlayerTools(){
   const tab=pendingDockPlay.tab;
   let play='';
   if(tab==='ability'){
-    play=`<section class="dock-play">${pendingDockPlay.abilityTitle?`<h2 class="role-act-title" data-no-translate>${pendingDockPlay.abilityTitle}</h2>`:''}${pendingDockPlay.abilityBody||`<p class="muted">${discussionText('ما فيه إجراء الحين.','No action right now.')}</p>`}</section>`;
-  }else if(tab==='vote'){
-    play=`<section class="dock-play"><h2 class="role-act-title" data-no-translate>${discussionText('التصويت','Vote')}</h2>${pendingDockPlay.voteBody||`<p class="muted">${discussionText('ما فيه نتيجة تصويت بعد.','No vote result yet.')}</p>`}</section>`;
+    play=`<section class="dock-play">${nowTaskHtml()}${pendingDockPlay.abilityTitle?`<h2 class="role-act-title" data-no-translate>${pendingDockPlay.abilityTitle}</h2>`:''}${pendingDockPlay.abilityBody||`<p class="muted">${discussionText('ما فيه إجراء الحين.','No action right now.')}</p>`}</section>`;
   }else if(tab==='card'){
-    play=`<section class="dock-play dock-card-play">${personalRoleCard(false,{reveal:true})}</section>`;
+    play=`<section class="dock-play dock-card-play">${personalRoleCard(true,{reveal:true})}</section>`;
   }
   const chatOn=canChat?' dock-chat-on':'';
-  const on=name=>tab===name?' is-on':'';
+  const homeOn=tab==='none'||tab==='home'||!tab;
+  const on=name=>name==='home'?(homeOn?' is-on':''):(tab===name?' is-on':'');
   const dock=document.createElement('nav');
   dock.className='player-dock';
   dock.setAttribute('aria-label',discussionText('شريط اللاعب','Player bar'));
-  dock.innerHTML=`${play}<div class="dock-row">
-    <button type="button" class="dock-item${on('ability')}" onclick="selectDockTab('ability')"><span class="dock-icon">⚡</span><span>${discussionText('قدرتي','Ability')}</span></button>
-    <button type="button" class="dock-item${on('vote')}" onclick="selectDockTab('vote')"><span class="dock-icon">🗳️</span><span>${discussionText('التصويت','Vote')}</span></button>
-    <button type="button" class="dock-item dock-card-tab${on('card')}" onclick="selectDockTab('card')"><span class="dock-icon">🃏</span><span>${discussionText('كرتي','My card')}</span></button>
-    <button type="button" class="dock-item${chatOn}" data-chat-button ${canChat?'':'disabled'} onclick="openChat()"><span class="dock-icon">💬</span><span>${discussionText('محادثة','Chat')}</span><i class="dock-badge" ${unread?'':'hidden'}></i></button>
-    <button type="button" class="dock-item" onclick="openDockMore()"><span class="dock-icon">⋯</span><span>${discussionText('المزيد','More')}</span></button>
+  dock.innerHTML=`${play}<div class="dock-row" data-no-translate>
+    <button type="button" class="dock-item${on('ability')}" onclick="selectDockTab('ability')"><span class="dock-icon">⚡</span><span class="dock-label">${discussionText('قدرتي','Ability')}</span></button>
+    <button type="button" class="dock-item${on('card')}" onclick="selectDockTab('card')"><span class="dock-icon">🃏</span><span class="dock-label">${discussionText('كرتي','My card')}</span></button>
+    <button type="button" class="dock-item dock-home-tab${on('home')}" onclick="selectDockTab('home')"><span class="dock-icon">🏠</span><span class="dock-label">${discussionText('الرئيسية','Home')}</span></button>
+    <button type="button" class="dock-item${chatOn}${unread?' has-unread':''}" data-chat-button ${canChat?'':'disabled'} onclick="openChat()"><span class="dock-icon">💬</span><span class="dock-label">${discussionText('محادثة','Chat')}</span><i class="dock-badge" ${unread?'':'hidden'}></i></button>
+    <button type="button" class="dock-item" onclick="openDockMore()"><span class="dock-icon">⋯</span><span class="dock-label">${discussionText('المزيد','More')}</span></button>
   </div>`;
   document.body.append(dock);
   document.body.classList.add('has-player-dock');
+  paintActionFeedback();
 }
 function openDockMore(){
   const host=game?.me?.isHost?`<button class="btn gold wide" type="button" onclick="toggleDelegatedHost()">👑 ${discussionText('تحكم','Host')}</button><button class="btn wide" type="button" onclick="returnToLobby()">🏠 ${discussionText('اللوبي','Lobby')}</button>`:'';
@@ -1308,21 +1540,25 @@ function chatHasUnread(){return unreadChat&&chatAllowed();}
 function chatButtonLabel(unread=false){return `💬 ${discussionText('محادثة','Chat')}${unread?' •':''}`;}
 function paintChatDock(){
   const unread=chatHasUnread();
+  const can=chatAllowed();
+  const labelText=discussionText('محادثة','Chat');
   for(const button of document.querySelectorAll('[data-chat-button]')){
-    if(button.classList.contains('dock-item')){
-      button.classList.toggle('has-unread',unread);
-      const badge=button.querySelector('.dock-badge');
-      if(badge)badge.hidden=!unread;
-      const label=button.querySelector('span:not(.dock-icon)');
-      if(label)label.textContent=discussionText('محادثة','Chat');
-      button.disabled=!chatAllowed();
-      button.classList.toggle('dock-chat-on',chatAllowed());
-    }else button.textContent=`${unread?'🔴 ':''}💬 ${dockChatLabel()}`;
+    button.classList.add('dock-item');
+    if(!button.querySelector('.dock-icon')||!button.querySelector('.dock-label')){
+      button.innerHTML=`<span class="dock-icon">💬</span><span class="dock-label">${labelText}</span><i class="dock-badge" hidden></i>`;
+    }
+    button.disabled=!can;
+    button.classList.toggle('dock-chat-on',can);
+    button.classList.toggle('has-unread',unread);
+    const label=button.querySelector('.dock-label');
+    if(label)label.textContent=labelText;
+    const badge=button.querySelector('.dock-badge');
+    if(badge)badge.hidden=!unread;
   }
 }
 function markChatRead(messages){const latest=messages?.at(-1);if(latest)localStorage.setItem(chatReadKey(),String(latest.id));unreadChat=false;paintChatDock();}
 async function pollChatNotification(){
- if(!chatAllowed()||document.querySelector('.chat-list')||chatNoticePending||Date.now()-chatNoticeAt<5000)return;
+ if(!chatAllowed()||document.querySelector('.chat-list')||chatNoticePending||Date.now()-chatNoticeAt<2500)return;
  chatNoticeAt=Date.now();chatNoticePending=true;const key=chatReadKey(),epoch=pollingEpoch;
  try{const result=await api({action:'messages',code:game.code,id:playerId,playerToken});
   if(epoch!==pollingEpoch||key!==chatReadKey()||!chatAllowed())return;
@@ -1369,9 +1605,9 @@ function startChatPolling(){
    if(epoch!==chatEpoch)return;
    if(['UNAUTHORIZED','INVALID_ACTION'].includes(error.code)){closeSheet();return;}
    const status=document.querySelector('.chat-status');if(status)status.textContent=discussionText('انقطع الاتصال، نحاول نرجع…','Reconnecting…');
-  }finally{if(epoch===chatEpoch&&document.querySelector('.chat-list'))chatTimer=setTimeout(tick,1000);}
+  }finally{if(epoch===chatEpoch&&document.querySelector('.chat-list'))chatTimer=setTimeout(tick,600);}
  };
- chatTimer=setTimeout(tick,1000);
+ chatTimer=setTimeout(tick,400);
 }
 async function openChat(){
  stopChatPolling();const epoch=chatEpoch;
@@ -1413,8 +1649,9 @@ function renderTrialPlayer(){
 }
 function renderVerdict(){
   const accused=game.accusedPlayer===playerId;
-  const options=`<div class="verdict-grid choice-stack"><button class="pick execute" data-target="GUILTY" aria-pressed="false" onclick="castVote('GUILTY')">${discussionText('🔨 مذنب','🔨 Guilty')}</button><button class="pick innocent" data-target="INNOCENT" aria-pressed="false" onclick="castVote('INNOCENT')">${discussionText('🕊️ بريء','🕊️ Innocent')}</button></div>`;
-  $('#app').innerHTML=`<div class="card hero"><div class="accused-name">${escapeHtml(nameOf(game.accusedPlayer))}</div>${accused||game.me.voted?'':options}</div>`;
+  const guilty=isPicked('GUILTY'),innocent=isPicked('INNOCENT');
+  const options=`${pickHintHtml()}<div class="verdict-grid choice-stack"><button class="pick execute${guilty?' is-picked':''}" data-target="GUILTY" aria-pressed="${guilty}" onclick="castVote('GUILTY')">${discussionText('🔨 مذنب','🔨 Guilty')}${guilty?` ${pickMark()}`:''}</button><button class="pick innocent${innocent?' is-picked':''}" data-target="INNOCENT" aria-pressed="${innocent}" onclick="castVote('INNOCENT')">${discussionText('🕊️ بريء','🕊️ Innocent')}${innocent?` ${pickMark()}`:''}</button></div>`;
+  $('#app').innerHTML=`<div class="card hero"><div class="accused-name">${escapeHtml(nameOf(game.accusedPlayer))}</div>${accused?'':options}</div>`;
 }
 
 function renderNight() {
@@ -1439,7 +1676,7 @@ function renderNight() {
   if (me.role === 'mafia' || me.role === 'mafia_boss') {
     const teamIds = new Set((me.mafiaTeam || []).map((x) => x.id));
     const targets = alivePlayers().filter((player) => !teamIds.has(player.id));
-    $('#app').innerHTML = `<div class="card">${(me.mafiaTeam||[]).length?`<div class="status wait">${(me.mafiaTeam||[]).map((x)=>escapeHtml(x.name)).join('، ')}</div>`:''}${me.acted ? '' : `${choiceButtons(targets, 'nightAction', { icon: '🔪' })}<button class="pick skip" onclick="nightAction('SKIP')">⏭️ ${discussionText('تخطي','Skip')}</button>`}</div>`;
+    $('#app').innerHTML = `<div class="card">${(me.mafiaTeam||[]).length?`<div class="status wait">${(me.mafiaTeam||[]).map((x)=>escapeHtml(x.name)).join('، ')}</div>`:''}${choiceButtons(targets, 'nightAction', { icon: '🔪' })}${skipPick('nightAction','SKIP',`⏭️ ${discussionText('تخطي','Skip')}`)}</div>`;
     return;
   }
   if (me.role === 'doctor') {
@@ -1448,7 +1685,7 @@ function renderNight() {
       return;
     }
     const targets = alivePlayers().filter((player) => player.id !== me.doctorLastTarget);
-    $('#app').innerHTML = `<div class="card" data-no-translate>${me.acted ? '' : `<h2>من ستحمي الليلة؟</h2>${choiceButtons(targets, 'nightAction', { icon: '🩺' })}`}</div>`;
+    $('#app').innerHTML = `<div class="card" data-no-translate><h2>من ستحمي الليلة؟</h2>${choiceButtons(targets, 'nightAction', { icon: '🩺' })}</div>`;
     return;
   }
   if (me.role === 'revealer') {
@@ -1456,9 +1693,12 @@ function renderNight() {
     return;
   }
   if (me.role === 'detective') {
-    const targets = alivePlayers().filter((player) => player.id !== playerId && !(me.selectedIds || []).includes(player.id));
+    const picked = new Set(me.selectedIds || []);
+    const remaining = alivePlayers().filter((player) => player.id !== playerId && !picked.has(player.id));
+    const chosen = alivePlayers().filter((player) => picked.has(player.id));
     const finished = game.round > detectiveQuestionCount(game.detectiveQuestions);
-    $('#app').innerHTML = `<div class="card" data-no-translate>${finished||me.acted?'':choiceButtons(targets, 'nightAction', { icon: '🔎' })}</div>`;
+    const chosenHtml = chosen.length ? `<p class="pick-hint is-set">${discussionText('فحصك','Your check')}: ${chosen.map((p)=>escapeHtml(p.name)).join('، ')}${me.acted?` — ${discussionText('لا يمكن تغيير الفحص بعد تسجيله.','This check cannot be changed.')}`:''}</p>` : '';
+    $('#app').innerHTML = `<div class="card" data-no-translate>${chosenHtml}${finished||me.acted?'':choiceButtons(remaining, 'nightAction', { icon: '🔎' })}</div>`;
     return;
   }
   if (me.role === 'vigilante') {
@@ -1467,12 +1707,12 @@ function renderNight() {
   }
   if (me.role === 'witch') {
     const targets = alivePlayers();
-    $('#app').innerHTML = `<div class="card"><div class="role-title">${roleLabel('witch')}</div><p>🧪 الحياة: ${me.charges?.life ? 'متوفرة' : 'استُخدمت'} · ☠️ السم: ${me.charges?.poison ? 'متوفرة' : 'استُخدمت'}</p>${me.acted ? '<h2 class="ok">تم تسجيل الجرعة ✅</h2>' : `${me.charges?.life ? `<h2>جرعة الحياة</h2>${choiceButtons(targets, "witchAction.bind(null,'SAVE')", { icon: '💚' })}` : ''}${me.charges?.poison ? `<h2>جرعة السم</h2>${choiceButtons(targets.filter((p) => p.id !== playerId), 'confirmPoison', { icon: '☠️' })}` : ''}`}</div>`;
+    $('#app').innerHTML = `<div class="card"><div class="role-title">${roleLabel('witch')}</div><p>🧪 الحياة: ${me.charges?.life ? 'متوفرة' : 'استُخدمت'} · ☠️ السم: ${me.charges?.poison ? 'متوفرة' : 'استُخدمت'}</p>${pickHintHtml()}${me.charges?.life ? `<h2>جرعة الحياة</h2>${choiceButtons(targets, "witchAction.bind(null,'SAVE')", { icon: '💚', hint: false })}` : ''}${me.charges?.poison ? `<h2>جرعة السم</h2>${choiceButtons(targets.filter((p) => p.id !== playerId), 'confirmPoison', { icon: '☠️', hint: false })}` : ''}</div>`;
     return;
   }
   if (me.role === 'serial_killer') {
     const targets = alivePlayers().filter((player) => player.id !== playerId);
-    $('#app').innerHTML = `<div class="card">${me.acted ? '' : `<h2>من ستقتل الليلة؟</h2>${choiceButtons(targets, 'nightAction', { icon: '🩸' })}`}</div>`;
+    $('#app').innerHTML = `<div class="card"><h2>من ستقتل الليلة؟</h2>${choiceButtons(targets, 'nightAction', { icon: '🩸' })}</div>`;
     return;
   }
   if (me.role === 'cupid') {
@@ -1480,20 +1720,21 @@ function renderNight() {
       $('#app').innerHTML = `<div class="card wait-only"></div>`;
       return;
     }
-    const targets = alivePlayers().filter((player) => player.id !== playerId && !(me.selectedIds || []).includes(player.id));
-    $('#app').innerHTML = `<div class="card"><div class="role-title">${roleLabel('cupid')}</div><h2>اختر حبيبين: ${(me.selectedIds || []).length} / 2</h2>${me.acted ? '<h2 class="ok">تم ربط مصيرهما 💘</h2>' : choiceButtons(targets, 'nightAction', { icon: '💘' })}</div>`;
+    const remaining = alivePlayers().filter((player) => player.id !== playerId && !(me.selectedIds || []).includes(player.id));
+    const chosen = alivePlayers().filter((player) => (me.selectedIds || []).includes(player.id));
+    $('#app').innerHTML = `<div class="card"><div class="role-title">${roleLabel('cupid')}</div><h2>اختر حبيبين: ${(me.selectedIds || []).length} / 2</h2>${chosen.length?choiceButtons(chosen,'nightAction',{icon:'💘',hint:false}):''}${me.acted?`<h2 class="ok">${discussionText('تم ربط مصيرهما','Their fates are linked')} 💘</h2>`:`${pickHintHtml()}${choiceButtons(remaining, 'nightAction', { icon: '💘', hint: false })}`}</div>`;
     return;
   }
   if (me.role === 'escort') {
     const targets = alivePlayers().filter((player) => player.id !== playerId);
-    $('#app').innerHTML = `<div class="card">${me.acted ? '' : `<h2>من ستعطّل الليلة؟</h2>${choiceButtons(targets, 'nightAction', { icon: '🚫' })}`}</div>`;
+    $('#app').innerHTML = `<div class="card"><h2>من ستعطّل الليلة؟</h2>${choiceButtons(targets, 'nightAction', { icon: '🚫' })}</div>`;
     return;
   }
   if (me.role === 'jailer') {
     if (!me.jailedPlayer || me.executionsLeft <= 0) {
       $('#app').innerHTML = `<div class="card wait-only"></div>`;
     } else {
-    $('#app').innerHTML = `<div class="card hero"><div class="role-title">${roleLabel('jailer')}</div>${me.acted ? '' : `<h2>${discussionText('السجين','Prisoner')}: ${escapeHtml(me.jailedPlayer)}</h2><div class="actions" style="justify-content:center"><button class="btn green" onclick="nightAction('SPARE')">${discussionText('إطلاقه','Spare')}</button><button class="btn danger" onclick="confirmExecute()">${discussionText('إعدامه','Execute')}</button></div>`}</div>`;
+    $('#app').innerHTML = `<div class="card hero"><div class="role-title">${roleLabel('jailer')}</div><h2>${discussionText('السجين','Prisoner')}: ${escapeHtml(me.jailedPlayer)}</h2>${pickHintHtml()}<div class="actions" style="justify-content:center">${skipPick('nightAction','SPARE',discussionText('إطلاقه','Spare')).replace('pick skip','btn green pick')}<button class="btn danger pick${isPicked('EXECUTE')?' is-picked':''}" data-target="EXECUTE" aria-pressed="${isPicked('EXECUTE')}" onclick="confirmExecute()">${discussionText('إعدامه','Execute')}${isPicked('EXECUTE')?` ${pickMark()}`:''}</button></div></div>`;
     }
     return;
   }
@@ -1531,29 +1772,129 @@ function roleActTitle(){
   if(phase==='trial')return discussionText('المحاكمة','Trial');
   return '';
 }
+function publicNewsEvents(){
+  const events=String(game?.lastEvent||'').split(',').filter(Boolean);
+  const nightish=/(mafia_|doctor_|jail_saved|witch_|serial_|detective_only|escort_)/;
+  if(game?.lastSaved && !events.some((e)=>/_saved$/.test(e)) && (events.length===0 || events.some((e)=>nightish.test(e))))events.push('doctor_saved');
+  return events;
+}
+function squareEventLine(event){
+  const named=(game.eliminations||[]).filter(p=>p.reason===event).map(p=>p.name).filter(Boolean);
+  const who=named.join('، ');
+  if(event==='mafia_kill')return who?discussionText(`المافيا اغتالت ${who}.`,`Mafia killed ${who}.`):eventLabel(event);
+  if(event==='doctor_saved')return discussionText('الطبيب حمى الهدف، وما صار اغتيال.','The Doctor protected the target, so there was no kill.');
+  if(event==='jail_saved')return discussionText('السجن حمى الهدف من اغتيال المافيا.','Jail protected the target from the Mafia kill.');
+  if(event==='witch_saved')return discussionText('الساحرة أنقذت لاعبًا بجرعة الحياة.','The Witch saved a player with the life potion.');
+  if(event==='serial_kill')return who?discussionText(`القاتل المتسلسل اغتال ${who}.`,`The Serial Killer killed ${who}.`):eventLabel(event);
+  if(event==='witch_poison')return who?discussionText(`سم الساحرة قتل ${who}.`,`Witch poison killed ${who}.`):eventLabel(event);
+  if(event==='jailer_executed')return who?discussionText(`السجّان أعدم ${who}.`,`The Jailer executed ${who}.`):eventLabel(event);
+  if(event==='vigilante_kill')return who?discussionText(`طلقة القناص قتلت ${who}.`,`The sniper killed ${who}.`):eventLabel(event);
+  if(event==='lovers_died')return who?discussionText(`مات الحبيبان: ${who}.`,`The linked pair died: ${who}.`):eventLabel(event);
+  if(event==='vote_eliminated')return who?discussionText(`التصويت استبعد ${who}.`,`The vote eliminated ${who}.`):eventLabel(event);
+  if(event==='trial_guilty')return who?discussionText(`صدر الحكم بإدانة ${who}.`,`The verdict condemned ${who}.`):eventLabel(event);
+  if(event==='player_accused'&&game.accusedPlayer)return discussionText(`المتهم للمحاكمة: ${nameOf(game.accusedPlayer)}.`,`Accused for trial: ${nameOf(game.accusedPlayer)}.`);
+  if(event==='lawyer_saved')return discussionText('المحامي أنقذ اللاعب من نتيجة التصويت.','The Lawyer saved the player from the vote.');
+  if(event==='escort_blocked')return discussionText('المعطّل عطّل قدرة لاعب هذه الليلة.','The Escort blocked a player tonight.');
+  return eventLabel(event);
+}
+function mySpeakTurn(){
+  if(!game?.me?.alive||!['day','trial'].includes(game.phase))return false;
+  const view=typeof clientDiscussion==='function'?clientDiscussion():{};
+  if(view.mode!=='turns'||view.status!=='active'||typeof openingDrawActive==='function'&&openingDrawActive(view))return false;
+  return view.speakerId===playerId;
+}
+function speakTurnHtml(){
+  return discussionBoardHtml(true);
+}
+function discussionBoardHtml(mineOnly=false){
+  if(!['day','trial'].includes(game?.phase))return '';
+  const view=typeof clientDiscussion==='function'?clientDiscussion():{};
+  if(typeof openingDrawActive==='function'&&openingDrawActive(view)){
+    return mineOnly?'':`<section class="speak-turn" data-no-translate><p>${discussionText('قرعة المتحدث جارية…','Speaker draw in progress…')}</p></section>`;
+  }
+  if(view.mode==='group'&&view.status==='active'){
+    const seconds=discussionSeconds(view.remainingMs);
+    return mineOnly?'':`<section class="speak-turn" data-no-translate><h2>${discussionText('الجميع يتكلم','Everyone can speak')}</h2><div class="discussion-clock" data-count="seconds" role="timer">${seconds} ${discussionText('ثانية','seconds')}</div></section>`;
+  }
+  if(view.mode!=='turns'||!view.speakerId||!['active','paused'].includes(view.status))return '';
+  const mine=game.me?.alive&&view.speakerId===playerId;
+  if(mineOnly&&!mine)return '';
+  const seconds=discussionSeconds(view.remainingMs);
+  const nextId=view.order?.[view.index+1];
+  const nextLine=nextId
+    ? discussionText(`التالي: ${nameOf(nextId)} — بعد ${seconds} ثانية`, `Next: ${nameOf(nextId)} — in ${seconds} seconds`)
+    : discussionText(`هذا آخر دور — باقي ${seconds} ثانية` , `This is the last turn — ${seconds} seconds left`);
+  const skip=mine?`<button class="btn gold wide" type="button" onclick="discussionAction('passDiscussion')">⏭️ ${discussionText('تخطي','Skip')}</button>`:'';
+  return `<section class="speak-turn${mine?' is-mine':''}" data-no-translate>
+    <h2>${mine?discussionText('دورك في النقاش','Your turn to speak'):discussionText('النقاش','Discussion')}</h2>
+    <p class="speak-now"><b>${discussionText('يتكلم الآن','Speaking now')}</b> ${escapeHtml(nameOf(view.speakerId))}</p>
+    <div class="discussion-clock" data-count="seconds" role="timer">${seconds} ${discussionText('ثانية','seconds')}</div>
+    <p class="speak-next" data-speak-next="${escapeHtml(nextId||'')}" data-speak-last="${nextId?'0':'1'}">${escapeHtml(nextLine)}</p>
+    ${skip}
+  </section>`;
+}
+function nowTaskHtml(){
+  const hint=typeof playerTaskHint==='function'?playerTaskHint():'';
+  if(!hint)return '';
+  return `<div class="square-block square-now"><h3>${discussionText('المطلوب الآن','Now')}</h3><p>${escapeHtml(hint)}</p></div>`;
+}
+let speakSyncKey='';
+let speakSyncBusy=false;
+function syncSpeakTurn(view){
+  if(speakSyncBusy||!game?.me?.alive||hostToken||delegatedHostMode)return;
+  const key=`${game.phase}:${view?.speakerId||''}:${view?.status||''}:${mySpeakTurn()}`;
+  if(key===speakSyncKey)return;
+  speakSyncKey=key;
+  if(!['day','trial'].includes(game.phase))return;
+  speakSyncBusy=true;
+  try{renderPlayer();}finally{speakSyncBusy=false;}
+}
+function squarePanelHtml(voteBody=''){
+  const voting=['nomination','vote','verdict'].includes(game.phase);
+  if(voting){
+    const title=game.phase==='nomination'?discussionText('الترشيح','Nomination'):game.phase==='verdict'?discussionText('الحكم','Verdict'):discussionText('التصويت','Voting');
+    return `${nowTaskHtml()}<div class="square-block vote-home"><h3>${title}</h3>${voteBody}</div>`;
+  }
+  const talk=discussionBoardHtml(false);
+  const view=typeof clientDiscussion==='function'?clientDiscussion():{};
+  const roundTalkDone=game.phase==='day'&&view.round===game.round&&view.id&&(view.complete||view.status==='done');
+  const waiting=roundTalkDone?`<p class="pick-hint is-set">${discussionText('النقاش انتهى. انتظر بدء التصويت.','Discussion is over. Wait for voting to start.')}</p>`:'';
+  const causes={
+    mafia_kill:['اغتالته المافيا','Killed by Mafia'], vote_eliminated:['استُبعد بالتصويت','Voted out'], trial_guilty:['أُدين بالحكم','Voted guilty'],
+    vigilante_kill:['طلقة القناص','Sniper shot'], serial_kill:['اغتيال القاتل المتسلسل','Serial Killer'], witch_poison:['سم الساحرة','Witch poison'],
+    jailer_executed:['إعدام السجّان','Jailer execution'], lovers_died:['مات مع شريكه','Linked partner'], host_expelled:['استبعده المضيف','Host expelled'], eliminated:['خرج','Eliminated']
+  };
+  const deathRows=(game.eliminations||[]).map(p=>{const label=causes[p.reason]||causes.eliminated;return `<p>☠️ <b>${escapeHtml(p.name)}</b> — ${discussionText(...label)}</p>`;}).join('')
+    ||(game.lastDeaths||[]).map(id=>`<p>☠️ ${escapeHtml(nameOf(id))}</p>`).join('');
+  const dead=`<div class="square-block"><h3>${discussionText('من مات','Who died')}</h3>${deathRows||`<p>${discussionText('لم يمت أحد','Nobody died')}</p>`}</div>`;
+  const news=announcementEvents().map((e)=>`<p class="${/_saved$/.test(e)?'square-save':''}">${squareEventLine(e)}</p>`).join('');
+  const announce=news?`<div class="square-block"><h3>${discussionText('الإعلان','Announcements')}</h3>${news}</div>`:'';
+  const vote=voteBody?`<div class="square-block"><h3>${discussionText('التصويت','Vote')}</h3>${voteBody}</div>`:'';
+  return [talk,waiting,nowTaskHtml(),announce,dead,vote].filter(Boolean).join('')||`<p class="muted">${discussionText('ما فيه خبر الحين.','Nothing to show yet.')}</p>`;
+}
 function wrapCyclePlay(cycle, actionHtml) {
   const isDay = cycle === 'day';
   const isNight = cycle === 'night';
-  const view = typeof clientDiscussion === 'function' ? clientDiscussion() : {status:'off'};
-  const draw = isDay && typeof openingDrawActive === 'function' && openingDrawActive(view);
-  const talk = isDay ? discussionPanel(false) : '';
-  const hasPick = /class="[^"]*\bpick\b/.test(actionHtml);
-  const talkBlock = !talk ? '' : (draw ? talk : `<details class="cycle-talk" data-disclosure-key="cycle-talk"${hasPick?'':' open'}><summary>${discussionText('النقاش','Discussion')}</summary>${talk}</details>`);
   const extra = isNight || isDay ? bossDiscussionChoice() : '';
+  const speak=speakTurnHtml();
   const detectHits=(game.me?.investigationResults||[]).filter(r=>r.round===game.round);
   const detect=isDay&&game.me?.role==='detective'?investigationPanel():'';
   const action=extractDockAction(actionHtml);
   const votes=voteSummaryCard();
   const voteNeed=['nomination','vote','verdict','trial'].includes(game.phase);
-  const abilityTitle=voteNeed?(detectHits.length?discussionText('نتيجة الفحص','Investigation result'):discussionText('قدرتي','Ability')):(roleActTitle()||discussionText('قدرتي','Ability'));
-  const abilityBody=voteNeed?detect:[detect,extra,action].filter(Boolean).join('');
-  const voteBody=voteNeed?[action,votes].filter(Boolean).join(''):votes;
-  const auto=detectHits.length?'ability':(votes||voteNeed?'vote':(abilityBody?'ability':''));
-  const key=[game.matchId,game.round,game.phase,detectHits.length,!!game.voteSummary].join('|');
+  const abilityTitle=speak?discussionText('دورك في النقاش','Your turn to speak'):(voteNeed?(detectHits.length?discussionText('نتيجة الفحص','Investigation result'):discussionText('قدرتي','Ability')):(roleActTitle()||discussionText('قدرتي','Ability')));
+  const abilityBody=[speak,voteNeed?detect:[detect,extra,action].filter(Boolean).join('')].filter(Boolean).join('');
+  const voteBody=voteNeed?[action,votes].filter(Boolean).join(''):'';
+  const squareBody=squarePanelHtml(voteBody);
+  const view=typeof clientDiscussion==='function'?clientDiscussion():{};
+  const votingHome=['nomination','vote','verdict'].includes(game.phase);
+  const auto=votingHome?'none':(speak||detectHits.length||dockHasAction(voteNeed?detect:[extra,action].join(''))?'ability':'none');
+  const key=[game.matchId,game.round,game.phase,detectHits.length,!!game.voteSummary,(game.lastDeaths||[]).join(','),view.speakerId||'',speak].join('|');
   if(key!==dockAutoKey){dockAutoKey=key;pendingDockPlay.tab=auto;}
-  pendingDockPlay={...pendingDockPlay,abilityTitle,abilityBody,voteBody};
+  if(pendingDockPlay.tab==='square'||pendingDockPlay.tab==='vote')pendingDockPlay.tab='none';
+  pendingDockPlay={...pendingDockPlay,abilityTitle,abilityBody,voteBody,squareBody};
   if(pendingDockPlay.tab!=='none'&&!pendingDockPlay.tab)pendingDockPlay.tab=auto;
-  return `${phaseBar()}<div class="phase-play ${cycle}-play">${isDay?morningBriefPanel():''}${talkBlock}</div>`;
+  return `${phaseBar()}<div class="phase-play ${cycle}-play square-home">${squareBody}</div>`;
 }
 function morningBriefPanel(embedded=false) {
   const deaths = (game.lastDeaths || []).map((id) => `<div class="event danger-text">☠️ ${escapeHtml(nameOf(id))}</div>`).join('');
@@ -1568,11 +1909,11 @@ function renderDay() {
   const me = game.me;
   if (me.role === 'jailer') {
     const targets = alivePlayers().filter((player) => player.id !== playerId);
-    $('#app').innerHTML = `<div class="card">${me.jailerSelected ? '' : `<h2>من ستسجن الليلة؟</h2>${choiceButtons(targets, 'jailPlayer', { icon: '🔐' })}`}</div>`;
+    $('#app').innerHTML = `<div class="card"><h2>من ستسجن الليلة؟</h2>${choiceButtons(targets, 'jailPlayer', { icon: '🔐' })}</div>`;
     return;
   }
   if (me.role === 'lawyer') {
-    $('#app').innerHTML = `<div class="card">${me.acted ? '' : `<h2>من ستحمي من التصويت؟</h2>${choiceButtons(alivePlayers(), 'lawyerProtect', { icon: '⚖️' })}`}</div>`;
+    $('#app').innerHTML = `<div class="card"><h2>من ستحمي من التصويت؟</h2>${choiceButtons(alivePlayers(), 'lawyerProtect', { icon: '⚖️' })}</div>`;
     return;
   }
   $('#app').innerHTML = '';
@@ -1581,7 +1922,7 @@ function renderVote() {
   const me = game.me;
   const targets = alivePlayers().filter((player) => player.id !== playerId);
   const nomination=game.phase==='nomination';
-  $('#app').innerHTML = `<div class="card">${me.voted?'':`<h2>${nomination?discussionText('من تريد محاكمته؟','Who should stand trial?'):discussionText('اختر لاعبًا','Choose a player')}</h2>`}${choiceButtons(targets,'castVote')}${game.enabledRoles?.allow_no_vote?`<button class="pick skip" onclick="castVote('SKIP')">✋ ${discussionText('تخطي','Skip')}</button>`:''}</div>`;
+  $('#app').innerHTML = `<div class="card"><h2>${nomination?discussionText('من تريد محاكمته؟','Who should stand trial?'):discussionText('اختر لاعبًا','Choose a player')}</h2>${choiceButtons(targets,'castVote')}${game.enabledRoles?.allow_no_vote?skipPick('castVote','SKIP',`✋ ${discussionText('تخطي','Skip')}`):''}</div>`;
 }
 
 let actionFeedback = null;
@@ -1592,13 +1933,17 @@ function paintActionFeedback(){
   if(!actionFeedback || actionFeedback.context!==actionContext())return;
   const {state,target}=actionFeedback;
   const displayTarget=target.replace(/^(SAVE|POISON):/,'');
-  const label=game.players.find(p=>p.id===displayTarget)?.name || ({SKIP:discussionText('تخطي','Skip'),GUILTY:discussionText('مذنب','Guilty'),INNOCENT:discussionText('بريء','Innocent')})[target] || '';
-  const message=state==='pending'?discussionText('جاري إرسال الاختيار…','Sending choice…'):state==='success'?discussionText('✓ تم تسجيل اختيارك','✓ Choice recorded'):discussionText('تعذر تأكيد الإرسال. تحقق من الاتصال والحالة قبل المحاولة مجددًا.','Could not confirm delivery. Check your connection and current state before trying again.');
+  const label=game.players.find(p=>p.id===displayTarget)?.name || ({SKIP:discussionText('تخطي','Skip'),GUILTY:discussionText('مذنب','Guilty'),INNOCENT:discussionText('بريء','Innocent'),SPARE:discussionText('إطلاقه','Spare'),EXECUTE:discussionText('إعدامه','Execute'),COUNT:discussionText('كشف','Reveal')})[target] || '';
+  const message=state==='pending'?discussionText('جاري إرسال الاختيار…','Sending choice…'):state==='success'?discussionText('✓ تم تسجيل اختيارك — يمكنك تغييره','✓ Choice saved — you can change it'):discussionText('تعذر تأكيد الإرسال. تحقق من الاتصال والحالة قبل المحاولة مجددًا.','Could not confirm delivery. Check your connection and current state before trying again.');
   const card=document.createElement('p');card.id='actionFeedback';card.className='status action-feedback '+state;card.setAttribute('role',state==='error'?'alert':'status');card.setAttribute('data-no-translate','');card.textContent=message+(label?' — '+label:'');
-  document.querySelector('#app .phase-bar')?.insertAdjacentElement('afterend',card) || document.getElementById('app').prepend(card);
-  for(const button of document.querySelectorAll('#app .pick')){
+  document.querySelector('.player-dock .dock-play')?.insertAdjacentElement('afterbegin',card) || document.querySelector('#app .phase-bar')?.insertAdjacentElement('afterend',card) || document.getElementById('app')?.prepend(card);
+  for(const button of document.querySelectorAll('.pick')){
     button.disabled=state==='pending';
-    if(button.dataset.target)button.setAttribute('aria-pressed',String(button.dataset.target===displayTarget));
+    if(button.dataset.target){
+      const pressed=isPicked(button.dataset.target)||button.dataset.target===displayTarget;
+      button.setAttribute('aria-pressed',String(pressed));
+      button.classList.toggle('is-picked',pressed);
+    }
   }
 }
 async function playerAction(action, target) {
@@ -1711,6 +2056,7 @@ function renderWithNotices(content,controller=false) {
 }
 function renderPlayer(){
   setShowingRole(!!(game?.me?.alive && !roleAcknowledged() && !['lobby','finished'].includes(game.phase)));
+  document.body.classList.remove('host-tv-mode');
   renderWithNotices(renderPlayerContent);
   if(!roleAcknowledged())return;
   enhanceJourney(false);
@@ -1752,6 +2098,7 @@ function playerTaskHint() {
     return discussionText('لا توجد قدرة ليلية لك الآن. انتظر الصباح.','You have no night action now. Wait for morning.');
   }
   if(game.phase==='day') {
+    if(mySpeakTurn())return discussionText('دورك تتكلم الآن. تقدر تتخطى بعد ما تخلص.','It is your turn to speak. You can skip when you are done.');
     if(me.role==='jailer')return me.jailerSelected?discussionText('تم اختيار السجين. شارك في النقاش وانتظر التصويت.','Prisoner selected. Join discussion and wait for voting.'):discussionText('اختر لاعبًا ليسجن في الليلة القادمة.','Choose one player to jail tonight.');
     if(me.role==='lawyer')return me.acted?discussionText('تم تسجيل حماية التصويت. شارك في النقاش.','Vote protection recorded. Join discussion.'):discussionText('اختر لاعبًا لتحميه من نتيجة التصويت.','Choose one player to protect from voting.');
     return discussionText('شارك في النقاش وراقب التناقضات حتى يبدأ التصويت.','Join discussion and watch for contradictions until voting starts.');
@@ -1766,11 +2113,12 @@ function enhanceJourney(controller){
   if(!game)return;
   if(!document.querySelector('#app .phase-bar'))$('#app').insertAdjacentHTML('afterbegin',phaseBar());
   const hint=controller?controllerTaskHint():playerTaskHint();
-  if(hint){const node=document.createElement('section');node.className='journey-hint next-action-hint';node.setAttribute('data-no-translate','');node.innerHTML=`<b>${discussionText('المطلوب الآن','Now')}</b><p>${escapeHtml(hint)}</p>`;document.querySelector('#app .phase-bar').insertAdjacentElement('afterend',node);}
+  const playerHome=game.me?.alive&&!controller&&!['lobby','reveal','finished','paused'].includes(game.phase);
+  if(hint&&!playerHome&&!controller){const node=document.createElement('section');node.className='journey-hint next-action-hint';node.setAttribute('data-no-translate','');node.innerHTML=`<b>${discussionText('المطلوب الآن','Now')}</b><p>${escapeHtml(hint)}</p>`;document.querySelector('#app .phase-bar').insertAdjacentElement('afterend',node);}
   document.querySelectorAll('.setup-tabs button').forEach((button,index)=>{if(index+1===setupStep)button.setAttribute('aria-current','step');});
   paintActionFeedback();updatePhaseTimer();
 }
-function renderHost(){setShowingRole(false);renderWithNotices(renderHostContent,true);enhanceJourney(true);mountHostProgress();}
+function renderHost(){setShowingRole(false);document.body.classList.toggle('host-tv-mode',!!(game?.phase&&game.phase!=='lobby'));renderWithNotices(renderHostContent,true);enhanceJourney(true);if(game?.phase==='lobby')mountHostProgress();}
 function renderSpectator(){renderWithNotices(renderSpectatorContent);}
 
 function disciplineButtons(player) {
@@ -1794,38 +2142,8 @@ async function submitDiscipline(target,action) {
 let hostProgressObserver;
 function mountHostProgress() {
   hostProgressObserver?.disconnect();
-  if (game?.phase !== 'lobby') return;
-  const app = document.querySelector('#app');
-  const lobby = true;
-  const actions = {reveal:'beginNight',night:'resolveNight',day:'startVote',nomination:'resolveVote',trial:'advanceVerdict',verdict:'resolveVote',vote:'resolveVote',paused:'togglePause'};
-  const handler = lobby ? (setupStep < 3 ? 'setSetupStep(' + (setupStep + 1) + ')' : 'startGame()') : actions[game?.phase] ? "hostAction('" + actions[game.phase] + "')" : '';
-  const scope = app.querySelector(lobby ? '.setup-card' : '.hero');
-  const primary = [...(scope?.querySelectorAll('button') || [])].find(button => !button.closest('.setup-tabs') && button.getAttribute('onclick') === handler);
-  if (!primary) return;
-  const dock = document.createElement('nav');
-  dock.className = 'host-progress';
-  dock.setAttribute('aria-label', discussionText('متابعة إعداد ومراحل المباراة','Game setup and phase controls'));
-  dock.innerHTML = '<div class="host-progress-info" data-no-translate><strong id="hostProgressTitle"></strong><span id="hostProgressStatus" role="status"></span></div><div class="host-progress-actions"></div>';
-  const controls = dock.querySelector('.host-progress-actions');
-  if (lobby && setupStep > 1) {
-    const back = document.createElement('button');
-    back.type = 'button';back.className = 'btn host-progress-back';
-    back.textContent = discussionText('رجوع','Back');
-    back.setAttribute('data-no-translate','');
-    back.setAttribute('onclick', 'setSetupStep(' + (setupStep - 1) + ')');
-    controls.append(back);
-    // The dock is the single place for setup navigation.
-    for (const button of scope.querySelectorAll('button')) {
-      if (button !== primary && !button.closest('.setup-tabs') && button.getAttribute('onclick') === 'setSetupStep(' + (setupStep - 1) + ')') button.remove();
-    }
-  }
-  primary.dataset.progressPrimary = '';
-  primary.setAttribute('aria-describedby','hostProgressStatus');
-  controls.append(primary);
-  app.append(dock);
-  const measure = () => document.documentElement.style.setProperty('--host-progress-height', Math.ceil(dock.getBoundingClientRect().height) + 'px');
-  hostProgressObserver = new ResizeObserver(measure);hostProgressObserver.observe(dock);
-  updateHostProgress();measure();
+  document.querySelector('.host-progress')?.remove();
+  return;
 }
 function updateHostProgress() {
   const dock = document.querySelector('.host-progress');
