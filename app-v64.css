@@ -879,6 +879,9 @@ body:has(.noir-entry) .utility-bar .fullscreen-toggle{display:none}
 .noir-site-footer{margin:18px 0 0;font-size:13px}
 .noir-site-footer a{color:#c9a85a;font-weight:800;text-decoration:none;border-bottom:1px solid #c9a85a44}
 .noir-site-footer a:hover{color:#e8c882}
+.noir-site-footer{display:flex;align-items:center;justify-content:center;gap:10px}
+.app-version{display:inline-flex;align-items:center;padding:2px 8px;border:1px solid #c9a85a66;border-radius:999px;color:#e4c873;font-size:.9em;font-weight:800;letter-spacing:.04em;white-space:nowrap}
+body.light .app-version{border-color:#70501e66;color:#70501e}
 .noir-subpage .noir-content-wide{max-width:720px}
 .noir-subpage .auth-card{max-width:100%!important;text-align:start!important}
 .noir-subpage .noir-links{max-width:460px;margin-inline:auto}
