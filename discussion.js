@@ -120,10 +120,17 @@ function finishDiscussionEarly() {
 }
 
 function bossDiscussionChoice() {
-  if (game.me?.role !== 'mafia_boss' || !game.me.alive || !['night','day'].includes(game.phase) || game.enabledRoles?.discussion_mode !== 'turns' || (game.discussion?.id && game.discussion.round === game.round)) return '';
-  const claim = game.me.discussionClaim === true;
-  if(game.me.discussionChoiceLocked)return `<section class="card" data-no-translate><p>${discussionText(claim?'اختيارك ثابت لنهاية القيم: المشاركة كشرطي مزيف.':'اختيارك ثابت لنهاية القيم: البقاء متخفّيًا.',claim?'Your choice for this game: participate as a fake detective.':'Your choice for this game: stay undercover.')}</p></section>`;
-  return `<section class="card" data-no-translate><h2>${discussionText('اختيارك السري للنقاش','Your private discussion choice')}</h2><p>${discussionText('تقدر تبقى متخفّي وتتكلم بدورك العادي، أو تبدأ النقاش وتدّعي بنفسك إنك شرطي. اختيارك مرة واحدة ويثبت لنهاية القيم. إذا ما اخترت قبل أول نقاش، تبقى متخفّيًا.','Stay undercover and speak on your normal turn, or open discussion and claim to be a detective yourself. Choose once for the entire game. If you do not choose before the first discussion, you stay undercover.')}</p><div class="actions"><button class="btn ${!claim?'green':''}" aria-pressed="${!claim}" onclick="setBossDiscussionClaim(false)">${discussionText('أبقى متخفّي','Stay undercover')}</button><button class="btn ${claim?'green':''}" aria-pressed="${claim}" onclick="setBossDiscussionClaim(true)">${discussionText('أبدأ كشرطي مزيف','Open as a fake detective')}</button></div></section>`;
+  if (game.me?.role !== 'mafia_boss' || !game.me.alive || !['reveal','night','day'].includes(game.phase)) return '';
+  const claim = game.me.discussionClaim === true || game.me.fakeDetectiveClaimActive === true;
+  let content;
+  if (game.enabledRoles?.discussion_mode !== 'turns') {
+    content = '<p>المشاركة كشرطي مزيف تتطلب اختيار نظام النقاش «بالدور» من إعدادات اللعبة.</p>';
+  } else if (game.me.discussionChoiceLocked || (game.discussion?.id && game.discussion.round === game.round)) {
+    content = '<p>' + (claim ? 'أنت مشارك كشرطي مزيف في النقاش.' : 'خيار الدخول كشرطي مزيف غير متاح الآن؛ انتهت فرصته أو تم تثبيت اختيارك.') + '</p>';
+  } else {
+    content = '<p>اختر البقاء متخفّيًا أو الدخول كشرطي مزيف. الاختيار نهائي؛ إذا تبي تتنازل، سلّم القيادة أولًا ليختار الزعيم الجديد.</p><div class="actions"><button class="btn" onclick="setBossDiscussionClaim(false)">أبقى متخفّي</button><button class="btn green" onclick="setBossDiscussionClaim(true)">أبدأ كشرطي مزيف</button></div>';
+  }
+  return '<section id="bossDiscussionChoice" class="card" data-no-translate><h2>اختيارك السري للنقاش</h2>' + content + '</section>';
 }
 async function setBossDiscussionClaim(claim) {
   if (discussionRequestPending) return;
