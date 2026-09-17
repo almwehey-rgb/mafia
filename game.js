@@ -1261,7 +1261,7 @@ function renderHostContent() {
   }
   if (game.phase === 'day') {
     const ready = ((game.lawyerReady && game.jailerReady)||phaseTimeExpired()) && clientDiscussion().complete;
-    $('#app').innerHTML = hostTvFrame(`${announcementHtml()}<div class="role-title">${discussionText('الصباح','Morning')}</div><button class="btn gold wide" data-discussion-vote ${ready ? '' : 'disabled'} onclick="hostAction('startVote')">${discussionText('بدء التصويت','Start voting')}</button>`);
+    $('#app').innerHTML = hostTvFrame(`${announcementHtml()}<div class="role-title">${discussionText('الصباح','Morning')}</div>${discussionPanel(true)}<button class="btn gold wide" data-discussion-vote ${ready ? '' : 'disabled'} onclick="hostAction('startVote')">${discussionText('بدء التصويت','Start voting')}</button>`);
     return;
   }
   if (game.phase === 'nomination') {
@@ -1896,7 +1896,7 @@ function squarePanelHtml(voteBody=''){
 function wrapCyclePlay(cycle, actionHtml) {
   const isDay = cycle === 'day';
   const isNight = cycle === 'night';
-  const extra = isNight || isDay ? bossDiscussionChoice() : '';
+  const extra = '';
   const speak=speakTurnHtml();
   const detectHits=(game.me?.investigationResults||[]).filter(r=>r.round===game.round);
   const detect=isDay&&game.me?.role==='detective'?investigationPanel():'';
@@ -2030,9 +2030,9 @@ async function resignMafiaLeader(successor){
  const target=(game.me.mafiaTeam||[]).find(p=>p.id===successor);
  if(!target)return;
  if(!confirm('تسليم قيادة المافيا إلى '+target.name+'؟'))return;
- dismissResignOffer();
  try{
-  game=await api({action:'electMafiaLeader',code:game.code,id:playerId,playerToken,target:'RESIGN',successor});
+  const targetId = typeof game.me.fakeDetectiveRightAvailable === 'boolean' ? successor : 'RESIGN';
+  game=await api({action:'electMafiaLeader',code:game.code,id:playerId,playerToken,target:targetId,successor});
   renderPlayer();
  }catch{notice(discussionText('تعذر تسليم القيادة.','Could not transfer leadership.'));}
 }
@@ -2043,9 +2043,9 @@ function leaderElectionCard(){
   return `<section id="leaderElectionCard" class="card"><h2>اختيار زعيم المافيا الجديد</h2><p>تصويت سري بعد التنازل. الأكثر أصواتًا يصبح الزعيم، والتعادل بقرعة. تنتهي المهلة خلال 30 ثانية، وتبقى القيادة الحالية حتى حسم البديل.</p>${ended?'<button class="btn gold" onclick="electMafiaLeader(&quot;FINALIZE&quot;)">حسم التصويت وتحديث الكروت</button>':game.me.leaderVote?'<p>تم تسجيل صوتك. بانتظار بقية الفريق.</p>':choiceButtons((game.me.mafiaTeam||[]).filter(p=>p.id!==game.me.leaderFormer&&p.alive!==false),'electMafiaLeader',{icon:'👑'})}</section>`;
  }
  if(game.me.role!=='mafia_boss'||!(game.me.mafiaTeam||[]).some(p=>p.id!==game.me.id&&p.alive!==false))return '';
- if(localStorage.getItem(resignOfferKey())==='done')return '';
- const successors=(game.me.mafiaTeam||[]).filter(p=>p.id!==game.me.id&&p.alive!==false);
- return `<section id="leaderElectionCard" class="card" data-no-translate><h3>${discussionText('تسليم قيادة المافيا','Transfer Mafia leadership')}</h3><p>${discussionText('اختر فرد المافيا الذي يستلم الزعامة مباشرة.','Choose the Mafia member who will become the Boss immediately.')}</p>${successors.map(p=>`<button class="btn red wide" onclick="resignMafiaLeader('${String(p.id).replace(/'/g,'&#39;')}')">👑 ${escapeHtml(p.name)}</button>`).join('')}<button class="btn wide" type="button" onclick="dismissResignOffer()">${discussionText('إخفاء — يظهر مرة واحدة','Hide — shown once')}</button></section>`;
+ const successors=(game.me.mafiaTeam||[]).filter(p=>p.id!==game.me.id&&game.players.some(x=>x.id===p.id&&x.alive));
+ if(!successors.length)return '<section id="leaderElectionCard" class="card"><p>لا يوجد عضو مافيا حي لتسليمه القيادة.</p></section>';
+ return `<section id="leaderElectionCard" class="card" data-no-translate><h3>${discussionText('تسليم قيادة المافيا','Transfer Mafia leadership')}</h3><p>${discussionText('اختر فرد المافيا الذي يستلم الزعامة مباشرة.','Choose the Mafia member who will become the Boss immediately.')}</p>${successors.map(p=>`<button class="btn red wide" onclick="resignMafiaLeader('${String(p.id).replace(/'/g,'&#39;')}')">👑 ${escapeHtml(p.name)}</button>`).join('')}</section>`;
 }
 function voteSummaryCard() {
   const summary=game?.voteSummary;
@@ -2069,7 +2069,8 @@ function renderWithNotices(content,controller=false) {
     }
     if(!roleAcknowledged() && !controller)return;
     if(game?.me?.isHost && !controller && !document.getElementById('controllerNotice'))$('#app').insertAdjacentHTML('afterbegin','<section id="controllerNotice" class="status"><p>👑 أنت تدير الغرفة الآن.</p><button class="btn" onclick="toggleDelegatedHost()">فتح تحكم المضيف</button></section>');
-    if(!document.getElementById('leaderElectionCard'))$('#app').insertAdjacentHTML('afterbegin',leaderElectionCard());
+    if(!controller && !document.getElementById('bossDiscussionChoice'))$('#app').insertAdjacentHTML('afterbegin',bossDiscussionChoice());
+    if(!controller && !document.getElementById('leaderElectionCard'))$('#app').insertAdjacentHTML('afterbegin',leaderElectionCard());
     if(game?.me?.alive&&game.me.mafiaCountResult&&!document.getElementById('revealerResult')){const result=game.me.mafiaCountResult;$('#app').insertAdjacentHTML('afterbegin',`<section id="revealerResult" class="card" data-no-translate><h3>${discussionText('📡 نتيجة كشف الجولة','📡 Reveal result, round')} ${escapeHtml(result.round)}</h3><p>${discussionText('عدد المافيا الباقين عند إعلان الصباح','Mafia alive at dawn')}: <strong>${escapeHtml(result.count)}</strong></p></section>`);}
     if(controller && !document.getElementById('voteSummaryNotice'))$('#app').insertAdjacentHTML('afterbegin',voteSummaryCard());
     if(!document.getElementById('eliminationNotice'))$('#app').insertAdjacentHTML('afterbegin',eliminationNotice());
