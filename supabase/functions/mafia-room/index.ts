@@ -1149,7 +1149,8 @@ async function routeElectMafiaLeader(context:RoomRouteContext) {
  if(context.room.enabled_roles?.leader_election?.pending&&!context.room.enabled_roles.leader_election.former)return routeInitialMafiaLeader(context);
  const {body,code,now}=context;
  let {room,players,me}=context;
- if(!me?.alive||!mafiaRole(me.role)||['lobby','finished','paused'].includes(room.phase))return out({error:'UNAUTHORIZED'},403);
+ // Leadership handover is allowed only while role cards are being revealed.
+ if(!me?.alive||!mafiaRole(me.role)||room.phase!=='reveal')return out({error:'UNAUTHORIZED'},403);
  let election=room.enabled_roles?.leader_election;
  if(body.target==='RESIGN'){
   if(me.role!=='mafia_boss'||election?.pending)return out({error:'INVALID_ACTION'},409);
