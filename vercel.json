@@ -1,23 +1,12 @@
 {
-  "headers": [
+  "routes": [
     {
-      "source": "/assets/:path*",
-      "headers": [
-        {
-          "key": "Cache-Control",
-          "value": "public, max-age=31536000, immutable"
-        }
-      ]
-    }
-  ],
-  "rewrites": [
-    {
-      "source": "/game.js",
-      "destination": "/old-game.js"
+      "src": "/game\\.js",
+      "dest": "/old-game.js"
     },
     {
-      "source": "/:path*",
-      "destination": "https://mafia-night-1lv1ns6ni-tm-d73f.vercel.app/:path*"
+      "src": "/(.*)",
+      "dest": "https://mafia-night-1lv1ns6ni-tm-d73f.vercel.app/$1"
     }
   ]
 }
