@@ -10,7 +10,8 @@ async function routeAddBot(context:RoomRouteContext) {
       while(players.some(p=>p.name.toLowerCase()===botName.toLowerCase())) botName = `${base} ${count++}`;
       const styles = ["skeptic", "quiet", "bold", "empathetic", "chaotic"];
       const style = styles[players.filter(p=>p.is_bot).length % styles.length];
-      const bot = { room_code: code, id: crypto.randomUUID(), name: botName, is_bot: true, session_token: null, last_seen: new Date().toISOString(), role_state: { botStyle: style, botMemory: { suspicion: {}, claims: [], votes: [] } } };
+      const difficulty = ['easy','balanced','hard'].includes(room.enabled_roles?.solo_difficulty) ? room.enabled_roles.solo_difficulty : 'balanced';
+      const bot = { room_code: code, id: crypto.randomUUID(), name: botName, is_bot: true, session_token: null, last_seen: new Date().toISOString(), role_state: { botStyle: style, botDifficulty: difficulty, botMemory: { suspicion: {}, claims: [], votes: [] } } };
       const { error } = await db.from("mafia_players").insert(bot);
       if (error) throw error;
       ({ room, players } = await load(code));

@@ -47,7 +47,9 @@ async function botVotes(room: any, players: any[], verdict = false) {
     const nonMafia = candidates.filter((x) => !mafiaRole(x.role));
     const state=roleState(bot), suspicion=state.botMemory?.suspicion||{};
     const ranked=[...(mafiaRole(bot.role)?nonMafia:candidates)].sort((a,b)=>(Number(suspicion[b.id]||0)-Number(suspicion[a.id]||0)));
-    const likely=ranked[0] || randomItem(candidates);
+    const difficulty=state.botDifficulty || room.enabled_roles?.solo_difficulty || 'balanced';
+    const randomChance=difficulty==='easy' ? .55 : difficulty==='hard' ? .05 : .2;
+    const likely=(Math.random()<randomChance ? randomItem(ranked) : ranked[0]) || randomItem(candidates);
     const value = verdict ? (Math.random() < (mafiaRole(bot.role) ? .35 : .68) ? "GUILTY" : "INNOCENT") : (likely?.id || "SKIP");
     state.botMemory={...state.botMemory,suspicion:{...suspicion,...(likely?{[likely.id]:Number(suspicion[likely.id]||0)+1}:{})},votes:[...(state.botMemory?.votes||[]),{round:room.round,target:likely?.id||null}]};
     await persist(db.from("mafia_players").update({role_state:state}).eq("room_code",room.code).eq("id",bot.id));

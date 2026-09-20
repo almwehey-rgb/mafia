@@ -13,8 +13,10 @@ async function createSoloRoom() {
   spectatorMode=false;delegatedHostMode=false;playerId='';playerToken='';
   const soloName = (window.prompt('اكتب اسمك في اللعبة / Enter your name', 'أنت') || '').trim().slice(0,20);
   if (!soloName) return;
+  const chosenDifficulty = (window.prompt('اختر الصعوبة: easy أو balanced أو hard', 'balanced') || 'balanced').trim().toLowerCase();
+  const soloDifficulty = ['easy','balanced','hard'].includes(chosenDifficulty) ? chosenDifficulty : 'balanced';
   try {
-    game = await withBusy('جاري تجهيز لعبة فردية… / Preparing solo game…', () => api({ action: 'create', hostAccessToken, mafiaCount: 2, detectiveCount: 1, detectiveQuestions: 3, enabledRoles: { ...enabledRoles, solo_mode: true } }));
+    game = await withBusy('جاري تجهيز لعبة فردية… / Preparing solo game…', () => api({ action: 'create', hostAccessToken, mafiaCount: 2, detectiveCount: 1, detectiveQuestions: 3, enabledRoles: { ...enabledRoles, solo_mode: true, solo_difficulty: soloDifficulty } }));
     hostToken = game.hostToken;
     enabledRoles = normalizeEnabledRoles(game.enabledRoles);
     saveSession(true);

@@ -1,5 +1,5 @@
 {
-  "release": "7df0fce88e3fef64",
+  "release": "5a2cc28580ea7e92",
   "versions": {
     "/admin-qr.js": "48c79c1232616fe4",
     "/admin-remote.js": "2d5d891309bc1b62",
@@ -11,7 +11,7 @@
     "/discussion.js": "de9b53c0a9184ed5",
     "/experience.css": "d7c78778fc925ae3",
     "/feature-loader.js": "26e816103fea3f02",
-    "/game.js": "51b6fefc73fec6f6",
+    "/game.js": "a15001e28e381f20",
     "/landscape.css": "53d4018f2189e419",
     "/large-type.css": "6483889eeeaff1cf",
     "/layout-refresh.css": "6d8e1166c64b868c",
