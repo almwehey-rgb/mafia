@@ -33,6 +33,8 @@ const enabledRoles = (value: any) => {
   discussion_seconds: [30, 60, 120, 180, 300, 600, 900, 1800, 3600].includes(+value?.discussion_seconds) ? +value.discussion_seconds : 180,
   speaker_seconds: [15, 30, 45, 60, 90, 120].includes(+value?.speaker_seconds) ? +value.speaker_seconds : 30,
   paused_phase: ["reveal", "night", "day", "nomination", "trial", "verdict", "vote"].includes(value?.paused_phase) ? value.paused_phase : null,
+  solo_mode: value?.solo_mode === true,
+  solo_difficulty: ["easy", "balanced", "hard"].includes(value?.solo_difficulty) ? value.solo_difficulty : "balanced",
   });
 };
 const mafiaKillEnabledForRound = (room: any) => {
