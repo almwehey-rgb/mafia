@@ -4,8 +4,8 @@ function eliminationNotice() {
     vigilante_kill:['طلقة القناص الأخيرة','Sniper final shot'], serial_kill:['اغتيال القاتل المتسلسل','Killed by Serial Killer'], witch_poison:['سم الساحرة','Witch poison'],
     jailer_executed:['إعدام السجّان','Jailer execution'], lovers_died:['الارتباط بلاعب مستبعد','Linked partner eliminated'], host_expelled:['استبعاد من المضيف','Expelled by host'], eliminated:['الاستبعاد','Eliminated']
   };
-  const rows=(game?.eliminations||[]).map(p=>{const label=causes[p.reason]||causes.eliminated;return `<p><b>${escapeHtml(p.name)}</b> — ${discussionText(...label)}${p.detail?`: ${escapeHtml(p.detail)}`:''}</p>`;}).join('');
-  return rows?`<section id="eliminationNotice" class="card elimination-notice" role="status" data-no-translate><b>${discussionText('المستبعدون','Eliminated players')}</b>${rows}</section>`:'';
+  const rows=(game?.eliminations||[]).map(p=>{const label=causes[p.reason]||causes.eliminated;const kind=p.reason==='vote_eliminated'||p.reason==='trial_guilty'?'vote':p.reason==='serial_kill'?'serial':p.reason==='mafia_kill'?'mafia':'other';return `<p class="elimination-row elimination-${kind}"><span class="elimination-mark" aria-hidden="true">${kind==='vote'?'⚖️':kind==='serial'?'🩸':kind==='mafia'?'🗡️':'☠️'}</span><b>${escapeHtml(p.name)}</b> — ${discussionText(...label)}${p.detail?`: ${escapeHtml(p.detail)}`:''}</p>`;}).join('');
+  return rows?`<section id="eliminationNotice" class="card elimination-notice elimination-card" role="status" data-no-translate><b>${discussionText('المستبعدون','Eliminated players')}</b>${rows}</section>`:'';
 }
 function renderPendingShot(controller=false) {
   const shot=game?.pendingShot;

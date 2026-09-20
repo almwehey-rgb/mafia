@@ -523,6 +523,10 @@ test('Language labels use one language and preserve numeric counters',()=>{
 });
 
 test('Chat receiver reads without sending; latest 80 messages and channel isolation',async()=>{
+ const publicFixture=fixture();
+ const publicSend=await publicFixture.call('sendMessage',{id:'a',playerToken:'token-a',text:'أشك في bot'});
+ assert.equal(publicSend.status,200);
+ assert.equal(publicFixture.messages.some(m=>m.author_id==='bot'&&m.content.includes('bot')),true);
  const f=fixture();f.rooms[0].phase='night';f.players[0].role='mafia_boss';f.players[1].role='mafia';f.players[2].role='jailer';
  const a={id:'a',playerToken:'token-a'},b={id:'b',playerToken:'token-b'};
  assert.equal((await f.call('sendMessage',{...a,text:'hello'})).status,200);

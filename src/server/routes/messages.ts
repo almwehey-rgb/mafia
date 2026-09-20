@@ -14,7 +14,7 @@ async function routeMessages(context:RoomRouteContext) {
           await rememberPublicMessage(room, players, me, content);
           const replies = botRepliesForPublicMessage(room, players, me, content);
           if (replies.length) {
-            const { error: replyError } = await db.from("mafia_messages").insert(replies.slice(0, 1));
+            const { error: replyError } = await db.from("mafia_messages").insert(replies[0]);
             if (replyError) throw replyError;
           }
         }
