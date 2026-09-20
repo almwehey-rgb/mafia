@@ -55,7 +55,7 @@ function discussionRoulette(view) {
   const order = view.order.filter(id=>candidates.includes(id));
   const duration = openingDrawDuration(view);
   const geometry = openingDrawGeometry(candidates, winner);
-  const colors = ['#66acb3','#d4a856','#9472b2','#77994f','#bc778b','#5488b6','#bb794b','#638f80','#8c83bc'];
+  const colors = ['#66acb3','#d4a856','#9472b2','#77994f','#bc778b','#5488b6','#bb794b','#638f80','#8c83bc'].map((color,i)=>`var(--draw-color-${i+1},${color})`);
   const chance = `${100 % candidates.length ? '≈ ' : ''}${geometry.chance}${discussionText('٪','%')}`;
   const sectors = candidates.map((id,i) => `${colors[i % colors.length]} ${i*geometry.size}deg ${(i+1)*geometry.size}deg`).join(',');
   const labels = candidates.map((id,i) => {

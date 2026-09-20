@@ -291,6 +291,17 @@ async function rememberPublicMessage(room:any, players:any[], author:any, conten
   }
 }
 
+function botRepliesForPublicMessage(room:any, players:any[], author:any, content:string) {
+  const mentioned=players.filter((p:any)=>p.alive&&p.id!==author.id&&content.includes(p.name));
+  if (!mentioned.length) return [];
+  const target=mentioned[0];
+  return players.filter((p:any)=>p.is_bot&&p.alive).slice(0,2).map((bot:any)=>{
+    const style=roleState(bot).botStyle||'quiet';
+    const text=style==='bold' ? `أتفق أن ${target.name} يحتاج يوضح موقفه.` : style==='empathetic' ? `خلونا نعطي ${target.name} فرصة يشرح.` : style==='skeptic' ? `شنو الدليل على ${target.name}؟ نحتاج واقعة محددة.` : `سمعت الاتهام ضد ${target.name}، نراقب رده.`;
+    return {room_code:room.code,round:room.round,channel:'public',author_id:bot.id,author_name:bot.name,content:text};
+  });
+}
+
 async function botVotes(room: any, players: any[], verdict = false) {
   const alive = players.filter((x) => x.alive);
   for (const bot of alive.filter((x) => x.is_bot && !x.vote_target && (!verdict || x.id !== room.accused_player))) {
@@ -1153,6 +1164,11 @@ async function routeMessages(context:RoomRouteContext) {
           const { error: insertError } = await db.from("mafia_messages").insert({ room_code: code, round: room.round, channel: "public", author_id: me.id, author_name: me.name, content });
           if (insertError) throw insertError;
           await rememberPublicMessage(room, players, me, content);
+          const replies = botRepliesForPublicMessage(room, players, me, content);
+          if (replies.length) {
+            const { error: replyError } = await db.from("mafia_messages").insert(replies.slice(0, 1));
+            if (replyError) throw replyError;
+          }
         }
         const beforeId = typeof body.beforeId === "string" ? body.beforeId : null;
         let query = db.from("mafia_messages").select("id,author_id,author_name,content,created_at").eq("room_code", code).eq("round", room.round).eq("channel", "public");

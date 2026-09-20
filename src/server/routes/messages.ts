@@ -12,6 +12,11 @@ async function routeMessages(context:RoomRouteContext) {
           const { error: insertError } = await db.from("mafia_messages").insert({ room_code: code, round: room.round, channel: "public", author_id: me.id, author_name: me.name, content });
           if (insertError) throw insertError;
           await rememberPublicMessage(room, players, me, content);
+          const replies = botRepliesForPublicMessage(room, players, me, content);
+          if (replies.length) {
+            const { error: replyError } = await db.from("mafia_messages").insert(replies.slice(0, 1));
+            if (replyError) throw replyError;
+          }
         }
         const beforeId = typeof body.beforeId === "string" ? body.beforeId : null;
         let query = db.from("mafia_messages").select("id,author_id,author_name,content,created_at").eq("room_code", code).eq("round", room.round).eq("channel", "public");
