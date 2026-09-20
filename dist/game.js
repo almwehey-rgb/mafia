@@ -518,6 +518,8 @@ async function createRoom() {
 }
 async function createSoloRoom() {
   spectatorMode=false;delegatedHostMode=false;playerId='';playerToken='';
+  const soloName = (window.prompt('اكتب اسمك في اللعبة / Enter your name', 'أنت') || '').trim().slice(0,20);
+  if (!soloName) return;
   try {
     game = await withBusy('جاري تجهيز لعبة فردية… / Preparing solo game…', () => api({ action: 'create', hostAccessToken, mafiaCount: 2, detectiveCount: 1, detectiveQuestions: 3, enabledRoles }));
     hostToken = game.hostToken;
@@ -528,8 +530,12 @@ async function createSoloRoom() {
       game = await api({ action: 'addBot', code: game.code, hostToken, id: playerId, playerToken });
       if (game.players.length <= before) break;
     }
-    renderHost();
-    startPolling(true);
+    playerId = crypto.randomUUID();
+    playerToken = crypto.randomUUID();
+    game = await api({ action: 'join', code: game.code, id: playerId, playerToken, profileToken, name: soloName });
+    saveSession(false);
+    renderPlayer();
+    startPolling(false);
   } catch (error) {
     if (error.code === 'UNAUTHORIZED') logoutHost();
     else alert('تعذر تجهيز اللعبة الفردية / Could not prepare solo game');
