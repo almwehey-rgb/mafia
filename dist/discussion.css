@@ -63,3 +63,23 @@ body.light .opening-roulette.clear-draw{background:#fffaf0!important;color:#382b
 body.light .draw-contenders>span{background:#e9f0ec;color:#304b45}body.light .draw-contenders>span:nth-child(even){background:#f5e8c9;color:#5b421c}body.light .draw-contenders i,body.light .draw-wait-note{color:#795721}
 @media(prefers-reduced-motion:reduce){.animated-draw .draw-after{animation:draw-result var(--draw-duration,6000ms) steps(1,end) both;animation-delay:var(--draw-delay);animation-play-state:var(--draw-play,running)}.draw-suspense-track i{animation:none;transform:none}.draw-name-stage:before{content:'✦';grid-area:1/1;color:#d6b46d}}
 .bot-discussion-feed{margin:12px 0;padding:10px;border:1px solid rgba(206,166,70,.35);border-radius:12px;background:rgba(20,18,14,.55);text-align:start}.bot-discussion-feed h3{margin:0 0 8px;color:#d5b566;font-size:.9rem}.bot-discussion-line{display:flex;gap:8px;padding:6px 0;border-top:1px solid rgba(255,255,255,.08);font-size:.9rem}.bot-discussion-line b{white-space:nowrap;color:#e7d19a}.bot-discussion-line span{color:#eee}
+
+/* Equal sectors mirror the server draw; animation never chooses a new winner. */
+.fair-draw-wheel{position:relative;width:min(100%,260px);aspect-ratio:1;margin:12px auto 26px;direction:ltr;isolation:isolate}
+.fair-draw-disc{position:absolute;inset:0;overflow:hidden;border:7px solid #f0d49b;box-sizing:border-box;border-radius:50%;box-shadow:0 0 0 3px #5d492b,0 12px 28px #0005;animation:fair-draw-spin var(--draw-duration) cubic-bezier(.12,.05,.05,1) both;animation-delay:var(--draw-delay);animation-play-state:var(--draw-play)}
+.fair-draw-pointer{position:absolute;z-index:3;top:-12px;left:calc(50% - 15px);width:30px;height:36px;background:#fff3d1;clip-path:polygon(0 0,100% 0,50% 100%);filter:drop-shadow(0 2px 2px #0009)}
+.fair-draw-hub{position:absolute;inset:calc(50% - 24px);display:grid;place-items:center;border:3px solid #f3d79b;border-radius:50%;background:#202821;color:#f5d28b;font-size:26px;box-shadow:0 3px 8px #0005}
+.fair-draw-sector{position:absolute;display:grid;justify-items:center;gap:3px;transform:translate(-50%,-50%);color:#102522;line-height:1.1;animation:fair-draw-label var(--draw-duration) cubic-bezier(.12,.05,.05,1) both;animation-delay:var(--draw-delay);animation-play-state:var(--draw-play)}
+.fair-draw-sector b{font-size:clamp(24px,6vw,36px);font-weight:900}.fair-draw-sector small{font-size:16px;font-weight:800}
+.fair-draw .draw-contenders{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.fair-draw .draw-contenders>span{grid-template-rows:auto 1fr auto auto;gap:7px;border-top:4px solid var(--contender-color);padding:12px 9px;background:#ffffff05;color:#fff1d4}
+.fair-draw .draw-contenders i{display:grid;place-items:center;width:28px;height:28px;border-radius:50%;background:var(--contender-color);color:#102522;font-size:16px;font-weight:900}
+.fair-draw .draw-contenders bdi{align-self:center;line-height:1.45}.fair-draw .draw-chance{font-size:30px;line-height:1.2;color:#f9dfa8;font-variant-numeric:tabular-nums}.fair-draw .draw-contenders small{font-size:12px;color:#d6c9b0}
+.fair-draw .draw-selected{padding:15px 12px;animation:none}.fair-draw .draw-name-stage{min-height:64px}.fair-draw .draw-name-stage>*{grid-area:1/1;min-width:0;overflow-wrap:anywhere}
+.fair-draw .draw-before{font-size:22px;color:#ddcba7;animation:fair-draw-pending var(--draw-duration) steps(1,end) both;animation-delay:var(--draw-delay);animation-play-state:var(--draw-play)}
+@keyframes fair-draw-spin{from{transform:rotate(0deg)}to{transform:rotate(var(--draw-rotation))}}
+@keyframes fair-draw-label{from{transform:translate(-50%,-50%) rotate(0deg)}to{transform:translate(-50%,-50%) rotate(calc(-1 * var(--draw-rotation)))}}
+@keyframes fair-draw-pending{from{opacity:1;visibility:visible}to{opacity:0;visibility:hidden}}
+body.light .fair-draw .draw-contenders>span{background:#fff9ec;color:#382b19}body.light .fair-draw .draw-chance{color:#654717}body.light .fair-draw .draw-contenders small,body.light .fair-draw .draw-before{color:#705d3a}
+@media(max-width:360px){.fair-draw .draw-contenders{gap:8px}.fair-draw .draw-contenders bdi{font-size:16px}.fair-draw .draw-chance{font-size:26px}}
+@media(prefers-reduced-motion:reduce){.fair-draw-disc,.fair-draw-sector{animation-timing-function:steps(1,end)}.fair-draw .draw-name-stage:before{content:none}}

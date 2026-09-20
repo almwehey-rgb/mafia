@@ -1,5 +1,5 @@
 let unreadChat=false,chatNoticeAt=0,chatNoticePending=false;
-function chatReadKey(){return `mafia-chat-read-${game?.code}-${playerId}-${game?.round}-${game?.me?.jailed||game?.me?.role==='jailer'?'jail':'mafia'}`;}
+function chatReadKey(){return `mafia-chat-read-${game?.code}-${playerId}-${game?.round}-${game?.phase==='day'?'public':(game?.me?.jailed||game?.me?.role==='jailer'?'jail':'mafia')}`;}
 function chatHasUnread(){return unreadChat&&chatAllowed();}
 function markChatRead(messages){const latest=messages?.at(-1);if(latest)localStorage.setItem(chatReadKey(),String(latest.id));unreadChat=false;document.querySelector('[data-chat-button]')?.replaceChildren(document.createTextNode('💬 محادثة / Chat'));}
 async function pollChatNotification(){
@@ -18,7 +18,7 @@ let chatEpoch = 0;
 let chatSending = false;
 let chatRevision = 0;
 function stopChatPolling(){clearTimeout(chatTimer);chatEpoch++;}
-function chatAllowed(){return game?.me?.alive && (game.me.jailed||['mafia','mafia_boss','jailer'].includes(game.me.role)) && (game.phase==='night' || (game.phase==='paused' && game.enabledRoles?.paused_phase==='night'));}
+function chatAllowed(){return game?.me?.alive && (game.phase==='day' || game.me.jailed||['mafia','mafia_boss','jailer'].includes(game.me.role)) && (game.phase==='day' || game.phase==='night' || (game.phase==='paused' && game.enabledRoles?.paused_phase==='night'));}
 function chatMessageHtml(messages){return messages.map(m=>`<div class="chat-message"><b data-no-translate>${escapeHtml(m.author_name)}</b><span data-no-translate>${escapeHtml(m.content)}</span></div>`).join('')||`<p>${discussionText('ابدأ المحادثة.','Start the conversation.')}</p>`;}
 function updateChatMessages(result,older=false){
  const list=document.querySelector('.chat-list');if(!list)return;
@@ -60,7 +60,7 @@ async function openChat(){
 }
 function renderChatSheet(result){
  chatCache=[];chatOlderCursor=null;chatHasOlder=false;
- const label=result.channel==='mafia'?discussionText('🔪 محادثة المافيا','🔪 Mafia chat'):discussionText('🔐 محادثة السجن','🔐 Jail chat');
+ const label=result.channel==='public'?discussionText('☀️ النقاش العام','☀️ Public discussion'):result.channel==='mafia'?discussionText('🔪 محادثة المافيا','🔪 Mafia chat'):discussionText('🔐 محادثة السجن','🔐 Jail chat');
  openSheet(label,`<button class="btn" data-chat-older data-no-translate onclick="loadOlderChat()">${discussionText('رسائل أقدم','Older messages')}</button><div class="chat-list" tabindex="0" role="region" aria-label="${discussionText('رسائل المحادثة','Chat messages')}" aria-live="polite"></div><p class="chat-status" data-no-translate role="status"></p>${game.me.muted?`<div class="status wait">${discussionText('تم كتمك بواسطة المضيف','You were muted by the host')}</div>`:`<div class="chat-compose"><input class="input" id="chatText" maxlength="240" placeholder="${discussionText('اكتب رسالة','Write a message')}"><button class="btn red" id="chatSend" onclick="sendChat()">${discussionText('إرسال','Send')}</button></div>`}`);
  updateChatMessages(result);const list=document.querySelector('.chat-list');list.scrollTop=list.scrollHeight;
  document.querySelector('#chatText')?.addEventListener('keydown',event=>{if(event.key==='Enter'&&!event.isComposing){event.preventDefault();sendChat();}});

@@ -14,7 +14,7 @@ alter table public.mafia_reports add constraint mafia_reports_pkey PRIMARY KEY (
 alter table public.mafia_rooms add constraint mafia_rooms_pkey PRIMARY KEY (code);
 alter table public.mafia_season_stats add constraint mafia_season_stats_pkey PRIMARY KEY (profile_token, season);
 alter table public.mafia_messages add constraint mafia_messages_content_check CHECK (((char_length(content) >= 1) AND (char_length(content) <= 240)));
-alter table public.mafia_messages add constraint mafia_messages_channel_check CHECK ((channel = ANY (ARRAY['mafia'::text, 'jail'::text])));
+alter table public.mafia_messages add constraint mafia_messages_channel_check CHECK ((channel = ANY (ARRAY['public'::text, 'mafia'::text, 'jail'::text])));
 alter table public.mafia_messages add constraint mafia_messages_room_code_fkey FOREIGN KEY (room_code) REFERENCES mafia_rooms(code) ON DELETE CASCADE;
 alter table public.mafia_players add constraint mafia_players_role_check CHECK (((role IS NULL) OR (role = ANY (ARRAY['mafia'::text, 'mafia_boss'::text, 'doctor'::text, 'detective'::text, 'lawyer'::text, 'jailer'::text, 'vigilante'::text, 'witch'::text, 'serial_killer'::text, 'jester'::text, 'cupid'::text, 'escort'::text, 'citizen'::text, 'revealer'::text]))));
 alter table public.mafia_players add constraint mafia_players_name_check CHECK (((char_length(name) >= 1) AND (char_length(name) <= 20)));

@@ -36,6 +36,16 @@ function changeDiscussionSetting(key, value) {
 function openingDrawDuration(view){return Number(view?.roulette?.duration)||6000;}
 function openingDrawElapsed(view){return Math.max(0,(view.pausedAt||Date.now()+discussionClockOffset)-(view.roulette?.at||0));}
 function openingDrawActive(view){return view.mode==='turns'&&!view.complete&&view.index===0&&view.roulette&&openingDrawElapsed(view)<openingDrawDuration(view);}
+function openingDrawGeometry(candidates, winner) {
+  const size = 360 / candidates.length;
+  const winnerIndex = candidates.indexOf(winner);
+  return {
+    size,
+    // The fixed pointer is at twelve o'clock; land at the winner's sector centre.
+    rotation: 5 * 360 + (360 - (winnerIndex + .5) * size) % 360,
+    chance: Number((100 / candidates.length).toFixed(1)),
+  };
+}
 function discussionRoulette(view) {
   if(!view.roulette || view.mode!=='turns' || view.complete)return '';
   const candidates = view.roulette.candidates || [];
@@ -44,9 +54,15 @@ function discussionRoulette(view) {
   const elapsed = openingDrawElapsed(view);
   const order = view.order.filter(id=>candidates.includes(id));
   const duration = openingDrawDuration(view);
-  const stops = [0,90,180,280,390,510,650,800,970,1160,1370,1600,1860,2150,2470,2830,3230,3680,4180,4730,5330,6000].map(n=>n*duration/6000);
-  const frames = stops.slice(0,-1).map((start,i)=>`<bdi class="draw-name-frame" style="animation-duration:${stops[i+1]-start}ms;animation-delay:${start-elapsed}ms" aria-hidden="true">${escapeHtml(nameOf(candidates[i%candidates.length]))}</bdi>`).join('');
-  return `<details class="opening-roulette clear-draw animated-draw" style="--draw-duration:${duration}ms;--draw-delay:-${Math.min(elapsed,duration)}ms;--draw-play:${view.pausedAt?'paused':'running'}" ${view.index===0?'open':''} data-no-translate><summary><span>${discussionText('قرعة بداية النقاش','Opening draw')}</span><bdi class="draw-after">${escapeHtml(nameOf(winner))}</bdi><span class="draw-chevron" aria-hidden="true">⌄</span></summary><div class="draw-content"><div class="draw-heading"><span class="draw-emblem" aria-hidden="true">✦</span><div><h3>${discussionText('من يبدأ النقاش؟','Who speaks first?')}</h3><p>${discussionText('من يفتتح المواجهة؟ القرعة تحسمها…','Who opens the showdown? Let the draw decide…')}</p></div></div><div class="draw-contenders">${candidates.map(id=>`<span><i aria-hidden="true">✦</i><bdi>${escapeHtml(nameOf(id))}</bdi></span>`).join('')}</div><div class="draw-suspense-track" aria-hidden="true"><i></i></div><div class="draw-selected" style="animation-delay:-${Math.min(elapsed,500)}ms"><span class="draw-label">${discussionText('المتحدث الأول','FIRST SPEAKER')}</span><strong class="draw-name-stage">${frames}<bdi class="draw-after draw-final">${escapeHtml(nameOf(winner))}</bdi></strong><span class="draw-selected-note draw-after">${discussionText('اختارته القرعة لافتتاح النقاش','Selected by the draw to open the discussion')}</span></div><div class="draw-order-heading draw-after">${discussionText('ترتيب المشاركين في القرعة','Draw participants in speaking order')}<span>${order.length}</span></div><ol class="draw-order draw-after">${order.map((id,i)=>`<li class="${id===winner?'draw-first':''}"><span class="draw-position">${i+1}</span><bdi>${escapeHtml(nameOf(id))}</bdi><small>${i===0?discussionText('الأول','First'):i===1?discussionText('الثاني','Second'):discussionText('بالترتيب','In order')}</small></li>`).join('')}</ol></div></details>`;
+  const geometry = openingDrawGeometry(candidates, winner);
+  const colors = ['#397f87','#d4a856','#9472b2','#77994f','#bc778b','#5488b6','#bb794b','#638f80','#8c83bc'];
+  const chance = `${100 % candidates.length ? '≈ ' : ''}${geometry.chance}${discussionText('٪','%')}`;
+  const sectors = candidates.map((id,i) => `${colors[i % colors.length]} ${i*geometry.size}deg ${(i+1)*geometry.size}deg`).join(',');
+  const labels = candidates.map((id,i) => {
+    const angle = (i+.5)*geometry.size*Math.PI/180;
+    return `<span class="fair-draw-sector" style="left:${50+Math.sin(angle)*32}%;top:${50-Math.cos(angle)*32}%"><b>${i+1}</b>${candidates.length===2?`<small>${chance}</small>`:''}</span>`;
+  }).join('');
+  return `<details class="opening-roulette clear-draw animated-draw fair-draw" style="--draw-duration:${duration}ms;--draw-delay:-${Math.min(elapsed,duration)}ms;--draw-play:${view.pausedAt?'paused':'running'};--draw-rotation:${geometry.rotation}deg" ${view.index===0?'open':''} data-no-translate><summary><span>${discussionText('قرعة بداية النقاش','Opening draw')}</span><bdi class="draw-after">${escapeHtml(nameOf(winner))}</bdi><span class="draw-chevron" aria-hidden="true">⌄</span></summary><div class="draw-content"><div class="draw-heading"><span class="draw-emblem" aria-hidden="true">✦</span><div><h3>${discussionText('من يبدأ النقاش؟','Who speaks first?')}</h3><p>${discussionText('فرص متساوية · القرعة تحدد من يبدأ','Equal chances · The draw chooses who starts')}</p></div></div><div class="fair-draw-wheel" aria-hidden="true"><span class="fair-draw-pointer"></span><div class="fair-draw-disc" style="background:conic-gradient(${sectors})">${labels}</div><span class="fair-draw-hub">✦</span></div><div class="draw-contenders">${candidates.map((id,i)=>`<span style="--contender-color:${colors[i%colors.length]}"><i aria-hidden="true">${i+1}</i><bdi>${escapeHtml(nameOf(id))}</bdi><strong class="draw-chance" dir="ltr">${chance}</strong><small>${discussionText('فرصة البداية','Chance to start')}</small></span>`).join('')}</div><div class="draw-selected"><span class="draw-label">${discussionText('المتحدث الأول','FIRST SPEAKER')}</span><strong class="draw-name-stage"><span class="draw-before">${discussionText('القرعة تدور…','Drawing…')}</span><bdi class="draw-after draw-final">${escapeHtml(nameOf(winner))}</bdi></strong><span class="draw-selected-note draw-after">${discussionText('اختارته القرعة لافتتاح النقاش','Selected by the draw to open the discussion')}</span></div><div class="draw-order-heading draw-after">${discussionText('ترتيب المشاركين في القرعة','Draw participants in speaking order')}<span>${order.length}</span></div><ol class="draw-order draw-after">${order.map((id,i)=>`<li class="${id===winner?'draw-first':''}"><span class="draw-position">${i+1}</span><bdi>${escapeHtml(nameOf(id))}</bdi><small>${i===0?discussionText('الأول','First'):i===1?discussionText('الثاني','Second'):discussionText('بالترتيب','In order')}</small></li>`).join('')}</ol></div></details>`;
 }
 function discussionQueue(view) {
   if(view.mode!=='turns'||!view.order?.length)return '';
