@@ -82,4 +82,10 @@ body.light .draw-contenders>span{background:#e9f0ec;color:#304b45}body.light .dr
 @keyframes fair-draw-pending{from{opacity:1;visibility:visible}to{opacity:0;visibility:hidden}}
 body.light .fair-draw .draw-contenders>span{background:#fff9ec;color:#382b19}body.light .fair-draw .draw-chance{color:#654717}body.light .fair-draw .draw-contenders small,body.light .fair-draw .draw-before{color:#705d3a}
 @media(max-width:360px){.fair-draw .draw-contenders{gap:8px}.fair-draw .draw-contenders bdi{font-size:16px}.fair-draw .draw-chance{font-size:26px}}
-@media(prefers-reduced-motion:reduce){.fair-draw-disc,.fair-draw-sector{animation-timing-function:steps(1,end)}.fair-draw .draw-name-stage:before{content:none}}
+@media(prefers-reduced-motion:reduce){
+ .fair-draw .draw-name-stage:before{content:none}
+ .fair-draw:not(.draw-settled) .draw-after{opacity:0;visibility:hidden}
+ .fair-draw.draw-settled .draw-before{display:none}
+ .fair-draw.draw-settled .fair-draw-disc{transform:rotate(var(--draw-rotation))}
+ .fair-draw.draw-settled .fair-draw-sector{transform:translate(-50%,-50%) rotate(calc(-1 * var(--draw-rotation)))}
+}

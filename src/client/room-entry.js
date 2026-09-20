@@ -14,7 +14,7 @@ async function createSoloRoom() {
   const soloName = (window.prompt('اكتب اسمك في اللعبة / Enter your name', 'أنت') || '').trim().slice(0,20);
   if (!soloName) return;
   try {
-    game = await withBusy('جاري تجهيز لعبة فردية… / Preparing solo game…', () => api({ action: 'create', hostAccessToken, mafiaCount: 2, detectiveCount: 1, detectiveQuestions: 3, enabledRoles }));
+    game = await withBusy('جاري تجهيز لعبة فردية… / Preparing solo game…', () => api({ action: 'create', hostAccessToken, mafiaCount: 2, detectiveCount: 1, detectiveQuestions: 3, enabledRoles: { ...enabledRoles, solo_mode: true } }));
     hostToken = game.hostToken;
     enabledRoles = normalizeEnabledRoles(game.enabledRoles);
     saveSession(true);
