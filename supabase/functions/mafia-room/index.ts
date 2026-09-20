@@ -257,10 +257,19 @@ async function botDayActions(room: any, players: any[]) {
   if (lawyer && !lawyer.action_target) await db.from("mafia_players").update({ action_target: randomItem(alive)?.id || null }).eq("room_code", room.code).eq("id", lawyer.id);
 }
 
+function botDiscussionLines(room: any, players: any[]) {
+  const alive = players.filter((x) => x.alive && x.is_bot);
+  const civilianLines = ["أراقب التصويت قبل ما أتهم أحد.", "في شيء غير منطقي في اختيارات الليلة.", "خلونا نقارن كلام كل لاعب بدل التصويت العشوائي."];
+  const mafiaLines = ["أشعر أن الاتهام المبكر يخدم المافيا.", "لا تستعجلوا الحكم، نحتاج دليلًا أقوى.", "أنا أراقب من يغيّر كلامه بسرعة."];
+  return alive.map((bot, index) => ({ id: `${room.round}-${bot.id}`, playerId: bot.id, name: bot.name, text: mafiaRole(bot.role) ? mafiaLines[index % mafiaLines.length] : civilianLines[index % civilianLines.length] }));
+}
+
 async function botVotes(room: any, players: any[], verdict = false) {
   const alive = players.filter((x) => x.alive);
   for (const bot of alive.filter((x) => x.is_bot && !x.vote_target && (!verdict || x.id !== room.accused_player))) {
-    const value = verdict ? (Math.random() < .55 ? "GUILTY" : "INNOCENT") : (randomItem(alive.filter((x) => x.id !== bot.id))?.id || "SKIP");
+    const candidates = alive.filter((x) => x.id !== bot.id);
+    const nonMafia = candidates.filter((x) => !mafiaRole(x.role));
+    const value = verdict ? (Math.random() < (mafiaRole(bot.role) ? .35 : .68) ? "GUILTY" : "INNOCENT") : (randomItem(mafiaRole(bot.role) ? nonMafia : candidates)?.id || "SKIP");
     await persist(db.from("mafia_players").update({ vote_target: value }).eq("room_code", room.code).eq("id", bot.id));
   }
 }
@@ -1413,7 +1422,7 @@ async function routeStartDiscussion(context:RoomRouteContext) {
       const seconds = body.seconds === undefined ? (settings.discussion_mode === "turns" ? settings.speaker_seconds : settings.discussion_seconds) : Number(body.seconds);
       if (!choices.includes(seconds)) return out({ error: "INVALID_DURATION" }, 400);
       const speakingAt = now + (roulette?.duration || 0);
-      const state = { id: crypto.randomUUID(), version: 0, round: room.round, mode: settings.discussion_mode, seconds, order, roulette, firstSpeakerId: starter?.id || order[0] || null, cursor: 0, turnStartedAt: speakingAt, endsAt: speakingAt + seconds * 1000, pausedAt: null, finished: false };
+      const state = { id: crypto.randomUUID(), version: 0, round: room.round, mode: settings.discussion_mode, seconds, order, roulette, firstSpeakerId: starter?.id || order[0] || null, cursor: 0, turnStartedAt: speakingAt, endsAt: speakingAt + seconds * 1000, pausedAt: null, finished: false, botLines: botDiscussionLines(room, players) };
       const { error } = await db.from("mafia_rooms").update({ enabled_roles: { ...room.enabled_roles, discussion_state: state } }).eq("code", code).eq("phase", "day").eq("enabled_roles", JSON.stringify(room.enabled_roles));
       if (error) throw error;
       ({ room, players } = await load(code));

@@ -28,10 +28,19 @@ async function botDayActions(room: any, players: any[]) {
   if (lawyer && !lawyer.action_target) await db.from("mafia_players").update({ action_target: randomItem(alive)?.id || null }).eq("room_code", room.code).eq("id", lawyer.id);
 }
 
+function botDiscussionLines(room: any, players: any[]) {
+  const alive = players.filter((x) => x.alive && x.is_bot);
+  const civilianLines = ["أراقب التصويت قبل ما أتهم أحد.", "في شيء غير منطقي في اختيارات الليلة.", "خلونا نقارن كلام كل لاعب بدل التصويت العشوائي."];
+  const mafiaLines = ["أشعر أن الاتهام المبكر يخدم المافيا.", "لا تستعجلوا الحكم، نحتاج دليلًا أقوى.", "أنا أراقب من يغيّر كلامه بسرعة."];
+  return alive.map((bot, index) => ({ id: `${room.round}-${bot.id}`, playerId: bot.id, name: bot.name, text: mafiaRole(bot.role) ? mafiaLines[index % mafiaLines.length] : civilianLines[index % civilianLines.length] }));
+}
+
 async function botVotes(room: any, players: any[], verdict = false) {
   const alive = players.filter((x) => x.alive);
   for (const bot of alive.filter((x) => x.is_bot && !x.vote_target && (!verdict || x.id !== room.accused_player))) {
-    const value = verdict ? (Math.random() < .55 ? "GUILTY" : "INNOCENT") : (randomItem(alive.filter((x) => x.id !== bot.id))?.id || "SKIP");
+    const candidates = alive.filter((x) => x.id !== bot.id);
+    const nonMafia = candidates.filter((x) => !mafiaRole(x.role));
+    const value = verdict ? (Math.random() < (mafiaRole(bot.role) ? .35 : .68) ? "GUILTY" : "INNOCENT") : (randomItem(mafiaRole(bot.role) ? nonMafia : candidates)?.id || "SKIP");
     await persist(db.from("mafia_players").update({ vote_target: value }).eq("room_code", room.code).eq("id", bot.id));
   }
 }
