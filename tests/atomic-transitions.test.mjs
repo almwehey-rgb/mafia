@@ -147,7 +147,7 @@ test('Lobby kick revokes pending controller requests and bot refills use an avai
   assert.equal((await call(handler,'kick',{hostToken:null,id:'a',playerToken:'token-a',target:'c'})).status,409);
   assert.equal((await call(handler,'state',{hostToken:null,id:'a',playerToken:'token-a'})).status,403);
   for(let i=0;i<2;i++)assert.equal((await call(handler,'addBot',{lifecycleVersion:1})).status,200);
-  const bot=(await db.query("select id from mafia_players where name='BOT 1'")).rows[0];
+  const bot=(await db.query("select id from mafia_players where is_bot order by name limit 1")).rows[0];
   assert.equal((await call(handler,'kick',{target:bot.id,lifecycleVersion:1})).status,200);
   assert.equal((await call(handler,'addBot',{lifecycleVersion:2})).status,200);
   const botNames=(await db.query("select name from mafia_players where is_bot order by name")).rows.map(p=>p.name);
