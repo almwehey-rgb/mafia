@@ -19,7 +19,8 @@ let chatSending = false;
 let chatRevision = 0;
 function stopChatPolling(){clearTimeout(chatTimer);chatEpoch++;}
 function chatAllowed(){return game?.me?.alive && (game.phase==='day' || game.me.jailed||['mafia','mafia_boss','jailer'].includes(game.me.role)) && (game.phase==='day' || game.phase==='night' || (game.phase==='paused' && game.enabledRoles?.paused_phase==='night'));}
-function chatMessageHtml(messages){return messages.map(m=>`<div class="chat-message"><b data-no-translate>${escapeHtml(m.author_name)}</b><span data-no-translate>${escapeHtml(m.content)}</span></div>`).join('')||`<p>${discussionText('ابدأ المحادثة.','Start the conversation.')}</p>`;}
+function speakChatMessage(text){if(!('speechSynthesis' in window))return;window.speechSynthesis.cancel();const utterance=new SpeechSynthesisUtterance(String(text));utterance.lang='ar-SA';utterance.rate=.95;window.speechSynthesis.speak(utterance)}
+function chatMessageHtml(messages){return messages.map(m=>{const bot=game?.players?.some(p=>p.id===m.author_id&&p.isBot);return `<div class="chat-message"><b data-no-translate>${escapeHtml(m.author_name)}${bot?` <button class="chat-speak" type="button" aria-label="${discussionText('استماع لرسالة البوت','Listen to bot message')}" onclick="speakChatMessage(${jsArg(m.content)})">🔊</button>`:''}</b><span data-no-translate>${escapeHtml(m.content)}</span></div>`}).join('')||`<p>${discussionText('ابدأ المحادثة.','Start the conversation.')}</p>`;}
 function updateChatMessages(result,older=false){
  const list=document.querySelector('.chat-list');if(!list)return;
  const merged=new Map(chatCache.map(m=>[String(m.id),m]));

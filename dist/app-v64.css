@@ -285,6 +285,7 @@ body.light .opening-roulette.clear-draw{background:#fffaf0!important;color:#382b
 body.light .draw-contenders>span{background:#e9f0ec;color:#304b45}body.light .draw-contenders>span:nth-child(even){background:#f5e8c9;color:#5b421c}body.light .draw-contenders i,body.light .draw-wait-note{color:#795721}
 @media(prefers-reduced-motion:reduce){.animated-draw .draw-after{animation:draw-result var(--draw-duration,6000ms) steps(1,end) both;animation-delay:var(--draw-delay);animation-play-state:var(--draw-play,running)}.draw-suspense-track i{animation:none;transform:none}.draw-name-stage:before{content:'✦';grid-area:1/1;color:#d6b46d}}
 .bot-discussion-feed{margin:12px 0;padding:10px;border:1px solid rgba(206,166,70,.35);border-radius:12px;background:rgba(20,18,14,.55);text-align:start}.bot-discussion-feed h3{margin:0 0 8px;color:#d5b566;font-size:.9rem}.bot-discussion-line{display:flex;gap:8px;padding:6px 0;border-top:1px solid rgba(255,255,255,.08);font-size:.9rem}.bot-discussion-line b{white-space:nowrap;color:#e7d19a}.bot-discussion-line span{color:#eee}
+.chat-speak{border:0;background:transparent;color:#e8c27b;cursor:pointer;font-size:15px;padding:0 3px}
 
 /* Equal sectors mirror the server draw; animation never chooses a new winner. */
 .fair-draw-wheel{position:relative;width:min(100%,260px);aspect-ratio:1;margin:12px auto 26px;direction:ltr;isolation:isolate}
@@ -850,6 +851,7 @@ body.light :is(.logo small,.home-emblem p,.home-emblem span,.character-count,.no
 body.light .noir-entry { background: transparent; border-color: transparent; box-shadow: none; }
 body.light .noir-kicker { color: var(--red) !important; background: var(--day-soft); border-color: #eec1cb; }
 body.light .noir-kicker::before { background: var(--red); }
+body.light .noir-entry .auth-card label { color: var(--day-ink); }
 body.light .noir-divider { color: var(--red); }
 body.light .noir-divider::before,body.light .noir-divider::after { background: linear-gradient(90deg, transparent, #d9a4ae); }
 body.light .noir-deck::before { background: #d1d3d91a; }
