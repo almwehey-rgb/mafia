@@ -25,5 +25,5 @@ async function showLeaderboard() {
 }
 function showTrainingHelp() {
   setRoomTag('🤖');
-  $('#app').innerHTML = `<div class="card hero"><div class="role-title">🤖 التدريب بالبوتات</div><p>أنشئ غرفة، ثم اختر العدد الذي تريده من 2 إلى 20 لاعبًا. تقدر تتدرب وحدك أو تكمل العدد الناقص بأصدقاء وبوتات.</p><button class="btn red" onclick="createRoom()">إنشاء غرفة تدريب</button><button class="btn" onclick="home()">رجوع</button></div>`;
+  $('#app').innerHTML = `<div class="card hero"><div class="role-title">🤖 التدريب واللعب الفردي</div><p>ابدأ مباراة فردية مع ثمانية مقاعد من البوتات، أو أنشئ غرفة عادية واختر عدد اللاعبين بنفسك.</p><button class="btn red" onclick="createSoloRoom()">العب وحدك مع البوتات</button><button class="btn" onclick="createRoom()">إنشاء غرفة عادية</button><button class="btn" onclick="home()">رجوع</button></div>`;
 }

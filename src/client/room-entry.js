@@ -9,6 +9,25 @@ async function createRoom() {
     startPolling(true);
   } catch (error) { if (error.code === 'UNAUTHORIZED') { logoutHost(); alert('انتهت جلسة المضيف. سجّل الدخول من جديد.'); } else alert('تعذر إنشاء الغرفة / Could not create room'); }
 }
+async function createSoloRoom() {
+  spectatorMode=false;delegatedHostMode=false;playerId='';playerToken='';
+  try {
+    game = await withBusy('جاري تجهيز لعبة فردية… / Preparing solo game…', () => api({ action: 'create', hostAccessToken, mafiaCount: 2, detectiveCount: 1, detectiveQuestions: 3, enabledRoles }));
+    hostToken = game.hostToken;
+    enabledRoles = normalizeEnabledRoles(game.enabledRoles);
+    saveSession(true);
+    while (game.players.length < 8) {
+      const before = game.players.length;
+      game = await api({ action: 'addBot', code: game.code, hostToken, id: playerId, playerToken });
+      if (game.players.length <= before) break;
+    }
+    renderHost();
+    startPolling(true);
+  } catch (error) {
+    if (error.code === 'UNAUTHORIZED') logoutHost();
+    else alert('تعذر تجهيز اللعبة الفردية / Could not prepare solo game');
+  }
+}
 function joinForm(prefill = '') {
   spectatorMode=false;delegatedHostMode=false;
   hostToken = '';

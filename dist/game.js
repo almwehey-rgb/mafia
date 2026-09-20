@@ -431,7 +431,7 @@ async function showLeaderboard() {
 }
 function showTrainingHelp() {
   setRoomTag('🤖');
-  $('#app').innerHTML = `<div class="card hero"><div class="role-title">🤖 التدريب بالبوتات</div><p>أنشئ غرفة، ثم اختر العدد الذي تريده من 2 إلى 20 لاعبًا. تقدر تتدرب وحدك أو تكمل العدد الناقص بأصدقاء وبوتات.</p><button class="btn red" onclick="createRoom()">إنشاء غرفة تدريب</button><button class="btn" onclick="home()">رجوع</button></div>`;
+  $('#app').innerHTML = `<div class="card hero"><div class="role-title">🤖 التدريب واللعب الفردي</div><p>ابدأ مباراة فردية مع ثمانية مقاعد من البوتات، أو أنشئ غرفة عادية واختر عدد اللاعبين بنفسك.</p><button class="btn red" onclick="createSoloRoom()">العب وحدك مع البوتات</button><button class="btn" onclick="createRoom()">إنشاء غرفة عادية</button><button class="btn" onclick="home()">رجوع</button></div>`;
 }
 const reviewCardViews = new Map();
 const kidsCardRoles = new Set(['mafia_boss','mafia','detective','doctor','citizen']);
@@ -515,6 +515,25 @@ async function createRoom() {
     renderHost();
     startPolling(true);
   } catch (error) { if (error.code === 'UNAUTHORIZED') { logoutHost(); alert('انتهت جلسة المضيف. سجّل الدخول من جديد.'); } else alert('تعذر إنشاء الغرفة / Could not create room'); }
+}
+async function createSoloRoom() {
+  spectatorMode=false;delegatedHostMode=false;playerId='';playerToken='';
+  try {
+    game = await withBusy('جاري تجهيز لعبة فردية… / Preparing solo game…', () => api({ action: 'create', hostAccessToken, mafiaCount: 2, detectiveCount: 1, detectiveQuestions: 3, enabledRoles }));
+    hostToken = game.hostToken;
+    enabledRoles = normalizeEnabledRoles(game.enabledRoles);
+    saveSession(true);
+    while (game.players.length < 8) {
+      const before = game.players.length;
+      game = await api({ action: 'addBot', code: game.code, hostToken, id: playerId, playerToken });
+      if (game.players.length <= before) break;
+    }
+    renderHost();
+    startPolling(true);
+  } catch (error) {
+    if (error.code === 'UNAUTHORIZED') logoutHost();
+    else alert('تعذر تجهيز اللعبة الفردية / Could not prepare solo game');
+  }
 }
 function joinForm(prefill = '') {
   spectatorMode=false;delegatedHostMode=false;
