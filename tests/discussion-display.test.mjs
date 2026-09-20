@@ -41,3 +41,10 @@ test('Three-way draws show their actual equal share instead of claiming 50/50',(
  assert.match(html,/>a<|>b<|>c</);
  assert.doesNotMatch(html,/50%/);
 });
+
+test('Bot chat voice controls remain in the published client bundle',()=>{
+ const source=readFileSync(new URL('../dist/game.js',import.meta.url),'utf8');
+ assert.match(source,/function speakChatMessage\(/);
+ assert.match(source,/function stopChatSpeech\(/);
+ assert.match(source,/chat-speak/);
+});
