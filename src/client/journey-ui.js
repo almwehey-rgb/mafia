@@ -87,27 +87,14 @@ function renderPlayer(){
 function playerStepStatus() {
   const me=game?.me;
   if(!me||!me.alive||['lobby','finished','paused'].includes(game.phase))return '';
-  let state='wait',title=discussionText('انتظر المرحلة التالية','Wait for the next step'),detail=discussionText('لا يوجد إجراء مطلوب منك الآن.','No action is required from you right now.');
-  if(game.phase==='reveal'){
-    if(!roleAcknowledged()){state='action';title=discussionText('مطلوب منك الآن','Your action is needed');detail=discussionText('اقرأ دورك سرًا ثم أكد فهمه.','Read your role privately, then confirm it.');}
-    else{state='done';title=discussionText('أنت جاهز','You are ready');detail=discussionText('بانتظار تأكيد بقية اللاعبين.','Waiting for the other players to confirm.');}
-  }else if(document.querySelector('#app .pick:not(:disabled), #app .verdict-grid button:not(:disabled)')){
-    state='action';title=discussionText('مطلوب اختيارك','Choose now');detail=discussionText('اختر هدفك، ثم انتظر رسالة تأكيد التسجيل.','Choose a target, then wait for the saved confirmation.');
-  }else if(me.acted||me.voted){
-    state='done';title=discussionText('تم تسجيل اختيارك','Your choice is saved');detail=discussionText('راقب المرحلة؛ سيخبرك المضيف أو المؤقت بالخطوة التالية.','Watch the phase; the host or timer will show the next step.');
-  }else if(game.phase==='night'&&game.round===1&&me.role!=='detective'){
-    title=discussionText('لا إجراء لك هذه الليلة','No action for you tonight');detail=discussionText('الليلة الأولى للتحقيق فقط. انتظر إعلان الصباح.','The first night is for investigation only. Wait for morning.');
-  }else if(game.phase==='trial'){
-    title=game.accusedPlayer===playerId?discussionText('دافع عن نفسك الآن','Defend yourself now'):discussionText('استمع إلى دفاع المتهم','Listen to the defense');
-    detail=discussionText('يبدأ التصويت على الحكم بعد انتهاء الدفاع.','The verdict vote starts after the defense.');
-  }else if(game.phase==='day'){
-    title=discussionText('وقت النقاش','Discussion time');detail=discussionText('ناقش أحداث الجولة واستعد للتصويت.','Discuss the round and prepare to vote.');
-  }
-  return `<section class="player-step-status ${state}" data-no-translate role="status"><span>${state==='action'?'●':state==='done'?'✓':'○'}</span><div><strong>${escapeHtml(title)}</strong><small>${escapeHtml(detail)}</small></div></section>`;
+  const privateRole=!roleAcknowledged();
+  const title=privateRole?discussionText('لا تعرض دورك للآخرين.','Keep your role private.'):game.phase==='trial'?discussionText('التصويت على الحكم بعد الدفاع.','The verdict vote follows the defense.'):'';
+  if(!title)return '';
+  return `<section class="player-step-status wait" data-no-translate role="status"><span aria-hidden="true">${privateRole?'🔒':'○'}</span><div><strong>${escapeHtml(title)}</strong></div></section>`;
 }
 function setupSummary(roles, showCounts = true){
   const counts=[['mafia',roles.mafia],['doctor',roles.doctor],['detective',roles.detectives],['lawyer',roles.lawyer],['jailer',roles.jailer],['vigilante',roles.vigilante],['witch',roles.witch],['serial_killer',roles.serialKiller],['jester',roles.jester],['cupid',roles.cupid],['escort',roles.escort],['revealer',roles.revealer],['citizen',roles.citizens]];
-  return `<section class="setup-summary"><h2 data-no-translate>${discussionText('ملخص المباراة قبل التوزيع','Review before dealing')}</h2><p data-no-translate>${discussionText('اللاعبون','Players')}: <b>${game.players.length}</b> · ${discussionText('مهلة المرحلة','Phase time')}: <b>${phaseDuration}</b> ${discussionText('ثانية','seconds')}</p>${showCounts ? `<ul>${counts.filter(([,count])=>count>0).map(([role,count])=>`<li>${roleLabel(role)} <b>× ${count}</b></li>`).join('')}</ul>` : ''}<p data-no-translate>${discussionText('بعد التوزيع يقرأ الجميع أدوارهم ويؤكدونها، ثم تبدأ الليلة الأولى للمحقق فقط.','After dealing, everyone reads and confirms their role. The first night is for detectives only.')}</p></section>`;
+  return `<section class="setup-summary"><h2 data-no-translate>${discussionText('ملخص المباراة','Game summary')}</h2><p data-no-translate>${discussionText('اللاعبون','Players')}: <b>${game.players.length}</b> · ${discussionText('مهلة المرحلة','Phase time')}: <b>${phaseDuration}</b> ${discussionText('ثانية','seconds')}</p>${showCounts ? `<ul>${counts.filter(([,count])=>count>0).map(([role,count])=>`<li>${roleLabel(role)} <b>× ${count}</b></li>`).join('')}</ul>` : ''}<p data-no-translate>${discussionText('يؤكد الجميع أدوارهم قبل البداية. الليلة الأولى للمحقق فقط.','Everyone confirms their role before starting. The first night is for detectives only.')}</p></section>`;
 }
 function showMatchTools(){
   openSheet(discussionText('إدارة المباراة','Game management'),`<div data-no-translate><button class="btn wide" onclick="showModeration()">${discussionText('اللاعبون والبلاغات','Players and reports')}</button><section class="danger-zone"><h3>${discussionText('إنهاء نهائي','End permanently')}</h3><p>${discussionText('للاستراحة استخدم الإيقاف المؤقت. الإنهاء ينهي المباراة الحالية.','Use Pause for a break. Ending closes the current match.')}</p><button class="btn danger wide" onclick="endGame()">${discussionText('إنهاء المباراة','End match')}</button></section></div>`);
@@ -120,13 +107,6 @@ function enhanceJourney(controller){
     const statusHtml=playerStepStatus();
     if(statusHtml){const holder=document.createElement('div');holder.innerHTML=statusHtml;const status=holder.firstElementChild;status.id='playerStepStatus';document.querySelector('#app .phase-bar').insertAdjacentElement('afterend',status);}
   }
-  let hint='';
-  if(controller){
-    const messages={lobby:['شارك كود الغرفة، ثم اختر التشكيلة وراجع الملخص.','Share the room code, choose a preset, then review the summary.'],reveal:[`بانتظار تأكيد ${Math.max(0,game.players.length-(game.roleReadyCount||0))} لاعب. يبدأ الليل عند تأكيد الجميع.`,`Waiting for ${Math.max(0,game.players.length-(game.roleReadyCount||0))} players. Night can begin when everyone confirms.`],night:['إعلان الصباح متاح بعد اكتمال الاختيارات أو انتهاء المهلة.','Morning becomes available when choices are complete or time runs out.'],day:['بدء التصويت يتطلب انتهاء النقاش واكتمال قدرات النهار أو انتهاء مهلتها.','Voting requires discussion to finish and day abilities to complete or time out.'],nomination:['اختيار المتهم متاح بعد اكتمال الأصوات أو انتهاء المهلة.','Resolve nominations when all votes arrive or time runs out.'],verdict:['إعلان الحكم متاح بعد اكتمال الأصوات أو انتهاء المهلة.','Reveal the verdict when all votes arrive or time runs out.'],vote:['كشف النتيجة متاح بعد اكتمال الأصوات أو انتهاء المهلة.','Reveal the result when all votes arrive or time runs out.']};
-    if(messages[game.phase])hint=discussionText(...messages[game.phase]);
-  }else if(game.phase==='reveal'&&!roleAcknowledged())hint=discussionText('اقرأ شرح دورك بقلب البطاقة، ثم اضغط «فهمت دوري». لا تعرض شاشتك للآخرين.','Flip the card to read your role, then choose “I understand”. Keep your screen private.');
-  else if(game.me?.alive&&document.querySelector('#app .pick'))hint=discussionText('اضغط اسم الهدف لإرسال اختيارك. انتظر رسالة تأكيد التسجيل.','Tap a target to send your choice. Wait for confirmation that it was recorded.');
-  if(hint){const node=document.createElement('p');node.className='journey-hint';node.setAttribute('data-no-translate','');node.textContent=hint;(document.getElementById('playerStepStatus')||document.querySelector('#app .phase-bar')).insertAdjacentElement('afterend',node);}
   document.querySelectorAll('.setup-tabs button').forEach((button,index)=>{if(index+1===setupStep)button.setAttribute('aria-current','step');});
   paintActionFeedback();updatePhaseTimer();
 }
