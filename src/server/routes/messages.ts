@@ -11,6 +11,7 @@ async function routeMessages(context:RoomRouteContext) {
           if (latest && Date.now() - new Date(latest.created_at).getTime() < 700) return out({ error: "RATE_LIMITED" }, 429);
           const { error: insertError } = await db.from("mafia_messages").insert({ room_code: code, round: room.round, channel: "public", author_id: me.id, author_name: me.name, content });
           if (insertError) throw insertError;
+          await rememberPublicMessage(room, players, me, content);
         }
         const beforeId = typeof body.beforeId === "string" ? body.beforeId : null;
         let query = db.from("mafia_messages").select("id,author_id,author_name,content,created_at").eq("room_code", code).eq("round", room.round).eq("channel", "public");

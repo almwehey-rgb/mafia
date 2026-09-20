@@ -39,6 +39,17 @@ function botDiscussionLines(room: any, players: any[]) {
   };
   return alive.map((bot, index) => { const state=roleState(bot); const style=state.botStyle||"quiet"; const pool=lines[style]||lines.quiet; return { id: `${room.round}-${bot.id}`, playerId: bot.id, name: bot.name, text: pool[(room.round+index)%pool.length] }; });
 }
+async function rememberPublicMessage(room:any, players:any[], author:any, content:string) {
+  const mentioned=players.filter((p:any)=>p.alive&&p.id!==author.id&&content.includes(p.name));
+  if (!mentioned.length) return;
+  for (const bot of players.filter((p:any)=>p.is_bot&&p.alive)) {
+    const state=roleState(bot), memory=state.botMemory||{suspicion:{},claims:[],votes:[]};
+    const suspicion={...(memory.suspicion||{})};
+    for (const target of mentioned) suspicion[target.id]=Number(suspicion[target.id]||0)+1;
+    const claims=[...(memory.claims||[]),{round:room.round,authorId:author.id,mentioned:mentioned.map((p:any)=>p.id),text:content}].slice(-30);
+    await persist(db.from('mafia_players').update({role_state:{...state,botMemory:{...memory,suspicion,claims}}}).eq('room_code',room.code).eq('id',bot.id));
+  }
+}
 
 async function botVotes(room: any, players: any[], verdict = false) {
   const alive = players.filter((x) => x.alive);
