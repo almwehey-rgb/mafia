@@ -10,6 +10,16 @@ const source = stripTypeScriptTypes(readFileSync(new URL('../supabase/functions/
 function fixture(mode = 'turns') {
   let now = 1800000000000;
   let handler;
+  let openingDrawValues = [0], openingDrawReads = 0;
+  const fixtureCrypto = {
+    randomUUID: () => webcrypto.randomUUID(),
+    subtle: webcrypto.subtle,
+    getRandomValues(array) {
+      if (array.BYTES_PER_ELEMENT !== 4) return webcrypto.getRandomValues(array);
+      for (let i = 0; i < array.length; i++) array[i] = openingDrawValues[Math.min(openingDrawReads++, openingDrawValues.length - 1)];
+      return array;
+    }
+  };
   class Clock extends Date { static now() { return now; } }
   const rooms = [{ code:'8754',host_token:'test-host',phase:'day',round:1,phase_started_at:new Date(now).toISOString(),enabled_roles:{discussion_mode:mode,speaker_seconds:30,discussion_seconds:180,lawyer:false,jailer:false},last_event:'',linked_players:[] }];
   const players = ['a','b','c','bot'].map(id=>({id,room_code:'8754',name:id,alive:true,role:'citizen',session_token:'token-'+id,is_bot:id==='bot',last_seen:new Date(now).toISOString(),role_state:{}}));
@@ -60,13 +70,14 @@ function fixture(mode = 'turns') {
     Object.assign(room,{phase:'reveal',round:1,lifecycle_version:(room.lifecycle_version||0)+1,phase_started_at:new Date(now).toISOString(),phase_paused_at:null,mafia_count:args.p_mafia,detective_count:args.p_detectives,detective_questions:args.p_questions,enabled_roles:settings,jailed_player:null,accused_player:null,jailer_executions:3,doctor_last_target:null,linked_players:[],last_event:'game_started',last_deaths:[],last_eliminated:null,last_saved:false,winner:null,winner_player:null,stats_recorded:false});
     return {data:{ok:true},error:null};
   };
-  const context=vm.createContext({AsyncLocalStorage,Date:Clock,crypto:webcrypto,Uint8Array,TextEncoder,Response,URL,console,createClient:()=>({from:table=>new Query(table),rpc}),Deno:{env:{get:()=> 'test-only'},serve:value=>{handler=value;}}});
+  const context=vm.createContext({AsyncLocalStorage,Date:Clock,crypto:fixtureCrypto,Uint8Array,TextEncoder,Response,URL,console,createClient:()=>({from:table=>new Query(table),rpc}),Deno:{env:{get:()=> 'test-only'},serve:value=>{handler=value;}}});
   vm.runInContext(source+'\nMath.random=()=>0;this.testView=discussionView;',context);
   const call=async(action,extra={})=>{
     const response=await handler(new Request('https://example.test/',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({action,code:'8754',lifecycleVersion:rooms[0].lifecycle_version||0,...extra})}));
     return {status:response.status,body:await response.json()};
   };
-  return {rooms,players,messages,tables,context,call,advance:ms=>{now+=ms;},view:()=>context.testView(rooms[0]),host:{hostToken:'test-host'}};
+  return {rooms,players,messages,tables,context,call,advance:ms=>{now+=ms;},view:()=>context.testView(rooms[0]),host:{hostToken:'test-host'},
+    setOpeningDraw(...values){openingDrawValues=values;openingDrawReads=0;},get openingDrawReads(){return openingDrawReads;}};
 }
 
 test('Reconnect restores the same authenticated seat in active and full rooms without changing identity or role',async()=>{
@@ -96,6 +107,63 @@ test('Lobby UI suppresses duplicate requests and preserves history on failure',a
  c.game={phase:'finished',code:'8754',lifecycleVersion:5};c.localHistory=['keep'];
  c.api=async()=>{throw Error('network');};await c.returnToLobby();
  assert.equal(c.game.phase,'finished');assert.deepEqual(c.localHistory,['keep']);assert.equal(cleared,1);
+});
+
+test('Bot boss opts in once and can win or lose the opening draw against a human detective',async()=>{
+ for(const sample of [0,1]){
+  const f=fixture();f.players[0].role='detective';f.players[3].role='mafia_boss';
+  f.players[3].role_state={ack:true,botStyle:'quiet',botMemory:{suspicion:{b:2}}};
+  f.setOpeningDraw(sample);
+  const response=await f.call('startDiscussion',f.host);
+  assert.equal(response.status,200);
+  const draw=response.body.discussion;
+  assert.equal(f.players[3].role_state.discussionClaim,true);
+  assert.equal(f.players[3].role_state.botStyle,'quiet');
+  assert.equal(f.players[3].role_state.botMemory.suspicion.b,2);
+  assert.deepEqual(new Set(draw.roulette.candidates),new Set(['a','bot']));
+  assert.equal(draw.roulette.winner,sample===0?'a':'bot');
+  assert.deepEqual(new Set(draw.order.slice(0,2)),new Set(['a','bot']));
+  assert.ok(draw.botLines.some(line=>line.playerId==='bot' && /بدر|b/.test(line.text)) || draw.botLines.some(line=>line.playerId==='bot'));
+  assert.equal(response.body.players.some(p=>p.role||p.discussionClaim),false);
+  const repeat=await f.call('startDiscussion',f.host);
+  assert.equal(repeat.body.discussion.id,draw.id);
+  assert.equal(f.openingDrawReads,1);
+ }
+});
+
+test('Solo player can draw between a real bot detective and a fake bot detective without ordinary bot turns',async()=>{
+ const f=fixture();f.players[1].role='detective';f.players[1].is_bot=true;
+ f.players[2].role='mafia_boss';f.players[2].is_bot=true;
+ f.rooms[0].detective_questions=2;
+ const first=await f.call('startDiscussion',f.host);
+ assert.equal(first.status,200);
+ assert.deepEqual(new Set(first.body.discussion.roulette.candidates),new Set(['b','c']));
+ assert.deepEqual(first.body.discussion.order,['b','c','a']);
+ assert.equal(f.players[2].role_state.discussionClaim,true);
+ f.rooms[0].round=2;
+ const second=await f.call('startDiscussion',f.host);
+ assert.deepEqual(new Set(second.body.discussion.roulette.candidates),new Set(['b','c']));
+ f.rooms[0].round=3;
+ const later=await f.call('startDiscussion',f.host);
+ assert.equal(later.body.discussion.roulette,null);
+ assert.deepEqual(later.body.discussion.order,['a']);
+});
+
+test('Automatic bot claim respects a locked opt-out, death, role and the first-round deadline',async()=>{
+ for(const change of [
+  f=>{f.players[3].role_state.discussionClaim=false;},
+  f=>{f.players[3].alive=false;},
+  f=>{f.players[3].role='mafia';},
+  f=>{f.players[3].is_bot=false;},
+  f=>{f.rooms[0].round=2;},
+  f=>{f.rooms[0].enabled_roles.discussion_mode='group';}
+ ]){
+  const f=fixture();f.players[0].role='detective';f.players[3].role='mafia_boss';change(f);
+  const response=await f.call('startDiscussion',f.host);
+  assert.equal(response.status,200);
+  assert.notEqual(f.players[3].role_state.discussionClaim,true);
+  assert.equal(response.body.discussion.roulette,null);
+ }
 });
 
 test('Opening draw reserves six seconds, blocks early passing, and survives a game pause',async()=>{
@@ -334,7 +402,7 @@ test('Boss choice locks once, persists across rounds and resets on rematch',asyn
   assert.equal((await f.call('setDiscussionClaim',{id:'a',playerToken:'token-a',claim})).status,403);
   assert.equal((await f.call('setDiscussionClaim',{...auth,claim})).status,200);
   assert.equal((await f.call('setDiscussionClaim',{...auth,claim:!claim})).status,409);
-  vm.runInContext('Math.random=()=>0.99',f.context);
+  f.setOpeningDraw(1);
   for(const round of [1,2,3]){f.rooms[0].round=round;const r=await f.call('startDiscussion',f.host);assert.equal(r.body.discussion.speakerId,claim?'c':'b');}
   f.rooms[0].phase='finished';await f.call('start',{...f.host,mafiaCount:1,detectiveCount:0,enabledRoles:{doctor:false,detective:false,lawyer:false,jailer:false}});
   assert.equal(f.players.some(p=>typeof p.role_state.discussionClaim==='boolean'),false);
@@ -347,10 +415,10 @@ test('Concurrent choices lock once; no choice defaults to undercover for the gam
  assert.equal((await g.call('setDiscussionClaim',{...auth,claim:true})).status,409);
  g.rooms[0].round=2;assert.equal((await g.call('setDiscussionClaim',{...auth,claim:true})).status,409);
 });
-test('Opted-in boss and detective each can start; selection is saved and not alternating',async()=>{
- for(const [draw,expected] of [[0,'b'],[0.49,'b'],[0.5,'c'],[0.99,'c']]){
+test('Opening draw uses equal cryptographic outcomes for detective and opted-in boss and saves the winner',async()=>{
+ for(const [draw,expected] of [[0,'b'],[1,'c'],[0xfffffffe,'b'],[0xffffffff,'c']]){
   const f=fixture();f.rooms[0].detective_questions=2;f.players[1].role='detective';f.players[2].role='mafia_boss';
-  vm.runInContext(`Math.random=()=>${draw}`,f.context);
+  f.setOpeningDraw(draw);
   for(const round of [1,2]){
    f.rooms[0].round=round;
    await f.call('setDiscussionClaim',{id:'c',playerToken:'token-c',claim:true});
@@ -361,8 +429,52 @@ test('Opted-in boss and detective each can start; selection is saved and not alt
    assert.equal(new Set(start.body.discussion.order).size,3);
    const again=await f.call('startDiscussion',f.host);
    assert.deepEqual(again.body.discussion.order,start.body.discussion.order);
+   assert.deepEqual(again.body.discussion.roulette,start.body.discussion.roulette);
+   assert.equal(f.openingDrawReads,round,'repeated starts must not consume another draw');
    assert.equal(start.body.players.some(p=>p.role||p.discussionClaim),false);
   }
+ }
+});
+test('Concurrent opening requests and reconnects share the first saved draw even with different random samples',async()=>{
+ const f=fixture();f.players[1].role='detective';f.players[2].role='mafia_boss';f.players[2].role_state.discussionClaim=true;
+ f.setOpeningDraw(0,1);
+ const responses=await Promise.all([f.call('startDiscussion',f.host),f.call('startDiscussion',f.host)]);
+ for(const response of responses)assert.equal(response.status,200);
+ const saved=f.rooms[0].enabled_roles.discussion_state;
+ assert.equal(saved.roulette.winner,'b');
+ assert.equal(f.openingDrawReads,2,'both concurrent attempts sampled a candidate before the conditional save');
+ for(const response of responses){
+  assert.equal(response.body.discussion.id,saved.id);
+  assert.deepEqual(response.body.discussion.roulette,saved.roulette);
+  assert.equal(response.body.discussion.order[0],saved.roulette.winner);
+ }
+ const reconnected=(await f.call('state',{id:'c',playerToken:'token-c'})).body.discussion;
+ assert.deepEqual(reconnected.roulette,saved.roulette);
+ f.setOpeningDraw(1);
+ const again=(await f.call('startDiscussion',f.host)).body.discussion;
+ assert.deepEqual(again.roulette,saved.roulette);
+ assert.equal(f.openingDrawReads,0);
+});
+test('An undercover boss is excluded from the opening draw',async()=>{
+ for(const claim of [false,undefined]){
+  const f=fixture();f.players[1].role='detective';f.players[2].role='mafia_boss';f.players[2].role_state.discussionClaim=claim;
+  f.setOpeningDraw(0xffffffff);
+  const discussion=(await f.call('startDiscussion',f.host)).body.discussion;
+  assert.equal(discussion.speakerId,'b');
+  assert.equal(discussion.roulette,null);
+  assert.equal(f.openingDrawReads,0);
+ }
+});
+test('Three opening candidates each can win and rejection sampling removes modulo bias',async()=>{
+ for(const [draw,expected] of [[0,'a'],[1,'b'],[2,'c'],[0xfffffffc,'a'],[0xfffffffd,'b'],[0xfffffffe,'c']]){
+  const f=fixture();f.players[0].role='detective';f.players[1].role='detective';f.players[2].role='mafia_boss';f.players[2].role_state.discussionClaim=true;
+  // 2^32 is not divisible by three: the last uint32 must be discarded.
+  f.setOpeningDraw(0xffffffff,draw);
+  const discussion=(await f.call('startDiscussion',f.host)).body.discussion;
+  assert.equal(discussion.speakerId,expected);
+  assert.equal(discussion.roulette.winner,expected);
+  assert.deepEqual(new Set(discussion.roulette.candidates),new Set(['a','b','c']));
+  assert.equal(f.openingDrawReads,2);
  }
 });
 test('Priority lottery lasts the chosen number of rounds, then all living humans qualify',async()=>{
@@ -371,7 +483,7 @@ test('Priority lottery lasts the chosen number of rounds, then all living humans
   await f.call('setDiscussionClaim',{id:'c',playerToken:'token-c',claim:true});
   for(let round=1;round<=count;round++){
    f.rooms[0].round=round;
-   vm.runInContext(`Math.random=()=>${round%2?0.99:0}`,f.context);
+   f.setOpeningDraw(round%2?1:0);
    assert.equal((await f.call('startDiscussion',f.host)).body.discussion.speakerId,round%2?'c':'b');
   }
   f.rooms[0].round=count+1;vm.runInContext('Math.random=()=>0',f.context);
