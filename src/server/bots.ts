@@ -37,7 +37,16 @@ function botDiscussionLines(room: any, players: any[]) {
     empathetic: ["خلونا نعطي المتهم فرصة يشرح نفسه.", "أفهم خوفكم، لكن نحتاج دليلًا عادلًا."],
     chaotic: ["في شيء لا يركب في قصة الليلة.", "أغيّر رأيي إذا ظهر دليل أقوى."]
   };
-  return alive.map((bot, index) => { const state=roleState(bot); const style=state.botStyle||"quiet"; const pool=lines[style]||lines.quiet; return { id: `${room.round}-${bot.id}`, playerId: bot.id, name: bot.name, text: pool[(room.round+index)%pool.length] }; });
+  return alive.map((bot, index) => {
+    const state=roleState(bot), style=state.botStyle||"quiet", pool=lines[style]||lines.quiet;
+    const suspicion=state.botMemory?.suspicion||{};
+    const topId=Object.entries(suspicion).sort((a:any,b:any)=>Number(b[1])-Number(a[1]))[0]?.[0];
+    const top=players.find((p:any)=>p.id===topId&&p.alive);
+    const text=top && Number(suspicion[top.id])>0
+      ? (style==='empathetic' ? `خلونا نسمع تفسير ${top.name} قبل الحكم.` : style==='bold' ? `الشك عندي على ${top.name}، نحتاج رد واضح.` : `أبي أفهم تناقض ${top.name} قبل التصويت.`)
+      : pool[(room.round+index)%pool.length];
+    return { id: `${room.round}-${bot.id}`, playerId: bot.id, name: bot.name, text };
+  });
 }
 async function rememberPublicMessage(room:any, players:any[], author:any, content:string) {
   const mentioned=players.filter((p:any)=>p.alive&&p.id!==author.id&&content.includes(p.name));
