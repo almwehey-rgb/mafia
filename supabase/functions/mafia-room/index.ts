@@ -259,9 +259,14 @@ async function botDayActions(room: any, players: any[]) {
 
 function botDiscussionLines(room: any, players: any[]) {
   const alive = players.filter((x) => x.alive && x.is_bot);
-  const civilianLines = ["أراقب التصويت قبل ما أتهم أحد.", "في شيء غير منطقي في اختيارات الليلة.", "خلونا نقارن كلام كل لاعب بدل التصويت العشوائي."];
-  const mafiaLines = ["أشعر أن الاتهام المبكر يخدم المافيا.", "لا تستعجلوا الحكم، نحتاج دليلًا أقوى.", "أنا أراقب من يغيّر كلامه بسرعة."];
-  return alive.map((bot, index) => ({ id: `${room.round}-${bot.id}`, playerId: bot.id, name: bot.name, text: mafiaRole(bot.role) ? mafiaLines[index % mafiaLines.length] : civilianLines[index % civilianLines.length] }));
+  const lines: Record<string,string[]> = {
+    skeptic: ["أحتاج دليلًا من التصويت، لا مجرد إحساس.", "من غيّر رأيه؟ هذا أهم شيء عندي."],
+    quiet: ["سأسمع الجميع قبل أن أتهم أحدًا.", "تصويتي مبني على ما حدث، لا على الاسم."],
+    bold: ["عندي شك قوي، وأريد من المتهم يرد الآن.", "التردد هنا يخدم المافيا."],
+    empathetic: ["خلونا نعطي المتهم فرصة يشرح نفسه.", "أفهم خوفكم، لكن نحتاج دليلًا عادلًا."],
+    chaotic: ["في شيء لا يركب في قصة الليلة.", "أغيّر رأيي إذا ظهر دليل أقوى."]
+  };
+  return alive.map((bot, index) => { const state=roleState(bot); const style=state.botStyle||"quiet"; const pool=lines[style]||lines.quiet; return { id: `${room.round}-${bot.id}`, playerId: bot.id, name: bot.name, text: pool[(room.round+index)%pool.length] }; });
 }
 
 async function botVotes(room: any, players: any[], verdict = false) {
@@ -269,7 +274,12 @@ async function botVotes(room: any, players: any[], verdict = false) {
   for (const bot of alive.filter((x) => x.is_bot && !x.vote_target && (!verdict || x.id !== room.accused_player))) {
     const candidates = alive.filter((x) => x.id !== bot.id);
     const nonMafia = candidates.filter((x) => !mafiaRole(x.role));
-    const value = verdict ? (Math.random() < (mafiaRole(bot.role) ? .35 : .68) ? "GUILTY" : "INNOCENT") : (randomItem(mafiaRole(bot.role) ? nonMafia : candidates)?.id || "SKIP");
+    const state=roleState(bot), suspicion=state.botMemory?.suspicion||{};
+    const ranked=[...(mafiaRole(bot.role)?nonMafia:candidates)].sort((a,b)=>(Number(suspicion[b.id]||0)-Number(suspicion[a.id]||0)));
+    const likely=ranked[0] || randomItem(candidates);
+    const value = verdict ? (Math.random() < (mafiaRole(bot.role) ? .35 : .68) ? "GUILTY" : "INNOCENT") : (likely?.id || "SKIP");
+    state.botMemory={...state.botMemory,suspicion:{...suspicion,...(likely?{[likely.id]:Number(suspicion[likely.id]||0)+1}:{})},votes:[...(state.botMemory?.votes||[]),{round:room.round,target:likely?.id||null}]};
+    await persist(db.from("mafia_players").update({role_state:state}).eq("room_code",room.code).eq("id",bot.id));
     await persist(db.from("mafia_players").update({ vote_target: value }).eq("room_code", room.code).eq("id", bot.id));
   }
 }
@@ -920,7 +930,9 @@ async function routeAddBot(context:RoomRouteContext) {
       if (!host || room.phase !== "lobby" || players.length >= 20) return out({ error: "INVALID_ACTION" }, 400);
       const base=body.name ? cleanText(body.name,14) : 'BOT';
       let count=1;while(players.some(p=>p.name.toLowerCase()===`${base} ${count}`.toLowerCase()))count++;
-      const bot = { room_code: code, id: crypto.randomUUID(), name: `${base} ${count}`, is_bot: true, session_token: null, last_seen: new Date().toISOString() };
+      const styles = ["skeptic", "quiet", "bold", "empathetic", "chaotic"];
+      const style = styles[(count - 1) % styles.length];
+      const bot = { room_code: code, id: crypto.randomUUID(), name: `${base} ${count}`, is_bot: true, session_token: null, last_seen: new Date().toISOString(), role_state: { botStyle: style, botMemory: { suspicion: {}, claims: [], votes: [] } } };
       const { error } = await db.from("mafia_players").insert(bot);
       if (error) throw error;
       ({ room, players } = await load(code));
