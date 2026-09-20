@@ -1,12 +1,7 @@
 {
-  "routes": [
-    {
-      "src": "/game\\.js",
-      "dest": "/old-game.js"
-    },
-    {
-      "src": "/(.*)",
-      "dest": "https://mafia-night-1lv1ns6ni-tm-d73f.vercel.app/$1"
-    }
-  ]
+  "framework": null,
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
+  "installCommand": "npm ci",
+  "cleanUrls": true
 }

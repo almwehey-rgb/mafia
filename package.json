@@ -1,0 +1,29 @@
+{
+  "name": "mafia-night",
+  "version": "1.0.0",
+  "private": true,
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "test": "node --test --test-isolation=none tests/discussion.test.mjs tests/lifecycle-postgres.test.mjs tests/lifecycle-edge-sql.test.mjs tests/atomic-transitions.test.mjs tests/join-feedback.test.mjs tests/discussion-display.test.mjs tests/review-probes.mjs tests/assurance.test.mjs tests/feature-loader.test.mjs tests/transport.test.mjs tests/monitor.test.mjs tests/operations.test.mjs tests/join-atomic.test.mjs tests/role-interactions.test.mjs",
+    "predev": "npm run build",
+    "dev": "node tests/browser-server.mjs",
+    "test:performance": "node tests/performance-cache.mjs && node --test --test-isolation=none tests/feature-loader.test.mjs",
+    "test:browser": "node tests/browser-server.mjs",
+    "test:acceptance:browser": "node tests/ux-entry-browser.mjs && node tests/role-cards-browser.mjs && node tests/layout-audit-browser.mjs && node tests/final-journeys-browser.mjs",
+    "build": "node scripts/build-fast-start.mjs",
+    "test:backup": "node tests/backup-restore.mjs",
+    "test:human-balance": "node --test --test-isolation=none tests/human-balance.test.mjs",
+    "analyze:human-balance": "node scripts/analyze-human-playtests.mjs",
+    "acceptance:snapshot": "node scripts/acceptance-snapshot.mjs",
+    "preflight": "node scripts/preflight.mjs",
+    "test:operations": "node --test --test-isolation=none tests/operations.test.mjs tests/monitor.test.mjs",
+    "benchmark:runtime": "node tests/benchmark-runtime.mjs",
+    "benchmark:browser": "node tests/benchmark-browser.mjs",
+    "monitor": "node scripts/monitor.mjs"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "0.5.8"
+  }
+}

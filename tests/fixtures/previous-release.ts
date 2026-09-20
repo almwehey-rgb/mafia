@@ -6,9 +6,8 @@ const cors = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "content-type",
   "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
-  "Access-Control-Expose-Headers": "X-Request-Id,Server-Timing",
 };
-const requestDatabase = new AsyncLocalStorage<{headers: Record<string,string>; client?: any; plan?: TransitionPlan; requestId?:string; started?:number; action?:string; observation?:any}>();
+const requestDatabase = new AsyncLocalStorage<{headers: Record<string,string>; client?: any; plan?: TransitionPlan}>();
 const copyJson = (value:any) => JSON.parse(JSON.stringify(value));
 // Compute multi-step transitions on a private copy. No partial result is visible
 // until the database validates the preimage and commits all changes together.
@@ -61,50 +60,6 @@ function fencedQuery(query: any): any {
   }});
 }
 const db = {from:(table:string)=>fencedQuery(requestDatabase.getStore()?.plan?.from(table) || currentDatabase().from(table)),rpc:(name:string,args:any)=>fencedQuery(currentDatabase().rpc(name,args))};
-// A successful response must never acknowledge a rejected database write.
-async function persist(query: any) { const result=await query; if(result.error)throw result.error; return result; }
-type RoomRequest = {
-  action?:string; code?:string; lifecycleVersion?:number;
-  hostToken?:string; hostAccessToken?:string; id?:string; playerToken?:string;
-  spectatorToken?:string; target?:string;
-  [field:string]:any;
-};
-type ErrorResponse = {error:string};
-type PublicRoomResponse = {
-  code:string; phase:string; round:number; lifecycleVersion:number;
-  matchId:string|null; players:any[]; me?:any;
-  [field:string]:any;
-};
-type RouteContext = {
-  body:RoomRequest; action:string; ip:string; now:number; started:number;
-};
-type RoomRouteContext = RouteContext & {code:string;room:any;players:any[];me:any;host:boolean;authenticatedSpectator:any};
-// Shared protocol vocabulary; request/response shape documented in docs/protocol.md.
-const REQUEST_ACTIONS=["acknowledgeRole","act","addBot","adminState","advanceVerdict","beginNight","claimSeat","controlDiscussion","create","createAdminInvite","createReplacement","electMafiaLeader","endGame","expelPlayer","finishDiscussion","health","hostLogin","hostLogout","hostPreferences","id","jail","join","joinSpectator","kick","lastShot","lawyerProtect","leaderboard","leave","listSnapshots","messages","moderationLog","mute","ok","operationsStatus","passDiscussion","profile","recoverProfile","redeemAdminInvite","report","resolveNight","resolveVote","restoreSnapshot","returnToLobby","revokeAdminAccess","saveWill","sendMessage","setDiscussionClaim","spectatorState","start","startDiscussion","startVote","state","systemStatus","togglePause","transferHost","vote","warnPlayer","operationsStatus"];
-// Allowlisted operational fields only. Never record headers, request bodies,
-// credentials, player names, role assignments or action targets.
-const requestTotals={requests:0,failed:0,slow:0};
-function observeRoom(room:any) {
-  const scope=requestDatabase.getStore();
-  if(scope)scope.observation={room:room.code,phase:room.phase,version:room.lifecycle_version||0,phaseStartedAt:room.phase_started_at};
-}
-function recordResponse(response:Response) {
-  const scope=requestDatabase.getStore()!;
-  const durationMs=Math.max(0,Date.now()-(scope.started||Date.now()));
-  requestTotals.requests++;if(response.status>=500)requestTotals.failed++;if(durationMs>=1000)requestTotals.slow++;
-  response.headers.set('X-Request-Id',scope.requestId||'');
-  response.headers.set('Server-Timing',`app;dur=${durationMs}`);
-  response.headers.set('Cache-Control','no-store');
-  const shouldLog=Deno.env.get('MAFIA_LOG_ALL')==='true'||response.status>=400||durationMs>=1000||requestTotals.requests%20===0;
-  if(shouldLog)console.log(JSON.stringify({event:'mafia.request',requestId:scope.requestId,action:scope.action||'unknown',status:response.status,durationMs,...scope.observation}));
-  return response;
-}
-async function operationsStatus(body:any) {
-  if(!await validHostAccess(body.hostAccessToken))return out({error:'UNAUTHORIZED'},403);
-  const {data,error}=await db.from('mafia_rooms').select('code,phase,round,phase_started_at,lifecycle_version').in('phase',['reveal','night','day','vote','nomination','trial','verdict']).limit(1000);
-  if(error)throw error;
-  return out({status:'ok',time:Date.now(),instanceMetrics:{...requestTotals},rooms:data||[],truncated:(data||[]).length===1000});
-}
 const rateBuckets = new Map<string, { count: number; reset: number }>();
 const loginBuckets = new Map<string, { count: number; reset: number }>();
 const out = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { ...cors, "Content-Type": "application/json" } });
@@ -183,13 +138,11 @@ function discussionView(room: any, now = Date.now()) {
 }
 
 async function load(code: string) {
-  const [roomResult, playersResult] = await Promise.all([
+  const [{ data: room }, { data: players }] = await Promise.all([
     db.from("mafia_rooms").select("*").eq("code", code).single(),
     db.from("mafia_players").select("*").eq("room_code", code).order("joined_at"),
   ]);
-  if (roomResult.error && roomResult.error.code !== 'PGRST116') throw roomResult.error;
-  if (playersResult.error) throw playersResult.error;
-  return { room:roomResult.data, players: playersResult.data || [] };
+  return { room, players: players || [] };
 }
 const detectiveQuestionCount = (value: any) => Number.isFinite(Number(value)) && value != null ? Math.max(1, Math.min(5, Math.round(Number(value)))) : 3;
 const doctorAvailable = (room: any) => room.round >= 2;
@@ -207,7 +160,7 @@ const validHostAccess = async (token: any) => {
   const tokenHash = await sha256(clean);
   const { data } = await db.from("mafia_host_sessions").select("token_hash,expires_at").eq("token_hash", tokenHash).maybeSingle();
   if (!data || new Date(data.expires_at).getTime() <= Date.now()) return false;
-  await persist(db.from("mafia_host_sessions").update({ last_seen: new Date().toISOString() }).eq("token_hash", tokenHash));
+  await db.from("mafia_host_sessions").update({ last_seen: new Date().toISOString() }).eq("token_hash", tokenHash);
   return true;
 };
 const cleanPreferences = (value: any) => ({
@@ -219,10 +172,10 @@ const cleanPreferences = (value: any) => ({
   soundEnabled: value?.soundEnabled !== false,
 });
 const audit = async (roomCode: string | null, action: string, status = "ok", started = Date.now()) => {
-  await persist(db.from("mafia_audit_events").insert({ room_code: roomCode, action, status, duration_ms: Date.now() - started }));
+  await db.from("mafia_audit_events").insert({ room_code: roomCode, action, status, duration_ms: Date.now() - started });
 };
 async function snapshot(room: any, players: any[], reason: string) {
-  await persist(db.from("mafia_snapshots").insert({ room_code: room.code, phase: room.phase, round: room.round, reason, room_state: room, players_state: players }));
+  await db.from("mafia_snapshots").insert({ room_code: room.code, phase: room.phase, round: room.round, reason, room_state: room, players_state: players });
   const { data } = await db.from("mafia_snapshots").select("id").eq("room_code", room.code).order("created_at", { ascending: false }).range(20, 100);
   if (data?.length) await db.from("mafia_snapshots").delete().in("id", data.map((x) => x.id));
 }
@@ -261,7 +214,7 @@ async function botVotes(room: any, players: any[], verdict = false) {
   const alive = players.filter((x) => x.alive);
   for (const bot of alive.filter((x) => x.is_bot && !x.vote_target && (!verdict || x.id !== room.accused_player))) {
     const value = verdict ? (Math.random() < .55 ? "GUILTY" : "INNOCENT") : (randomItem(alive.filter((x) => x.id !== bot.id))?.id || "SKIP");
-    await persist(db.from("mafia_players").update({ vote_target: value }).eq("room_code", room.code).eq("id", bot.id));
+    await db.from("mafia_players").update({ vote_target: value }).eq("room_code", room.code).eq("id", bot.id);
   }
 }
 
@@ -274,12 +227,12 @@ async function recordStats(room: any, players: any[]) {
     const won = room.winner === team || (room.winner === "serial_killer" && player.role === "serial_killer") || (room.winner === "jester" && player.id === room.winner_player);
     const { data: profile } = await db.from("mafia_profiles").select("*").eq("profile_token", player.profile_token).maybeSingle();
     const base = profile || { games: 0, wins: 0, village_wins: 0, mafia_wins: 0, independent_wins: 0 };
-    await persist(db.from("mafia_profiles").upsert({ profile_token: player.profile_token, nickname: player.name, games: base.games + 1, wins: base.wins + (won ? 1 : 0), village_wins: base.village_wins + (won && team === "village" ? 1 : 0), mafia_wins: base.mafia_wins + (won && team === "mafia" ? 1 : 0), independent_wins: base.independent_wins + (won && team === "independent" ? 1 : 0), updated_at: new Date().toISOString() }));
+    await db.from("mafia_profiles").upsert({ profile_token: player.profile_token, nickname: player.name, games: base.games + 1, wins: base.wins + (won ? 1 : 0), village_wins: base.village_wins + (won && team === "village" ? 1 : 0), mafia_wins: base.mafia_wins + (won && team === "mafia" ? 1 : 0), independent_wins: base.independent_wins + (won && team === "independent" ? 1 : 0), updated_at: new Date().toISOString() });
     const season = currentSeason();
     const { data: seasonProfile } = await db.from("mafia_season_stats").select("games,wins").eq("profile_token", player.profile_token).eq("season", season).maybeSingle();
-    await persist(db.from("mafia_season_stats").upsert({ profile_token: player.profile_token, season, games: Number(seasonProfile?.games || 0) + 1, wins: Number(seasonProfile?.wins || 0) + (won ? 1 : 0), updated_at: new Date().toISOString() }));
+    await db.from("mafia_season_stats").upsert({ profile_token: player.profile_token, season, games: Number(seasonProfile?.games || 0) + 1, wins: Number(seasonProfile?.wins || 0) + (won ? 1 : 0), updated_at: new Date().toISOString() });
   }
-  await persist(db.from("mafia_rooms").update({ stats_recorded: true }).eq("code", room.code));
+  await db.from("mafia_rooms").update({ stats_recorded: true }).eq("code", room.code);
 }
 
 function adminPlayerView(player: any) {
@@ -293,7 +246,6 @@ function adminPlayerView(player: any) {
     warnings: state.warnings || [], elimination: state.elimination || null };
 }
 function publicView(room: any, players: any[], meId?: string, host = false) {
-  observeRoom(room);
   const me = players.find((x) => x.id === (meId || (host ? room.host_player_id : undefined)));
   const lawyer = players.find((x) => x.alive && x.role === "lawyer");
   const jailer = players.find((x) => x.alive && x.role === "jailer");
@@ -362,10 +314,8 @@ function publicView(room: any, players: any[], meId?: string, host = false) {
       questionsUsed: me.role === "detective" ? selected(me).length : undefined,
       questionLimit: me.role === "detective" ? limit : undefined,
       mafiaTeam: mafiaRole(me.role) ? players.filter((x) => mafiaRole(x.role)).map((x) => ({ id: x.id, name: x.name, role: x.role })) : undefined,
-      leaderElection: mafiaRole(me.role) && room.enabled_roles?.leader_election?.pending === true,
-      leaderVote: mafiaRole(me.role) ? (room.enabled_roles?.leader_election?.former ? room.enabled_roles.leader_election.votes?.[me.id] : roleState(me).leaderVote) || null : undefined,
-      leaderFormer: mafiaRole(me.role) ? room.enabled_roles?.leader_election?.former : undefined,
-      leaderDeadline: mafiaRole(me.role) ? room.enabled_roles?.leader_election?.deadline : undefined,
+      leaderElection: mafiaRole(me.role) && room.phase === "reveal" && room.enabled_roles?.leader_election?.pending === true,
+      leaderVote: mafiaRole(me.role) ? roleState(me).leaderVote || null : undefined,
       acted: me.role === "detective" ? selected(me).length >= limit : me.role === "cupid" ? selected(me).length >= 2 : Boolean(me.action_target),
       voted: Boolean(me.vote_target),
       voteTarget: me.vote_target || null,
@@ -414,12 +364,11 @@ async function checkWin(code: string) {
   const serialKillers = alive.filter((x) => x.role === "serial_killer").length;
   const others = alive.length - mafia - serialKillers;
   let winner: string | null = null;
-  if (alive.length === 0) winner = "draw";
-  else if (serialKillers > 0 && mafia === 0 && serialKillers >= others) winner = "serial_killer";
+  if (serialKillers > 0 && mafia === 0 && serialKillers >= others) winner = "serial_killer";
   else if (mafia === 0 && serialKillers === 0) winner = "village";
   else if (serialKillers === 0 && mafia >= others) winner = "mafia";
   if (winner) {
-    await persist(db.from("mafia_rooms").update({ phase: "finished", winner, winner_player: null }).eq("code", code));
+    await db.from("mafia_rooms").update({ phase: "finished", winner, winner_player: null }).eq("code", code);
     const final = await load(code);
     await recordStats(final.room, final.players);
   }
@@ -433,32 +382,22 @@ function plurality(choices: string[]) {
   return top.length === 1 ? top[0] : "SKIP";
 }
 
-function actorRateLimited(key:string,now:number) {
-  const bucket=rateBuckets.get(key);
-  if (!bucket || bucket.reset < now) rateBuckets.set(key,{count:1,reset:now+60_000});
-  else if (++bucket.count > 240) return true;
-  if (rateBuckets.size > 10000) for (const [key,value] of rateBuckets) if (value.reset < now) rateBuckets.delete(key);
-  return false;
-}
-async function readCurrentState(code:string,body:any,now:number) {
-  const {data,error}=await db.rpc('mafia_presence',{p_code:code,p_host_token:body.hostToken||null,p_player_id:body.id||null,p_player_token:body.playerToken||null});
-  if(error)throw error;
-  if(data?.error)return out({error:data.error},data.error==='UNAUTHORIZED'?403:404);
-  if(data?.ok!==true)throw Error('PRESENCE_FAILED');
-  let {room,players}=await load(code);
-  if(!room)return out({error:'ROOM_NOT_FOUND'},404);
-  let me=authenticatedPlayer(players,body);
-  let host=body.hostToken===room.host_token || Boolean(me && room.host_player_id===me.id && (me.alive||room.enabled_roles?.controller_spectator===true));
-  if(!host && (!me||me.left_at))return out({error:'UNAUTHORIZED'},403);
-  if(actorRateLimited(me?`player:${code}:${me.id}`:`host:${code}`,now))return out({error:'RATE_LIMITED'},429);
-  if(await reconcileDeparture(room,players))({room,players}=await load(code));
-  me=authenticatedPlayer(players,body);
-  host=body.hostToken===room.host_token || Boolean(me && room.host_player_id===me.id && (me.alive||room.enabled_roles?.controller_spectator===true));
-  return out(publicView(room,players,me?.id,host));
-}
-async function routeHostLogin(context:RouteContext) {
-  let {body, action, ip, now, started}=context;
-  {
+async function handleRequest(request:Request) {
+  if (request.method === "OPTIONS") return new Response("ok", { headers: cors });
+  try {
+    const ip = (request.headers.get("x-forwarded-for") || "unknown").split(",")[0].trim();
+    const now = Date.now(), bucket = rateBuckets.get(ip);
+    if (!bucket || bucket.reset < now) rateBuckets.set(ip, { count: 1, reset: now + 60_000 });
+    else if (++bucket.count > 6000) return out({ error: "RATE_LIMITED" }, 429);
+    const url = new URL(request.url);
+    const body = request.method === "POST" ? await request.json() : Object.fromEntries(url.searchParams);
+    const action = body.action || "state";
+    if (!["state","spectatorState"].includes(action) && /^\d{4}$/.test(String(body.code||'')) && Number.isSafeInteger(body.lifecycleVersion)) {
+      requestDatabase.getStore()!.headers = {'x-mafia-room':String(body.code),'x-mafia-generation':String(body.lifecycleVersion)};
+    }
+    const started = Date.now();
+    if (action === "health") return out({ status: "ok", version: 20, time: new Date().toISOString() });
+    if (action === "hostLogin") {
       const loginBucket = loginBuckets.get(ip);
       if (!loginBucket || loginBucket.reset < now) loginBuckets.set(ip, { count: 1, reset: now + 15 * 60_000 });
       else if (++loginBucket.count > 5) return out({ error: "LOGIN_RATE_LIMITED" }, 429);
@@ -470,31 +409,23 @@ async function routeHostLogin(context:RouteContext) {
       }
       loginBuckets.delete(ip);
       const hostAccessToken = `${crypto.randomUUID()}.${crypto.randomUUID()}`;
-      await persist(db.from("mafia_host_sessions").delete().lt("expires_at", new Date().toISOString()));
-      await persist(db.from("mafia_host_sessions").insert({ token_hash: await sha256(hostAccessToken), expires_at: new Date(Date.now() + 90 * 24 * 60 * 60_000).toISOString() }));
+      await db.from("mafia_host_sessions").delete().lt("expires_at", new Date().toISOString());
+      await db.from("mafia_host_sessions").insert({ token_hash: await sha256(hostAccessToken), expires_at: new Date(Date.now() + 90 * 24 * 60 * 60_000).toISOString() });
       const { data: prefs } = await db.from("mafia_host_preferences").select("settings").eq("id", "default").maybeSingle();
       await audit(null, action, "ok", started);
       return out({ hostAccessToken, preferences: cleanPreferences(prefs?.settings || {}) });
-    
-  }
-}
-async function routeHostPreferences(context:RouteContext) {
-  let {body, action, ip, now, started}=context;
-  {
+    }
+    if (action === "hostPreferences") {
       if (!await validHostAccess(body.hostAccessToken)) return out({ error: "UNAUTHORIZED" }, 403);
       if (body.settings) {
         const settings = cleanPreferences(body.settings);
-        await persist(db.from("mafia_host_preferences").upsert({ id: "default", settings, updated_at: new Date().toISOString() }));
+        await db.from("mafia_host_preferences").upsert({ id: "default", settings, updated_at: new Date().toISOString() });
         return out({ preferences: settings, saved: true });
       }
       const { data: prefs } = await db.from("mafia_host_preferences").select("settings").eq("id", "default").maybeSingle();
       return out({ preferences: cleanPreferences(prefs?.settings || {}) });
-    
-  }
-}
-async function routeHostLogout(context:RouteContext) {
-  let {body, action, ip, now, started}=context;
-  {
+    }
+    if (action === "hostLogout") {
       const token = cleanText(body.hostAccessToken, 200);
       if (token) {
         const hash = await sha256(token);
@@ -510,23 +441,15 @@ async function routeHostLogout(context:RouteContext) {
         if (error) throw error;
       }
       return out({ ok: true });
-    
-  }
-}
-async function routeRecoverProfile(context:RouteContext) {
-  let {body, action, ip, now, started}=context;
-  {
+    }
+    if (action === "recoverProfile") {
       const recoveryCode = cleanText(body.recoveryCode, 16).toUpperCase();
       const { data } = await db.from("mafia_profiles").select("profile_token,nickname").eq("recovery_code", recoveryCode).maybeSingle();
       if (!data) return out({ error: "RECOVERY_NOT_FOUND" }, 404);
       await audit(null, action, "ok", started);
       return out({ profileToken: data.profile_token, nickname: data.nickname });
-    
-  }
-}
-async function routeCreate(context:RouteContext) {
-  let {body, action, ip, now, started}=context;
-  {
+    }
+    if (action === "create") {
       if (!await validHostAccess(body.hostAccessToken)) return out({ error: "UNAUTHORIZED" }, 403);
       let code: string;
       do { code = String(Math.floor(1000 + Math.random() * 9000)); }
@@ -541,12 +464,8 @@ async function routeCreate(context:RouteContext) {
       }).select("*").single();
       if (error || !room) throw error || new Error("CREATE_FAILED");
       return out({ ...publicView(room, [], undefined, true), hostToken });
-    
-  }
-}
-async function routeProfile(context:RouteContext) {
-  let {body, action, ip, now, started}=context;
-  {
+    }
+    if (action === "profile") {
       const profileToken = cleanText(body.profileToken, 80);
       if (!profileToken) return out({ profile: null });
       const [{ data }, { data: seasonData }] = await Promise.all([
@@ -560,12 +479,8 @@ async function routeProfile(context:RouteContext) {
         profile = updated || { ...profile, recovery_code: recoveryCode };
       }
       return out({ profile: profile ? { ...profile, season: currentSeason(), season_games: seasonData?.games || 0, season_wins: seasonData?.wins || 0 } : null });
-    
-  }
-}
-async function routeLeaderboard(context:RouteContext) {
-  let {body, action, ip, now, started}=context;
-  {
+    }
+    if (action === "leaderboard") {
       const [{ data }, { data: seasonRows }] = await Promise.all([
         db.from("mafia_profiles").select("nickname,games,wins").gt("games", 0).order("wins", { ascending: false }).order("games", { ascending: true }).limit(20),
         db.from("mafia_season_stats").select("profile_token,games,wins").eq("season", currentSeason()).gt("games", 0).order("wins", { ascending: false }).order("games", { ascending: true }).limit(20),
@@ -574,24 +489,35 @@ async function routeLeaderboard(context:RouteContext) {
       const { data: seasonNames } = tokens.length ? await db.from("mafia_profiles").select("profile_token,nickname").in("profile_token", tokens) : { data: [] };
       const names = new Map((seasonNames || []).map((x) => [x.profile_token, x.nickname]));
       return out({ leaderboard: data || [], season: currentSeason(), seasonLeaderboard: (seasonRows || []).map((x) => ({ nickname: names.get(x.profile_token) || "Player", games: x.games, wins: x.wins })) });
-    
-  }
-}
-async function routeCreateAdminInvite(context:RoomRouteContext) {
-  let {body, action, ip, now, started, code, room, players, me, host, authenticatedSpectator}=context;
-  {
+    }
+    const code = String(body.code || "").trim();
+    if (!/^\d{4}$/.test(code)) return out({ error: "ROOM_NOT_FOUND" }, 404);
+    let { room, players } = await load(code);
+    if (!room) return out({ error: "ROOM_NOT_FOUND" }, 404);
+    let me = authenticatedPlayer(players, body);
+    let host = body.hostToken === room.host_token || Boolean(me && room.host_player_id === me.id && (me.alive || room.enabled_roles?.controller_spectator === true));
+    // Fence requests sent from a previous match. Transactional transition RPCs
+    // additionally check this value again under the database room lock.
+    const generationFree = ["state","adminState","messages","spectatorState","join","joinSpectator","claimSeat","redeemAdminInvite","moderationLog","listSnapshots","systemStatus","leave"];
+    if (!generationFree.includes(action) && (!Number.isSafeInteger(body.lifecycleVersion) || body.lifecycleVersion !== (room.lifecycle_version || 0))) return out({error:"STALE_GAME"},409);
+    if(['resolveNight','resolveVote','beginNight','startVote','advanceVerdict','lastShot','expelPlayer','endGame','transferHost'].includes(action)) {
+      requestDatabase.getStore()!.plan=new TransitionPlan(room,players);
+    }
+    const actorKey = me ? `player:${code}:${me.id}` : host ? `host:${code}` : `guest:${ip}`;
+    const actorBucket = rateBuckets.get(actorKey);
+    if (!actorBucket || actorBucket.reset < now) rateBuckets.set(actorKey, {count:1,reset:now+60_000});
+    else if (++actorBucket.count > 240) return out({error:"RATE_LIMITED"},429);
+    if (rateBuckets.size > 10000) for (const [key,value] of rateBuckets) if (value.reset < now) rateBuckets.delete(key);
+
+    if (["createAdminInvite", "revokeAdminAccess"].includes(action)) {
       if (!body.hostToken || body.hostToken !== room.host_token) return out({ error:"UNAUTHORIZED" },403);
       const inviteToken=crypto.randomUUID()+crypto.randomUUID();
       const access=action === "revokeAdminAccess" ? null : { inviteHash:await sha256(inviteToken), inviteExpires:Date.now()+120000, hostHash:await sha256(room.host_token) };
       const {error}=await db.from("mafia_rooms").update({enabled_roles:{...room.enabled_roles,admin_access:access}}).eq("code",code);
       if(error)throw error;
       return out(action === "revokeAdminAccess" ? {revoked:true} : {inviteToken,expiresAt:access.inviteExpires});
-    
-  }
-}
-async function routeRedeemAdminInvite(context:RoomRouteContext) {
-  let {body, action, ip, now, started, code, room, players, me, host, authenticatedSpectator}=context;
-  {
+    }
+    if (action === "redeemAdminInvite") {
       const access=room.enabled_roles?.admin_access;
       if(typeof body.inviteToken!=="string" || !access?.inviteHash || access.inviteExpires<Date.now() || access.hostHash!==await sha256(room.host_token) || await sha256(body.inviteToken)!==access.inviteHash) return out({error:"INVITE_EXPIRED"},403);
       const adminToken=crypto.randomUUID()+crypto.randomUUID();
@@ -600,12 +526,8 @@ async function routeRedeemAdminInvite(context:RoomRouteContext) {
       if(error)throw error;
       if(!data?.length)return out({error:"INVITE_USED"},409);
       return out({adminToken,expiresAt});
-    
-  }
-}
-async function routeAdminState(context:RoomRouteContext) {
-  let {body, action, ip, now, started, code, room, players, me, host, authenticatedSpectator}=context;
-  {
+    }
+    if (action === "adminState") {
       // Secret oversight belongs only to the original host, never delegated players.
       const access=room.enabled_roles?.admin_access;
       const admin=typeof body.adminToken==="string" && access?.sessionHash && access.expiresAt>Date.now() && access.hostHash===await sha256(room.host_token) && await sha256(body.adminToken)===access.sessionHash;
@@ -627,12 +549,9 @@ async function routeAdminState(context:RoomRouteContext) {
         return out({ ...overview, history: (data || []).map((s) => ({ phase:s.phase, round:s.round, reason:s.reason, at:s.created_at, players:(s.players_state || []).map(adminPlayerView) })) });
       }
       return out(overview);
-    
-  }
-}
-async function routeLastShot(context:RoomRouteContext) {
-  let {body, action, ip, now, started, code, room, players, me, host, authenticatedSpectator}=context;
-  {
+    }
+    if (room.enabled_roles?.pending_shot && room.phase !== "finished" && ["act","vote","resolveVote","resolveNight","startVote","startDiscussion","passDiscussion","finishDiscussion","advanceVerdict","togglePause","jail","lawyerProtect"].includes(action)) return out({ error: "WAITING_LAST_SHOT" }, 409);
+    if (action === "lastShot") {
       const pending = room.enabled_roles?.pending_shot;
       const shooter = pending && players.find((p) => p.id === pending.playerId);
       const skip = body.target === "SKIP";
@@ -661,35 +580,24 @@ async function routeLastShot(context:RoomRouteContext) {
       ({ room, players } = await load(code));
       if (!winner) { if (room.phase === "night") await botNightActions(room, players); else if (room.phase === "day") await botDayActions(room, players); ({ room, players } = await load(code)); }
       return out(publicView(room, players, me?.id, host));
-    
-  }
-}
-async function routeJoinSpectator(context:RoomRouteContext) {
-  let {body, action, ip, now, started, code, room, players, me, host, authenticatedSpectator}=context;
-  {
+    }
+
+    if (action === "joinSpectator") {
       const name = cleanText(body.name, 20);
       if (!name) return out({ error: "NAME_REQUIRED" }, 400);
       const id = cleanText(body.id, 80) || crypto.randomUUID();
       const spectatorToken = crypto.randomUUID();
-      await persist(db.from("mafia_spectators").upsert({ room_code: code, id, name, session_token: spectatorToken, last_seen: new Date().toISOString() }));
+      await db.from("mafia_spectators").upsert({ room_code: code, id, name, session_token: spectatorToken, last_seen: new Date().toISOString() });
       await audit(code, action, "ok", started);
       return out({ ...publicView(room, players), spectator: { id, name }, spectatorToken });
-    
-  }
-}
-async function routeSpectatorState(context:RoomRouteContext) {
-  let {body, action, ip, now, started, code, room, players, me, host, authenticatedSpectator}=context;
-  {
-      const spectator = authenticatedSpectator;
+    }
+    if (action === "spectatorState") {
+      const { data: spectator } = await db.from("mafia_spectators").select("id,name,session_token").eq("room_code", code).eq("id", cleanText(body.id, 80)).maybeSingle();
       if (!spectator || spectator.session_token !== body.spectatorToken) return out({ error: "UNAUTHORIZED" }, 403);
-      await persist(db.from("mafia_spectators").update({ last_seen: new Date().toISOString() }).eq("room_code", code).eq("id", spectator.id));
+      await db.from("mafia_spectators").update({ last_seen: new Date().toISOString() }).eq("room_code", code).eq("id", spectator.id);
       return out({ ...publicView(room, players), spectator: { id: spectator.id, name: spectator.name } });
-    
-  }
-}
-async function routeClaimSeat(context:RoomRouteContext) {
-  let {body, action, ip, now, started, code, room, players, me, host, authenticatedSpectator}=context;
-  {
+    }
+    if (action === "claimSeat") {
       const replacementCode = cleanText(body.replacementCode, 12).toUpperCase();
       const target = players.find((x) => x.replacement_code === replacementCode && (!x.replacement_expires_at || new Date(x.replacement_expires_at).getTime() > Date.now()));
       const name = cleanText(body.name, 20);
@@ -698,16 +606,13 @@ async function routeClaimSeat(context:RoomRouteContext) {
       requestDatabase.getStore()!.plan=new TransitionPlan(room,players);
       const playerToken = crypto.randomUUID();
       const profileToken = cleanText(body.profileToken, 80) || crypto.randomUUID();
-      await persist(db.from("mafia_players").update({ name, session_token: playerToken, profile_token: profileToken, replacement_code: null, replacement_expires_at: null, last_seen: new Date().toISOString() }).eq("room_code", code).eq("id", target.id));
+      await db.from("mafia_players").update({ name, session_token: playerToken, profile_token: profileToken, replacement_code: null, replacement_expires_at: null, last_seen: new Date().toISOString() }).eq("room_code", code).eq("id", target.id);
       ({ room, players } = await load(code));
       await audit(code, action, "ok", started);
       return out({ ...publicView(room, players, target.id), playerToken, profileToken, playerId: target.id });
-    
-  }
-}
-async function routeJoin(context:RoomRouteContext) {
-  let {body, action, ip, now, started, code, room, players, me, host, authenticatedSpectator}=context;
-  {
+    }
+
+    if (action === "join") {
       const name = String(body.name || "").trim().slice(0, 20);
       const requestedId = String(body.id || crypto.randomUUID());
       if (!validPlayerId(requestedId)) return out({ error: "INVALID_PLAYER_ID" }, 400);
@@ -724,20 +629,16 @@ async function routeJoin(context:RoomRouteContext) {
       if (players.length >= 20) return out({ error: "ROOM_FULL" }, 409);
       if (!name) return out({ error: "NAME_REQUIRED" }, 400);
       if (players.some((x) => x.name.trim().toLocaleLowerCase() === name.toLocaleLowerCase())) return out({ error: "NAME_TAKEN" }, 409);
-      const playerToken = typeof body.playerToken==='string' && /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(body.playerToken) ? body.playerToken : crypto.randomUUID();
+      const playerToken = crypto.randomUUID();
       const profileToken = cleanText(body.profileToken, 80) || crypto.randomUUID();
-      const {data:result,error}=await db.rpc('mafia_join_seat',{p_code:code,p_id:requestedId,p_name:name,p_player_token:playerToken,p_profile_token:profileToken});
-      if(error)throw error;
-      if(result?.error)return out({error:result.error},result.error==='SESSION_INVALID'?403:result.error==='ROOM_NOT_FOUND'?404:409);
-      if(!result?.player)throw new Error('JOIN_FAILED');
-      ({room,players}=await load(code));
-      return out({...publicView(room,players,requestedId),playerToken:result.player.session_token,profileToken:result.player.profile_token});
-    
-  }
-}
-async function routeLeave(context:RoomRouteContext) {
-  let {body, action, ip, now, started, code, room, players, me, host, authenticatedSpectator}=context;
-  {
+      const { data: joined, error } = await db.from("mafia_players").insert({ room_code: code, id: requestedId, name, session_token: playerToken, profile_token: profileToken, last_seen: new Date().toISOString() }).select("*").single();
+      if (error || !joined) throw error || new Error("JOIN_FAILED");
+      await db.from("mafia_profiles").upsert({ profile_token: profileToken, nickname: name, updated_at: new Date().toISOString() }, { onConflict: "profile_token", ignoreDuplicates: false });
+      players.push(joined);
+      return out({ ...publicView(room, players, requestedId), playerToken, profileToken });
+    }
+
+    if (action === "leave") {
       const { data, error } = await db.rpc("mafia_leave_room", {
         p_code: code, p_version: body.lifecycleVersion,
         p_host_token: body.hostToken || null, p_player_id: body.id || null,
@@ -755,12 +656,9 @@ async function routeLeave(context:RoomRouteContext) {
       ({ room, players } = await load(code));
       await reconcileDeparture(room,players);
       return out({ left: true });
-    
-  }
-}
-async function routeReturnToLobby(context:RoomRouteContext) {
-  let {body, action, ip, now, started, code, room, players, me, host, authenticatedSpectator}=context;
-  {
+    }
+
+    if (action === "returnToLobby") {
       // The RPC rechecks authority and the generation under the database lock.
       const { data, error } = await db.rpc("mafia_return_to_lobby", {
         p_code: code, p_version: body.lifecycleVersion,
@@ -771,12 +669,9 @@ async function routeReturnToLobby(context:RoomRouteContext) {
       if (data?.error) return out({ error: data.error }, data.error === "UNAUTHORIZED" ? 403 : 409);
       ({ room, players } = await load(code));
       return out(publicView(room, players, me?.id, true));
-    
-  }
-}
-async function routeStart(context:RoomRouteContext) {
-  let {body, action, ip, now, started, code, room, players, me, host, authenticatedSpectator}=context;
-  {
+    }
+
+    if (action === "start") {
       if (!host) return out({ error: "UNAUTHORIZED" }, 403);
       players = players.filter((p) => !p.left_at);
       if (!["lobby", "finished"].includes(room.phase)) return out({ error: "INVALID_ACTION" }, 400);
@@ -807,7 +702,8 @@ async function routeStart(context:RoomRouteContext) {
       const totalRoles = mafiaCount + fixed + detectiveCount;
       if (totalRoles > players.length) return out({ error: "TOO_MANY_ROLES" }, 400);
       const roles = shuffle(["mafia_boss", ...Array(Math.max(0, mafiaCount - 1)).fill("mafia"), ...Array(doctor).fill("doctor"), ...Array(lawyer).fill("lawyer"), ...Array(jailer).fill("jailer"), ...Array(vigilante).fill("vigilante"), ...Array(witch).fill("witch"), ...Array(serialKiller).fill("serial_killer"), ...Array(jester).fill("jester"), ...Array(cupid).fill("cupid"), ...Array(escort).fill("escort"), ...Array(revealer).fill("revealer"), ...Array(detectiveCount).fill("detective"), ...Array(players.length - totalRoles).fill("citizen")]);
-      (selectedRoles as any).leader_election = null;
+      (selectedRoles as any).leader_election = mafiaCount > 1 ? {pending:true} : null;
+      if(mafiaCount>1)for(let i=0;i<roles.length;i++)if(roles[i]==="mafia_boss")roles[i]="mafia";
       const assignments = players.map((player, i) => {
         const ack = player.is_bot === true;
         const state = roles[i] === "vigilante" ? { bullets: 1, ack } : roles[i] === "witch" ? { life: true, poison: true, ack } : { ack };
@@ -824,12 +720,22 @@ async function routeStart(context:RoomRouteContext) {
       if (transition?.ok !== true) throw new Error("START_FAILED");
       ({ room, players } = await load(code));
       return out(publicView(room, players, undefined, true));
-    
-  }
-}
-async function routeKick(context:RoomRouteContext) {
-  let {body, action, ip, now, started, code, room, players, me, host, authenticatedSpectator}=context;
-  {
+    }
+
+    if (action === "state") {
+      if (!host && !me) return out({ error: "UNAUTHORIZED" }, 403);
+      const { data, error } = await db.rpc("mafia_presence", {p_code:code,p_host_token:body.hostToken||null,p_player_id:body.id||null,p_player_token:body.playerToken||null});
+      if(error)throw error;
+      if(data?.error)return out({error:data.error},data.error==='UNAUTHORIZED'?403:404);
+      if(data?.ok!==true)throw new Error('PRESENCE_FAILED');
+      ({ room, players } = await load(code));
+      if(await reconcileDeparture(room,players))({room,players}=await load(code));
+      me = authenticatedPlayer(players, body);
+      host = body.hostToken === room.host_token || Boolean(me && room.host_player_id === me.id && (me.alive || room.enabled_roles?.controller_spectator === true));
+      return out(publicView(room, players, me?.id, host));
+    }
+
+    if (action === "kick") {
       if (!host || room.phase !== "lobby") return out({ error: "UNAUTHORIZED" }, 403);
       const target = players.find((x) => x.id === body.target);
       if (!target) return out({ error: "PLAYER_NOT_FOUND" }, 404);
@@ -839,12 +745,9 @@ async function routeKick(context:RoomRouteContext) {
       if(!data?.ok)throw Error('KICK_FAILED');
       ({ room, players } = await load(code));
       return out(publicView(room, players, undefined, true));
-    
-  }
-}
-async function routeWarnPlayer(context:RoomRouteContext) {
-  let {body, action, ip, now, started, code, room, players, me, host, authenticatedSpectator}=context;
-  {
+    }
+
+    if (action === "warnPlayer" || action === "expelPlayer") {
       if (!host) return out({ error: "UNAUTHORIZED" }, 403);
       if (["lobby", "finished"].includes(room.phase)) return out({ error: "INVALID_ACTION" }, 409);
       const target = players.find((p) => p.id === body.target && p.alive);
@@ -890,7 +793,7 @@ async function routeWarnPlayer(context:RoomRouteContext) {
           roomPatch.round = room.round + 1;
           if (room.phase === "paused") { settings.paused_phase = "night"; roomPatch.phase_started_at = new Date(Date.now()).toISOString(); roomPatch.phase_paused_at = new Date(Date.now()).toISOString(); }
           else roomPatch.phase = "night";
-          await persist(db.from("mafia_players").update({ vote_target: null, action_target: null }).eq("room_code", code));
+          await db.from("mafia_players").update({ vote_target: null, action_target: null }).eq("room_code", code);
         }
         const updated = await db.from("mafia_rooms").update(roomPatch).eq("code", code);
         if (updated.error) throw updated.error;
@@ -902,12 +805,9 @@ async function routeWarnPlayer(context:RoomRouteContext) {
       await audit(code, action, "ok", started);
       ({ room, players } = await load(code));
       return out(publicView(room, players, me?.id, host));
-    
-  }
-}
-async function routeAddBot(context:RoomRouteContext) {
-  let {body, action, ip, now, started, code, room, players, me, host, authenticatedSpectator}=context;
-  {
+    }
+
+    if (action === "addBot") {
       if (!host || room.phase !== "lobby" || players.length >= 20) return out({ error: "INVALID_ACTION" }, 400);
       const base=body.name ? cleanText(body.name,14) : 'BOT';
       let count=1;while(players.some(p=>p.name.toLowerCase()===`${base} ${count}`.toLowerCase()))count++;
@@ -916,100 +816,73 @@ async function routeAddBot(context:RoomRouteContext) {
       if (error) throw error;
       ({ room, players } = await load(code));
       return out(publicView(room, players, undefined, true));
-    
-  }
-}
-async function routeMute(context:RoomRouteContext) {
-  let {body, action, ip, now, started, code, room, players, me, host, authenticatedSpectator}=context;
-  {
+    }
+
+    if (action === "mute") {
       if (!host) return out({ error: "UNAUTHORIZED" }, 403);
       const target = players.find((x) => x.id === body.target);
       if (!target) return out({ error: "PLAYER_NOT_FOUND" }, 404);
       await patchRoleState(code, target, { muted: body.muted !== false });
       ({ room, players } = await load(code));
       return out(publicView(room, players, undefined, true));
-    
-  }
-}
-async function routeEndGame(context:RoomRouteContext) {
-  let {body, action, ip, now, started, code, room, players, me, host, authenticatedSpectator}=context;
-  {
+    }
+
+    if (action === "endGame") {
       if (!host || ["lobby", "finished"].includes(room.phase)) return out({ error: "INVALID_ACTION" }, 400);
       await snapshot(room, players, "before_host_end");
-      await persist(db.from("mafia_rooms").update({ phase: "finished", winner: "cancelled", winner_player: null, last_event: "host_ended" }).eq("code", code));
+      await db.from("mafia_rooms").update({ phase: "finished", winner: "cancelled", winner_player: null, last_event: "host_ended" }).eq("code", code);
       ({ room, players } = await load(code));
       return out(publicView(room, players, undefined, true));
-    
-  }
-}
-async function routeSaveWill(context:RoomRouteContext) {
-  let {body, action, ip, now, started, code, room, players, me, host, authenticatedSpectator}=context;
-  {
+    }
+
+    if (action === "saveWill") {
       if (!me?.alive) return out({ error: "UNAUTHORIZED" }, 403);
-      await persist(db.from("mafia_players").update({ will_text: cleanText(body.text, 500) }).eq("room_code", code).eq("id", me.id));
+      await db.from("mafia_players").update({ will_text: cleanText(body.text, 500) }).eq("room_code", code).eq("id", me.id);
       ({ room, players } = await load(code));
       return out(publicView(room, players, me.id));
-    
-  }
-}
-async function routeReport(context:RoomRouteContext) {
-  let {body, action, ip, now, started, code, room, players, me, host, authenticatedSpectator}=context;
-  {
+    }
+
+    if (action === "report") {
       if (!me) return out({ error: "UNAUTHORIZED" }, 403);
       const reason = cleanText(body.reason, 160);
       if (reason.length < 2) return out({ error: "REASON_REQUIRED" }, 400);
-      await persist(db.from("mafia_reports").insert({ room_code: code, reporter_id: me.id, target_id: cleanText(body.target, 80) || null, reason }));
+      await db.from("mafia_reports").insert({ room_code: code, reporter_id: me.id, target_id: cleanText(body.target, 80) || null, reason });
       return out({ ok: true });
-    
-  }
-}
-async function routeModerationLog(context:RoomRouteContext) {
-  let {body, action, ip, now, started, code, room, players, me, host, authenticatedSpectator}=context;
-  {
+    }
+
+    if (action === "moderationLog") {
       if (!host) return out({ error: "UNAUTHORIZED" }, 403);
       const { data } = await db.from("mafia_reports").select("id,reporter_id,target_id,reason,created_at").eq("room_code", code).order("created_at", { ascending: false }).limit(50);
       return out({ reports: data || [] });
-    
-  }
-}
-async function routeTransferHost(context:RoomRouteContext) {
-  let {body, action, ip, now, started, code, room, players, me, host, authenticatedSpectator}=context;
-  {
+    }
+
+    if (action === "transferHost") {
       if (!host) return out({ error: "UNAUTHORIZED" }, 403);
       const target = players.find((x) => x.id === body.target && !x.is_bot && !x.left_at);
       if (!target) return out({ error: "PLAYER_NOT_FOUND" }, 404);
-      await persist(db.from("mafia_rooms").update({ host_player_id: target.id, enabled_roles:{...room.enabled_roles,controller_spectator:!target.alive} }).eq("code", code));
+      await db.from("mafia_rooms").update({ host_player_id: target.id, enabled_roles:{...room.enabled_roles,controller_spectator:!target.alive} }).eq("code", code);
       ({ room, players } = await load(code));
       await audit(code, action, "ok", started);
       return out(publicView(room, players, me?.id, true));
-    
-  }
-}
-async function routeCreateReplacement(context:RoomRouteContext) {
-  let {body, action, ip, now, started, code, room, players, me, host, authenticatedSpectator}=context;
-  {
+    }
+
+    if (action === "createReplacement") {
       if (!host) return out({ error: "UNAUTHORIZED" }, 403);
       const target = players.find((x) => x.id === body.target && !x.is_bot);
       if (!target) return out({ error: "PLAYER_NOT_FOUND" }, 404);
       const replacementCode = shortCode(6);
-      await persist(db.from("mafia_players").update({ replacement_code: replacementCode, replacement_expires_at: new Date(Date.now() + 15 * 60_000).toISOString() }).eq("room_code", code).eq("id", target.id));
+      await db.from("mafia_players").update({ replacement_code: replacementCode, replacement_expires_at: new Date(Date.now() + 15 * 60_000).toISOString() }).eq("room_code", code).eq("id", target.id);
       await audit(code, action, "ok", started);
       return out({ replacementCode, target: { id: target.id, name: target.name }, expiresMinutes: 15 });
-    
-  }
-}
-async function routeListSnapshots(context:RoomRouteContext) {
-  let {body, action, ip, now, started, code, room, players, me, host, authenticatedSpectator}=context;
-  {
+    }
+
+    if (action === "listSnapshots") {
       if (!host) return out({ error: "UNAUTHORIZED" }, 403);
       const { data } = await db.from("mafia_snapshots").select("id,phase,round,reason,created_at").eq("room_code", code).order("created_at", { ascending: false }).limit(20);
       return out({ snapshots: data || [] });
-    
-  }
-}
-async function routeRestoreSnapshot(context:RoomRouteContext) {
-  let {body, action, ip, now, started, code, room, players, me, host, authenticatedSpectator}=context;
-  {
+    }
+
+    if (action === "restoreSnapshot") {
       if (!host) return out({ error: "UNAUTHORIZED" }, 403);
       const { data: saved } = await db.from("mafia_snapshots").select("*").eq("room_code", code).eq("id", Number(body.snapshotId)).maybeSingle();
       if (!saved) return out({ error: "SNAPSHOT_NOT_FOUND" }, 404);
@@ -1029,20 +902,17 @@ async function routeRestoreSnapshot(context:RoomRouteContext) {
       const settings={...savedRoom.enabled_roles};
       for(const key of ['admin_access','controller_spectator','departure_pending']){delete settings[key];if(room.enabled_roles?.[key]!==undefined)settings[key]=room.enabled_roles[key];}
       roomUpdate.enabled_roles=settings;
-      await persist(db.from("mafia_rooms").update(roomUpdate).eq("code", code));
+      await db.from("mafia_rooms").update(roomUpdate).eq("code", code);
       for (const player of savedPlayers) {
         const playerKeys = ["role","role_state","alive","action_target","vote_target","investigation_result","will_text"];
-        await persist(db.from("mafia_players").update(Object.fromEntries(playerKeys.map((key) => [key, player[key]]))).eq("room_code", code).eq("id", player.id));
+        await db.from("mafia_players").update(Object.fromEntries(playerKeys.map((key) => [key, player[key]]))).eq("room_code", code).eq("id", player.id);
       }
       ({ room, players } = await load(code));
       await audit(code, action, "ok", started);
       return out(publicView(room, players, me?.id, true));
-    
-  }
-}
-async function routeSystemStatus(context:RoomRouteContext) {
-  let {body, action, ip, now, started, code, room, players, me, host, authenticatedSpectator}=context;
-  {
+    }
+
+    if (action === "systemStatus") {
       if (!host) return out({ error: "UNAUTHORIZED" }, 403);
       const since = new Date(Date.now() - 24 * 60 * 60_000).toISOString();
       const [{ count: reports }, { count: snapshots }, { count: spectators }, { data: recentAudit }] = await Promise.all([
@@ -1053,12 +923,9 @@ async function routeSystemStatus(context:RoomRouteContext) {
       ]);
       const durations = (recentAudit || []).map((x) => Number(x.duration_ms) || 0);
       return out({ status: "ok", version: 18, reports: reports || 0, snapshots: snapshots || 0, spectators: spectators || 0, averageMs: durations.length ? Math.round(durations.reduce((a, b) => a + b, 0) / durations.length) : 0 });
-    
-  }
-}
-async function routeMessages(context:RoomRouteContext) {
-  let {body, action, ip, now, started, code, room, players, me, host, authenticatedSpectator}=context;
-  {
+    }
+
+    if (action === "messages" || action === "sendMessage") {
       if (!me?.alive || !(room.phase === "night" || (room.phase === "paused" && room.enabled_roles?.paused_phase === "night"))) return out({ error: "INVALID_ACTION" }, 400);
       const jailAccess = (me.role === "jailer" || me.id === room.jailed_player) && Boolean(room.jailed_player);
       const channel = jailAccess ? "jail" : mafiaRole(me.role) ? "mafia" : null;
@@ -1082,12 +949,10 @@ async function routeMessages(context:RoomRouteContext) {
       if (messagesError) throw messagesError;
       const page=(data||[]).slice(0,80);
       return out({ channel, hasMore:(data||[]).length>80, nextCursor:page.length?String(page.at(-1).id):null, messages: page.reverse().map((message) => channel === "jail" ? { ...message, author_id: undefined, author_name: message.author_id === room.jailed_player ? "السجين" : "السجّان" } : message) });
-    
-  }
-}
-async function routeTogglePause(context:RoomRouteContext) {
-  let {body, action, ip, now, started, code, room, players, me, host, authenticatedSpectator}=context;
-  {
+    }
+
+
+    if (action === "togglePause") {
       if (!host || ["lobby", "finished"].includes(room.phase)) return out({ error: "INVALID_ACTION" }, 400);
       const settings = enabledRoles(room.enabled_roles);
       const nextPhase = room.phase === "paused" ? settings.paused_phase || "night" : "paused";
@@ -1096,55 +961,16 @@ async function routeTogglePause(context:RoomRouteContext) {
       if (discussion && discussion.round === room.round && !discussion.finished) {
         if (room.phase === "paused" && discussion.pausedAt && !discussion.manualPaused) {
           const pauseMs = Date.now() - discussion.pausedAt;
-          nextDiscussion = { ...discussion, roulette:discussion.roulette?{...discussion.roulette,at:discussion.roulette.at+pauseMs}:null, pausedAt: null, turnStartedAt: discussion.turnStartedAt + pauseMs, endsAt: discussion.endsAt + pauseMs, version: discussion.version + 1 };
+          nextDiscussion = { ...discussion, pausedAt: null, turnStartedAt: discussion.turnStartedAt + pauseMs, endsAt: discussion.endsAt + pauseMs, version: discussion.version + 1 };
         } else if (room.phase === "day" && !discussion.pausedAt) nextDiscussion = { ...discussion, pausedAt: Date.now(), version: discussion.version + 1 };
       }
       const nextSettings = { ...room.enabled_roles, ...settings, paused_phase: room.phase === "paused" ? null : room.phase, discussion_state: nextDiscussion };
-      await persist(db.from("mafia_rooms").update({ phase: nextPhase, enabled_roles: nextSettings }).eq("code", code));
+      await db.from("mafia_rooms").update({ phase: nextPhase, enabled_roles: nextSettings }).eq("code", code);
       ({ room, players } = await load(code));
       return out(publicView(room, players, undefined, true));
-    
-  }
-}
-async function routeElectMafiaLeader(context:RoomRouteContext) {
- if(context.room.enabled_roles?.leader_election?.pending&&!context.room.enabled_roles.leader_election.former)return routeInitialMafiaLeader(context);
- const {body,code,now}=context;
- let {room,players,me}=context;
- if(!me?.alive||!mafiaRole(me.role)||['lobby','finished','paused'].includes(room.phase))return out({error:'UNAUTHORIZED'},403);
- let election=room.enabled_roles?.leader_election;
- if(body.target==='RESIGN'){
-  if(me.role!=='mafia_boss'||election?.pending)return out({error:'INVALID_ACTION'},409);
-  if(!players.some(p=>p.alive&&p.role==='mafia'&&p.id!==me.id))return out({error:'NO_CANDIDATES'},409);
-  election={pending:true,former:me.id,deadline:now+30000,votes:{}};
- }else{
-  if(!election?.pending||!election.former)return out({error:'INVALID_ACTION'},409);
-  election={...election,votes:{...election.votes}};
-  if(body.target!=='FINALIZE'){
-   if(now>=election.deadline||election.votes[me.id])return out({error:'INVALID_ACTION'},409);
-   const target=players.find(p=>p.id===body.target&&p.alive&&mafiaRole(p.role)&&p.id!==election.former);
-   if(!target)return out({error:'INVALID_ACTION'},400);
-   election.votes[me.id]=target.id;
-  }else if(now<election.deadline)return out({error:'WAITING_LEADER_VOTES'},409);
- }
- const team=players.filter(p=>p.alive&&mafiaRole(p.role));
- const candidates=team.filter(p=>p.id!==election.former);
- for(const bot of team.filter(p=>p.is_bot&&!election.votes[p.id]))if(candidates.length)election.votes[bot.id]=randomItem(candidates).id;
- const finished=now>=election.deadline||team.every(p=>election.votes[p.id])||!candidates.length;
- if(finished){
-  if(candidates.length){
-   const counts=new Map(candidates.map(p=>[p.id,0]));
-   for(const voter of team){const target=election.votes[voter.id];if(counts.has(target))counts.set(target,counts.get(target)!+1);}
-   const max=Math.max(...counts.values());const winner=randomItem(candidates.filter(p=>counts.get(p.id)===max))!.id;
-   for(const player of players.filter(p=>mafiaRole(p.role))){await persist(db.from('mafia_players').update({role:player.id===winner?'mafia_boss':'mafia'}).eq('room_code',code).eq('id',player.id));}
-   election={pending:false,winner};
-  }else election={pending:false};
- }
- await persist(db.from('mafia_rooms').update({enabled_roles:{...room.enabled_roles,leader_election:election}}).eq('code',code));
- ({room,players}=await load(code));return out(publicView(room,players,me.id));
-}
-async function routeInitialMafiaLeader(context:RoomRouteContext) {
-  let {body, action, ip, now, started, code, room, players, me, host, authenticatedSpectator}=context;
-  {
+    }
+
+    if (action === "electMafiaLeader") {
       if(room.phase!=="reveal" || !room.enabled_roles?.leader_election?.pending || room.enabled_roles.leader_election.winner || !me?.alive || !mafiaRole(me.role))return out({error:"UNAUTHORIZED"},403);
       const target=players.find(p=>p.id===body.target&&p.alive&&mafiaRole(p.role));
       if(!target||roleState(me).leaderVote)return out({error:"INVALID_ACTION"},400);
@@ -1153,26 +979,19 @@ async function routeInitialMafiaLeader(context:RoomRouteContext) {
       const {data,error}=await query.select("id");if(error)throw error;
       if(!data?.length)return out({error:"STALE_ACTION"},409);
       ({room,players}=await load(code));return out(publicView(room,players,me.id));
-    
-  }
-}
-async function routeAcknowledgeRole(context:RoomRouteContext) {
-  let {body, action, ip, now, started, code, room, players, me, host, authenticatedSpectator}=context;
-  {
+    }
+    if (action === "acknowledgeRole") {
       if (room.phase !== "reveal" || !me) return out({ error: "INVALID_ACTION" }, 400);
       await patchRoleState(code, me, { ack: true });
       ({ room, players } = await load(code));
       return out(publicView(room, players, me.id));
-    
-  }
-}
-async function routeBeginNight(context:RoomRouteContext) {
-  let {body, action, ip, now, started, code, room, players, me, host, authenticatedSpectator}=context;
-  {
+    }
+
+    if (action === "beginNight") {
       if (!host || room.phase !== "reveal") return out({ error: "INVALID_ACTION" }, 400);
       if (!players.length || !players.every((x) => roleState(x).ack === true)) return out({ error: "WAITING_ROLES" }, 409);
       const election=room.enabled_roles?.leader_election;
-      if(election?.pending&&!election.former){
+      if(election?.pending){
         const team=players.filter(p=>p.alive&&mafiaRole(p.role));
         for(const bot of team.filter(p=>p.is_bot&&!roleState(p).leaderVote)){
           bot.role_state={...roleState(bot),leaderVote:randomItem(team)?.id};
@@ -1192,46 +1011,36 @@ async function routeBeginNight(context:RoomRouteContext) {
         ({room,players}=await load(code));
         const finished=await db.from("mafia_rooms").update({enabled_roles:{...room.enabled_roles,leader_election:{pending:false,winner}}}).eq("code",code);if(finished.error)throw finished.error;
       }
-      await persist(db.from("mafia_rooms").update({ phase: "night" }).eq("code", code));
+      await db.from("mafia_rooms").update({ phase: "night" }).eq("code", code);
       ({ room, players } = await load(code));
       await botNightActions(room, players);
       ({ room, players } = await load(code));
       return out(publicView(room, players, undefined, true));
-    
-  }
-}
-async function routeJail(context:RoomRouteContext) {
-  let {body, action, ip, now, started, code, room, players, me, host, authenticatedSpectator}=context;
-  {
+    }
+
+    if (action === "jail") {
       const target = players.find((x) => x.id === body.target);
       if (room.phase !== "day" || !me?.alive || me.role !== "jailer" || !target?.alive || target.id === me.id) return out({ error: "INVALID_ACTION" }, 400);
-      await persist(db.from("mafia_rooms").update({ jailed_player: target.id }).eq("code", code));
+      await db.from("mafia_rooms").update({ jailed_player: target.id }).eq("code", code);
       ({ room, players } = await load(code));
       return out(publicView(room, players, me.id));
-    
-  }
-}
-async function routeLawyerProtect(context:RoomRouteContext) {
-  let {body, action, ip, now, started, code, room, players, me, host, authenticatedSpectator}=context;
-  {
+    }
+    if (action === "lawyerProtect") {
       const target = players.find((x) => x.id === body.target);
       if (room.phase !== "day" || !me?.alive || me.role !== "lawyer" || !target?.alive) return out({ error: "INVALID_ACTION" }, 400);
-      await persist(db.from("mafia_players").update({ action_target: target.id }).eq("room_code", code).eq("id", me.id));
+      await db.from("mafia_players").update({ action_target: target.id }).eq("room_code", code).eq("id", me.id);
       ({ room, players } = await load(code));
       return out(publicView(room, players, me.id));
-    
-  }
-}
-async function routeAct(context:RoomRouteContext) {
-  let {body, action, ip, now, started, code, room, players, me, host, authenticatedSpectator}=context;
-  {
+    }
+
+    if (action === "act") {
       if (room.round === 1 && me?.role !== "detective") return out({ error: "FIRST_NIGHT_DETECTIVE_ONLY" }, 409);
       if (room.phase !== "night" || !me?.alive || (room.round !== 1 && me.id === room.jailed_player)) return out({ error: "INVALID_ACTION" }, 400);
       const target = players.find((x) => x.id === body.target);
       if (mafiaRole(me.role)) {
         if (isMafiaLocked(room, players)) return out({ error: "MAFIA_LOCKED" }, 409);
         if (body.target !== "SKIP" && (!target?.alive || mafiaRole(target.role))) return out({ error: "INVALID_ACTION" }, 400);
-        await persist(db.from("mafia_players").update({ action_target: body.target }).eq("room_code", code).eq("id", me.id));
+        await db.from("mafia_players").update({ action_target: body.target }).eq("room_code", code).eq("id", me.id);
       } else if (me.role === "revealer") {
         if (!["COUNT","SKIP"].includes(body.target) || me.action_target || roleState(me).mafiaCountResult) return out({ error: "INVALID_ACTION" }, 400);
         let query=db.from("mafia_players").update({action_target:body.target}).eq("room_code",code).eq("id",me.id);
@@ -1241,7 +1050,7 @@ async function routeAct(context:RoomRouteContext) {
       } else if (me.role === "doctor") {
         if (!doctorAvailable(room)) return out({ error: "DOCTOR_UNAVAILABLE" }, 409);
         if (!target?.alive || target.id === room.doctor_last_target) return out({ error: "INVALID_ACTION" }, 400);
-        await persist(db.from("mafia_players").update({ action_target: target.id }).eq("room_code", code).eq("id", me.id));
+        await db.from("mafia_players").update({ action_target: target.id }).eq("room_code", code).eq("id", me.id);
       } else if (me.role === "detective") {
         const picked = selected(me), limit = detectiveLimit(room, players);
         if (!target?.alive || target.id === me.id || picked.includes(target.id) || picked.length >= limit) return out({ error: "INVALID_ACTION" }, 400);
@@ -1257,32 +1066,26 @@ async function routeAct(context:RoomRouteContext) {
         const potionTarget = players.find((x) => x.id === targetId && x.alive);
         const state = roleState(me);
         if (!potionTarget || !["SAVE", "POISON"].includes(kind) || (kind === "SAVE" && state.life === false) || (kind === "POISON" && (state.poison === false || potionTarget.id === me.id))) return out({ error: "INVALID_ACTION" }, 400);
-        await persist(db.from("mafia_players").update({ action_target: `${kind}:${potionTarget.id}` }).eq("room_code", code).eq("id", me.id));
+        await db.from("mafia_players").update({ action_target: `${kind}:${potionTarget.id}` }).eq("room_code", code).eq("id", me.id);
       } else if (me.role === "serial_killer" || me.role === "escort") {
         if (!target?.alive || target.id === me.id) return out({ error: "INVALID_ACTION" }, 400);
-        await persist(db.from("mafia_players").update({ action_target: target.id }).eq("room_code", code).eq("id", me.id));
+        await db.from("mafia_players").update({ action_target: target.id }).eq("room_code", code).eq("id", me.id);
       } else if (me.role === "cupid") {
         const picked = selected(me);
         if (room.round !== 2 || !target?.alive || target.id === me.id || picked.includes(target.id) || picked.length >= 2) return out({ error: "INVALID_ACTION" }, 400);
-        let query = db.from("mafia_players").update({action_target:[...picked,target.id].join(",")}).eq("room_code",code).eq("id",me.id);
-        query=me.action_target==null?query.is("action_target",null):query.eq("action_target",me.action_target);
-        const {data,error}=await query.select("id");if(error)throw error;
-        if(!data?.length)return out({error:"STALE_ACTION"},409);
+        await db.from("mafia_players").update({ action_target: [...picked, target.id].join(",") }).eq("room_code", code).eq("id", me.id);
       } else if (me.role === "jailer") {
         const prisoner = players.find((x) => x.id === room.jailed_player && x.alive);
         const choice = String(body.target || "");
         if (!prisoner || !["SPARE", "EXECUTE"].includes(choice)) return out({ error: "INVALID_ACTION" }, 400);
         if (choice === "EXECUTE" && room.jailer_executions <= 0) return out({ error: "NO_EXECUTIONS" }, 409);
-        await persist(db.from("mafia_players").update({ action_target: choice }).eq("room_code", code).eq("id", me.id));
+        await db.from("mafia_players").update({ action_target: choice }).eq("room_code", code).eq("id", me.id);
       } else return out({ error: "INVALID_ACTION" }, 400);
       ({ room, players } = await load(code));
       return out(publicView(room, players, me.id));
-    
-  }
-}
-async function routeResolveNight(context:RoomRouteContext) {
-  let {body, action, ip, now, started, code, room, players, me, host, authenticatedSpectator}=context;
-  {
+    }
+
+    if (action === "resolveNight") {
       if (!host) return out({ error: "UNAUTHORIZED" }, 403);
       if (room.phase !== "night") return out({ error: "INVALID_ACTION" }, 409);
       if (!publicView(room, players, undefined, true).nightReady && !phaseExpired(room)) return out({ error: "WAITING_ACTIONS" }, 409);
@@ -1351,7 +1154,7 @@ async function routeResolveNight(context:RoomRouteContext) {
       }
       if (witch?.action_target && ["SAVE", "POISON"].includes(witchKind)) {
         witch.role_state = { ...roleState(witch), [witchKind === "SAVE" ? "life" : "poison"]: false };
-        await persist(db.from("mafia_players").update({ role_state: witch.role_state }).eq("room_code", code).eq("id", witch.id));
+        await db.from("mafia_players").update({ role_state: witch.role_state }).eq("room_code", code).eq("id", witch.id);
       }
       for (const revealer of players.filter(p => p.role === "revealer" && !roleState(p).mafiaCountResult && canAct(p) && p.action_target === "COUNT" && !deaths.includes(p.id))) {
         const mafiaCountResult = { round: room.round, count: players.filter(p => p.alive && mafiaRole(p.role) && !deaths.includes(p.id)).length };
@@ -1359,8 +1162,8 @@ async function routeResolveNight(context:RoomRouteContext) {
         if (error) throw error;
       }
       await eliminatePlayers(room, players, causes);
-      await persist(db.from("mafia_players").update({ action_target: null, vote_target: null }).eq("room_code", code));
-      await persist(db.from("mafia_rooms").update({ phase: "day", jailed_player: null, jailer_executions: executions, doctor_last_target: doctorTarget || null, linked_players: linkedPlayers, last_event: events.join(","), last_deaths: deaths, last_eliminated: deaths[0] || null, last_saved: events.some((x) => x.endsWith("saved")) }).eq("code", code));
+      await db.from("mafia_players").update({ action_target: null, vote_target: null }).eq("room_code", code);
+      await db.from("mafia_rooms").update({ phase: "day", jailed_player: null, jailer_executions: executions, doctor_last_target: doctorTarget || null, linked_players: linkedPlayers, last_event: events.join(","), last_deaths: deaths, last_eliminated: deaths[0] || null, last_saved: events.some((x) => x.endsWith("saved")) }).eq("code", code);
       await prepareLastShot(code, causes, "day", room.round);
       await promoteMafia(code);
       const nightWinner = await checkWin(code);
@@ -1370,12 +1173,9 @@ async function routeResolveNight(context:RoomRouteContext) {
         ({ room, players } = await load(code));
       }
       return out(publicView(room, players, undefined, true));
-    
-  }
-}
-async function routeSetDiscussionClaim(context:RoomRouteContext) {
-  let {body, action, ip, now, started, code, room, players, me, host, authenticatedSpectator}=context;
-  {
+    }
+
+    if (action === "setDiscussionClaim") {
       if (!me || !me.alive || me.role !== "mafia_boss") return out({ error: "UNAUTHORIZED" }, 403);
       if (!["night", "day"].includes(room.phase) || room.round !== 1 || room.enabled_roles?.discussion_state || typeof roleState(me).discussionClaim === "boolean" || typeof body.claim !== "boolean") return out({ error: "CHOICE_LOCKED" }, 409);
       const { data: changed, error } = await db.from("mafia_players").update({ role_state: { ...roleState(me), discussionClaim: body.claim } }).eq("room_code",code).eq("id", me.id).eq("session_token", body.playerToken).eq("role_state",JSON.stringify(roleState(me))).select("id");
@@ -1383,12 +1183,8 @@ async function routeSetDiscussionClaim(context:RoomRouteContext) {
       if (!changed?.length) return out({error:"CHOICE_LOCKED"},409);
       ({ room, players } = await load(code));
       return out(publicView(room, players, me.id));
-    
-  }
-}
-async function routeStartDiscussion(context:RoomRouteContext) {
-  let {body, action, ip, started, code, room, players, me, host, authenticatedSpectator}=context;
-  {
+    }
+    if (action === "startDiscussion") {
       if (!host) return out({ error: "UNAUTHORIZED" }, 403);
       if (room.phase !== "day") return out({ error: "INVALID_ACTION" }, 409);
       const settings = enabledRoles(room.enabled_roles);
@@ -1408,22 +1204,17 @@ async function routeStartDiscussion(context:RoomRouteContext) {
       const remaining = speakers.filter(p=>!openingIds.has(p.id));
       for(let i=0;i<remaining.length-1;i++){const j=i+Math.floor(Math.random()*(remaining.length-i));[remaining[i],remaining[j]]=[remaining[j],remaining[i]];}
       const order = [...opening, ...remaining].map(p=>p.id);
-      const roulette = settings.discussion_mode === "turns" && priority.length > 1 ? { candidates: shuffle(opening).map(p=>p.id), winner:starter.id, at:now, duration:6000 } : null;
+      const roulette = settings.discussion_mode === "turns" && priority.length > 1 ? { candidates: opening.map(p=>p.id), winner:starter.id, at:now } : null;
       const choices = settings.discussion_mode === "turns" ? [15,30,45,60,90,120] : [30,60,120,180,300,600,900,1800,3600];
       const seconds = body.seconds === undefined ? (settings.discussion_mode === "turns" ? settings.speaker_seconds : settings.discussion_seconds) : Number(body.seconds);
       if (!choices.includes(seconds)) return out({ error: "INVALID_DURATION" }, 400);
-      const speakingAt = now + (roulette?.duration || 0);
-      const state = { id: crypto.randomUUID(), version: 0, round: room.round, mode: settings.discussion_mode, seconds, order, roulette, firstSpeakerId: starter?.id || order[0] || null, cursor: 0, turnStartedAt: speakingAt, endsAt: speakingAt + seconds * 1000, pausedAt: null, finished: false };
+      const state = { id: crypto.randomUUID(), version: 0, round: room.round, mode: settings.discussion_mode, seconds, order, roulette, firstSpeakerId: starter?.id || order[0] || null, cursor: 0, turnStartedAt: now, endsAt: now + seconds * 1000, pausedAt: null, finished: false };
       const { error } = await db.from("mafia_rooms").update({ enabled_roles: { ...room.enabled_roles, discussion_state: state } }).eq("code", code).eq("phase", "day").eq("enabled_roles", JSON.stringify(room.enabled_roles));
       if (error) throw error;
       ({ room, players } = await load(code));
       return out(publicView(room, players, me?.id, host));
-    
-  }
-}
-async function routeControlDiscussion(context:RoomRouteContext) {
-  let {body, action, ip, started, code, room, players, me, host, authenticatedSpectator}=context;
-  {
+    }
+    if (action === "controlDiscussion") {
       if (!host) return out({ error: "UNAUTHORIZED" }, 403);
       if (room.phase !== "day" || room.enabled_roles?.pending_shot) return out({ error: "INVALID_ACTION" }, 409);
       const view = discussionView(room);
@@ -1435,10 +1226,9 @@ async function routeControlDiscussion(context:RoomRouteContext) {
       if (body.operation === "pause" && view.status === "active") next = { ...saved, pausedAt: now, manualPaused: true };
       else if (body.operation === "resume" && view.status === "paused") {
         const elapsed = now - saved.pausedAt;
-        next = { ...saved, roulette:saved.roulette?{...saved.roulette,at:saved.roulette.at+elapsed}:null, pausedAt: null, manualPaused: false, turnStartedAt: saved.turnStartedAt + elapsed, endsAt: saved.endsAt + elapsed };
+        next = { ...saved, pausedAt: null, manualPaused: false, turnStartedAt: saved.turnStartedAt + elapsed, endsAt: saved.endsAt + elapsed };
       } else if (body.operation === "reset") {
         const at = saved.pausedAt || now;
-        if (at < saved.turnStartedAt) return out({ error: "DRAW_IN_PROGRESS" }, 409);
         next = { ...saved, cursor: view.index, turnStartedAt: at, endsAt: at + saved.seconds * 1000 };
       } else return out({ error: "INVALID_ACTION" }, 409);
       next.version = saved.version + 1;
@@ -1447,78 +1237,57 @@ async function routeControlDiscussion(context:RoomRouteContext) {
       if (!changed?.length) return out({ error: "STALE_TURN" }, 409);
       ({ room, players } = await load(code));
       return out(publicView(room, players, me?.id, host));
-    
-  }
-}
-async function routePassDiscussion(context:RoomRouteContext) {
-  let {body, action, ip, now, started, code, room, players, me, host, authenticatedSpectator}=context;
-  {
+    }
+    if (action === "passDiscussion" || action === "finishDiscussion") {
       const discussion = discussionView(room);
       if (room.phase !== "day" || discussion.status !== "active") return out({ error: "INVALID_ACTION" }, 409);
       if (action === "finishDiscussion" && !host) return out({ error: "UNAUTHORIZED" }, 403);
       if (action === "passDiscussion" && (!host && (!me?.alive || me.id !== discussion.speakerId))) return out({ error: "UNAUTHORIZED" }, 403);
       if (body.discussionId !== discussion.id || (action === "passDiscussion" && (discussion.mode !== "turns" || body.speakerId !== discussion.speakerId))) return out({ error: "STALE_TURN" }, 409);
       const saved = room.enabled_roles.discussion_state;
-      if (action === "passDiscussion" && Date.now() < saved.turnStartedAt) return out({ error: "DRAW_IN_PROGRESS" }, 409);
       const next = action === "finishDiscussion" ? { ...saved, finished: true, version: saved.version + 1 } : { ...saved, cursor: discussion.index + 1, turnStartedAt: Date.now(), version: saved.version + 1 };
       const { data: changed, error } = await db.from("mafia_rooms").update({ enabled_roles: { ...room.enabled_roles, discussion_state: next } }).eq("code", code).eq("phase", "day").eq("enabled_roles->discussion_state->>id", saved.id).eq("enabled_roles->discussion_state->>version", String(saved.version)).select("code");
       if (error) throw error;
       if (!changed?.length) return out({ error: "STALE_TURN" }, 409);
       ({ room, players } = await load(code));
       return out(publicView(room, players, me?.id, host));
-    
-  }
-}
-async function routeStartVote(context:RoomRouteContext) {
-  let {body, action, ip, now, started, code, room, players, me, host, authenticatedSpectator}=context;
-  {
+    }
+    if (action === "startVote") {
       if (!host) return out({ error: "UNAUTHORIZED" }, 403);
       if (room.phase !== "day") return out({ error: "INVALID_ACTION" }, 409);
       if (!discussionView(room).complete) return out({ error: "WAITING_DISCUSSION" }, 409);
       const lawyer = players.find((x) => x.alive && x.role === "lawyer"), jailer = players.find((x) => x.alive && x.role === "jailer");
       if (lawyer && !lawyer.action_target && !phaseExpired(room)) return out({ error: "WAITING_LAWYER" }, 409);
       if (jailer && !room.jailed_player && !phaseExpired(room)) return out({ error: "WAITING_JAILER" }, 409);
-      await persist(db.from("mafia_players").update({ vote_target: null }).eq("room_code", code));
+      await db.from("mafia_players").update({ vote_target: null }).eq("room_code", code);
       const phase = enabledRoles(room.enabled_roles).full_trial ? "nomination" : "vote";
-      await persist(db.from("mafia_rooms").update({ phase, accused_player: null }).eq("code", code));
+      await db.from("mafia_rooms").update({ phase, accused_player: null }).eq("code", code);
       ({ room, players } = await load(code));
       await botVotes(room, players);
       ({ room, players } = await load(code));
       return out(publicView(room, players, undefined, true));
-    
-  }
-}
-async function routeAdvanceVerdict(context:RoomRouteContext) {
-  let {body, action, ip, now, started, code, room, players, me, host, authenticatedSpectator}=context;
-  {
+    }
+    if (action === "advanceVerdict") {
       if (!host || room.phase !== "trial" || !room.accused_player) return out({ error: "INVALID_ACTION" }, 400);
-      await persist(db.from("mafia_players").update({ vote_target: null }).eq("room_code", code));
-      await persist(db.from("mafia_rooms").update({ phase: "verdict" }).eq("code", code));
+      await db.from("mafia_players").update({ vote_target: null }).eq("room_code", code);
+      await db.from("mafia_rooms").update({ phase: "verdict" }).eq("code", code);
       ({ room, players } = await load(code));
       await botVotes(room, players, true);
       ({ room, players } = await load(code));
       return out(publicView(room, players, undefined, true));
-    
-  }
-}
-async function routeVote(context:RoomRouteContext) {
-  let {body, action, ip, now, started, code, room, players, me, host, authenticatedSpectator}=context;
-  {
+    }
+    if (action === "vote") {
       const target = players.find((x) => x.id === body.target);
       const nomination = ["nomination", "vote"].includes(room.phase);
       const verdict = room.phase === "verdict";
       const skip = body.target === "SKIP" && enabledRoles(room.enabled_roles).allow_no_vote;
       const verdictChoice = ["GUILTY", "INNOCENT"].includes(body.target);
       if (!me?.alive || (!nomination && !verdict) || (nomination && !skip && (!target?.alive || target.id === me.id)) || (verdict && (!verdictChoice || me.id === room.accused_player))) return out({ error: "INVALID_VOTE" }, 400);
-      await persist(db.from("mafia_players").update({ vote_target: verdict ? body.target : skip ? "SKIP" : target!.id }).eq("room_code", code).eq("id", me.id));
+      await db.from("mafia_players").update({ vote_target: verdict ? body.target : skip ? "SKIP" : target!.id }).eq("room_code", code).eq("id", me.id);
       ({ room, players } = await load(code));
       return out(publicView(room, players, me.id));
-    
-  }
-}
-async function routeResolveVote(context:RoomRouteContext) {
-  let {body, action, ip, now, started, code, room, players, me, host, authenticatedSpectator}=context;
-  {
+    }
+    if (action === "resolveVote") {
       if (!host) return out({ error: "UNAUTHORIZED" }, 403);
       if (!["nomination", "vote", "verdict"].includes(room.phase)) return out({ error: "INVALID_ACTION" }, 409);
       const alive = players.filter((x) => x.alive);
@@ -1544,15 +1313,15 @@ async function routeResolveVote(context:RoomRouteContext) {
         const max = Math.max(...Object.values(nominationCounts));
         const top = Object.keys(nominationCounts).filter((id) => nominationCounts[id] === max);
         if (top.length !== 1 || top[0] === "SKIP") {
-          await persist(db.from("mafia_players").update({ vote_target: null, action_target: null }).eq("room_code", code));
-          await persist(db.from("mafia_rooms").update({ phase: "night", round: room.round + 1, accused_player: null, last_event: "nomination_tie" }).eq("code", code));
+          await db.from("mafia_players").update({ vote_target: null, action_target: null }).eq("room_code", code);
+          await db.from("mafia_rooms").update({ phase: "night", round: room.round + 1, accused_player: null, last_event: "nomination_tie" }).eq("code", code);
           ({ room, players } = await load(code));
           await botNightActions(room, players);
           ({ room, players } = await load(code));
           return out({ ...publicView(room, players, undefined, true), tie: true });
         }
-        await persist(db.from("mafia_players").update({ vote_target: null }).eq("room_code", code));
-        await persist(db.from("mafia_rooms").update({ phase: "trial", accused_player: top[0], last_event: "player_accused" }).eq("code", code));
+        await db.from("mafia_players").update({ vote_target: null }).eq("room_code", code);
+        await db.from("mafia_rooms").update({ phase: "trial", accused_player: top[0], last_event: "player_accused" }).eq("code", code);
         ({ room, players } = await load(code));
         return out(publicView(room, players, undefined, true));
       }
@@ -1575,9 +1344,9 @@ async function routeResolveVote(context:RoomRouteContext) {
         const voteCauses = Object.fromEntries(voteDeaths.map((id) => [id, id === eliminated ? (room.phase === "verdict" ? "trial_guilty" : "vote_eliminated") : "lovers_died"]));
       await eliminatePlayers(room, players, voteCauses);
       await prepareLastShot(code, voteCauses, "night", room.round + 1);
-        await persist(db.from("mafia_players").update({ vote_target: null, action_target: null }).eq("room_code", code));
+        await db.from("mafia_players").update({ vote_target: null, action_target: null }).eq("room_code", code);
         const jesterWinner = eliminated ? players.find((x) => x.id === eliminated)?.role === "jester" : false;
-        await persist(db.from("mafia_rooms").update({ phase: jesterWinner ? "finished" : "verdict", winner: jesterWinner ? "jester" : room.winner, winner_player: jesterWinner ? eliminated : room.winner_player, accused_player: null, last_event: jesterWinner ? "jester_won" : event, last_deaths: voteDeaths, last_eliminated: eliminated, last_saved: event === "lawyer_saved", jailed_player: eliminated === room.jailed_player ? null : room.jailed_player }).eq("code", code));
+        await db.from("mafia_rooms").update({ phase: jesterWinner ? "finished" : "verdict", winner: jesterWinner ? "jester" : room.winner, winner_player: jesterWinner ? eliminated : room.winner_player, accused_player: null, last_event: jesterWinner ? "jester_won" : event, last_deaths: voteDeaths, last_eliminated: eliminated, last_saved: event === "lawyer_saved", jailed_player: eliminated === room.jailed_player ? null : room.jailed_player }).eq("code", code);
         let winner: string | null = jesterWinner ? "jester" : null;
         if (jesterWinner) { ({ room, players } = await load(code)); await recordStats(room, players); }
         if (!winner) { await promoteMafia(code); winner = await checkWin(code); }
@@ -1605,9 +1374,9 @@ async function routeResolveVote(context:RoomRouteContext) {
       const voteCauses = Object.fromEntries(voteDeaths.map((id) => [id, id === eliminated ? (room.phase === "verdict" ? "trial_guilty" : "vote_eliminated") : "lovers_died"]));
       await eliminatePlayers(room, players, voteCauses);
       await prepareLastShot(code, voteCauses, "night", room.round + 1);
-      await persist(db.from("mafia_players").update({ vote_target: null, action_target: null }).eq("room_code", code));
+      await db.from("mafia_players").update({ vote_target: null, action_target: null }).eq("room_code", code);
       const jesterWinner = eliminated ? players.find((x) => x.id === eliminated)?.role === "jester" : false;
-      await persist(db.from("mafia_rooms").update({ phase: jesterWinner ? "finished" : room.phase, winner: jesterWinner ? "jester" : room.winner, winner_player: jesterWinner ? eliminated : room.winner_player, last_event: jesterWinner ? "jester_won" : event, last_deaths: voteDeaths, last_eliminated: eliminated, last_saved: event === "lawyer_saved", jailed_player: eliminated === room.jailed_player ? null : room.jailed_player }).eq("code", code));
+      await db.from("mafia_rooms").update({ phase: jesterWinner ? "finished" : room.phase, winner: jesterWinner ? "jester" : room.winner, winner_player: jesterWinner ? eliminated : room.winner_player, last_event: jesterWinner ? "jester_won" : event, last_deaths: voteDeaths, last_eliminated: eliminated, last_saved: event === "lawyer_saved", jailed_player: eliminated === room.jailed_player ? null : room.jailed_player }).eq("code", code);
       let winner: string | null = jesterWinner ? "jester" : null;
       if (jesterWinner) { ({ room, players } = await load(code)); await recordStats(room, players); }
       if (!winner) { await promoteMafia(code); winner = await checkWin(code); }
@@ -1615,138 +1384,14 @@ async function routeResolveVote(context:RoomRouteContext) {
       ({ room, players } = await load(code));
       if (!winner && !room.enabled_roles?.pending_shot) { await botNightActions(room, players); ({ room, players } = await load(code)); }
       return out({ ...publicView(room, players, undefined, true), tie: top.length > 1 });
-    
-  }
-}
-async function handleRequest(request:Request) {
-  if (request.method === "OPTIONS") return new Response("ok", { headers: cors });
-  if(!['GET','POST'].includes(request.method))return out({error:'METHOD_NOT_ALLOWED'},405);
-  try {
-    const ip = (request.headers.get("x-forwarded-for") || "unknown").split(",")[0].trim();
-    const now = Date.now(), bucket = rateBuckets.get(ip);
-    if (!bucket || bucket.reset < now) rateBuckets.set(ip, { count: 1, reset: now + 60_000 });
-    else if (++bucket.count > 6000) return out({ error: "RATE_LIMITED" }, 429);
-    const url = new URL(request.url);
-    let body;
-    try{body=request.method === "POST" ? await request.json() : Object.fromEntries(url.searchParams);}
-    catch{return out({error:'BAD_REQUEST'},400);}
-    if(!body||typeof body!=='object'||Array.isArray(body))return out({error:'BAD_REQUEST'},400);
-    const action = body.action || "state";
-    requestDatabase.getStore()!.action=REQUEST_ACTIONS.includes(action)?action:'unknown';
-    if(action==='operationsStatus')return await operationsStatus(body);
-    if (!["state","spectatorState"].includes(action) && /^\d{4}$/.test(String(body.code||'')) && Number.isSafeInteger(body.lifecycleVersion)) {
-      requestDatabase.getStore()!.headers = {'x-mafia-room':String(body.code),'x-mafia-generation':String(body.lifecycleVersion)};
     }
-    const started = Date.now();
-    if (action === "health") return out({ status: "ok", version: 20, time: new Date().toISOString() });
-    if (action === "hostLogin") return await routeHostLogin({body, action, ip, now, started});
-    if (action === "hostPreferences") return await routeHostPreferences({body, action, ip, now, started});
-    if (action === "hostLogout") return await routeHostLogout({body, action, ip, now, started});
-    if (action === "recoverProfile") return await routeRecoverProfile({body, action, ip, now, started});
-    if (action === "create") return await routeCreate({body, action, ip, now, started});
-    if (action === "profile") return await routeProfile({body, action, ip, now, started});
-    if (action === "leaderboard") return await routeLeaderboard({body, action, ip, now, started});
-    const code = String(body.code || "").trim();
-    if (!/^\d{4}$/.test(code)) return out({ error: "ROOM_NOT_FOUND" }, 404);
-    // Presence validates the credentials under the room lock. Read its committed
-    // result once, instead of loading the same room both before and after it.
-    if (action === 'state') return await readCurrentState(code, body, now);
-    let { room, players } = await load(code);
-    if (!room) return out({ error: "ROOM_NOT_FOUND" }, 404);
-    let me = authenticatedPlayer(players, body);
-    let host = body.hostToken === room.host_token || Boolean(me && room.host_player_id === me.id && (me.alive || room.enabled_roles?.controller_spectator === true));
-    // Fence requests sent from a previous match. Transactional transition RPCs
-    // additionally check this value again under the database room lock.
-    const generationFree = ["state","adminState","messages","spectatorState","join","joinSpectator","claimSeat","redeemAdminInvite","moderationLog","listSnapshots","systemStatus","leave"];
-    if (!generationFree.includes(action) && (!Number.isSafeInteger(body.lifecycleVersion) || body.lifecycleVersion !== (room.lifecycle_version || 0))) return out({error:"STALE_GAME"},409);
-    if(['resolveNight','resolveVote','beginNight','startVote','advanceVerdict','lastShot','expelPlayer','endGame','transferHost','electMafiaLeader'].includes(action)) {
-      requestDatabase.getStore()!.plan=new TransitionPlan(room,players);
-    }
-    let authenticatedSpectator:any=null;
-    if(action === "spectatorState") {
-      const result=await db.from("mafia_spectators").select("id,name,session_token").eq("room_code",code).eq("id",cleanText(body.id,80)).maybeSingle();
-      if(result.error)throw result.error;
-      if(!result.data || result.data.session_token!==body.spectatorToken)return out({error:"UNAUTHORIZED"},403);
-      authenticatedSpectator=result.data;
-    }
-    const actorKey = authenticatedSpectator ? `spectator:${code}:${authenticatedSpectator.id}` : me ? `player:${code}:${me.id}` : host ? `host:${code}` : `guest:${ip}`;
-    if(actorRateLimited(actorKey,now))return out({error:'RATE_LIMITED'},429);
-
-    if (["createAdminInvite", "revokeAdminAccess"].includes(action)) return await routeCreateAdminInvite({body, action, ip, now, started, code, room, players, me, host, authenticatedSpectator});
-    if (action === "redeemAdminInvite") return await routeRedeemAdminInvite({body, action, ip, now, started, code, room, players, me, host, authenticatedSpectator});
-    if (action === "adminState") return await routeAdminState({body, action, ip, now, started, code, room, players, me, host, authenticatedSpectator});
-    if (room.enabled_roles?.pending_shot && room.phase !== "finished" && ["act","vote","resolveVote","resolveNight","startVote","startDiscussion","passDiscussion","finishDiscussion","advanceVerdict","togglePause","jail","lawyerProtect"].includes(action)) return out({ error: "WAITING_LAST_SHOT" }, 409);
-    if (action === "lastShot") return await routeLastShot({body, action, ip, now, started, code, room, players, me, host, authenticatedSpectator});
-
-    if (action === "joinSpectator") return await routeJoinSpectator({body, action, ip, now, started, code, room, players, me, host, authenticatedSpectator});
-    if (action === "spectatorState") return await routeSpectatorState({body, action, ip, now, started, code, room, players, me, host, authenticatedSpectator});
-    if (action === "claimSeat") return await routeClaimSeat({body, action, ip, now, started, code, room, players, me, host, authenticatedSpectator});
-
-    if (action === "join") return await routeJoin({body, action, ip, now, started, code, room, players, me, host, authenticatedSpectator});
-
-    if (action === "leave") return await routeLeave({body, action, ip, now, started, code, room, players, me, host, authenticatedSpectator});
-
-    if (action === "returnToLobby") return await routeReturnToLobby({body, action, ip, now, started, code, room, players, me, host, authenticatedSpectator});
-
-    if (action === "start") return await routeStart({body, action, ip, now, started, code, room, players, me, host, authenticatedSpectator});
-
-    if (action === "kick") return await routeKick({body, action, ip, now, started, code, room, players, me, host, authenticatedSpectator});
-
-    if (action === "warnPlayer" || action === "expelPlayer") return await routeWarnPlayer({body, action, ip, now, started, code, room, players, me, host, authenticatedSpectator});
-
-    if (action === "addBot") return await routeAddBot({body, action, ip, now, started, code, room, players, me, host, authenticatedSpectator});
-
-    if (action === "mute") return await routeMute({body, action, ip, now, started, code, room, players, me, host, authenticatedSpectator});
-
-    if (action === "endGame") return await routeEndGame({body, action, ip, now, started, code, room, players, me, host, authenticatedSpectator});
-
-    if (action === "saveWill") return await routeSaveWill({body, action, ip, now, started, code, room, players, me, host, authenticatedSpectator});
-
-    if (action === "report") return await routeReport({body, action, ip, now, started, code, room, players, me, host, authenticatedSpectator});
-
-    if (action === "moderationLog") return await routeModerationLog({body, action, ip, now, started, code, room, players, me, host, authenticatedSpectator});
-
-    if (action === "transferHost") return await routeTransferHost({body, action, ip, now, started, code, room, players, me, host, authenticatedSpectator});
-
-    if (action === "createReplacement") return await routeCreateReplacement({body, action, ip, now, started, code, room, players, me, host, authenticatedSpectator});
-
-    if (action === "listSnapshots") return await routeListSnapshots({body, action, ip, now, started, code, room, players, me, host, authenticatedSpectator});
-
-    if (action === "restoreSnapshot") return await routeRestoreSnapshot({body, action, ip, now, started, code, room, players, me, host, authenticatedSpectator});
-
-    if (action === "systemStatus") return await routeSystemStatus({body, action, ip, now, started, code, room, players, me, host, authenticatedSpectator});
-
-    if (action === "messages" || action === "sendMessage") return await routeMessages({body, action, ip, now, started, code, room, players, me, host, authenticatedSpectator});
-
-
-    if (action === "togglePause") return await routeTogglePause({body, action, ip, now, started, code, room, players, me, host, authenticatedSpectator});
-
-    if (action === "electMafiaLeader") return await routeElectMafiaLeader({body, action, ip, now, started, code, room, players, me, host, authenticatedSpectator});
-    if (action === "acknowledgeRole") return await routeAcknowledgeRole({body, action, ip, now, started, code, room, players, me, host, authenticatedSpectator});
-
-    if (action === "beginNight") return await routeBeginNight({body, action, ip, now, started, code, room, players, me, host, authenticatedSpectator});
-
-    if (action === "jail") return await routeJail({body, action, ip, now, started, code, room, players, me, host, authenticatedSpectator});
-    if (action === "lawyerProtect") return await routeLawyerProtect({body, action, ip, now, started, code, room, players, me, host, authenticatedSpectator});
-
-    if (action === "act") return await routeAct({body, action, ip, now, started, code, room, players, me, host, authenticatedSpectator});
-
-    if (action === "resolveNight") return await routeResolveNight({body, action, ip, now, started, code, room, players, me, host, authenticatedSpectator});
-
-    if (action === "setDiscussionClaim") return await routeSetDiscussionClaim({body, action, ip, now, started, code, room, players, me, host, authenticatedSpectator});
-    if (action === "startDiscussion") return await routeStartDiscussion({body, action, ip, now, started, code, room, players, me, host, authenticatedSpectator});
-    if (action === "controlDiscussion") return await routeControlDiscussion({body, action, ip, now, started, code, room, players, me, host, authenticatedSpectator});
-    if (action === "passDiscussion" || action === "finishDiscussion") return await routePassDiscussion({body, action, ip, now, started, code, room, players, me, host, authenticatedSpectator});
-    if (action === "startVote") return await routeStartVote({body, action, ip, now, started, code, room, players, me, host, authenticatedSpectator});
-    if (action === "advanceVerdict") return await routeAdvanceVerdict({body, action, ip, now, started, code, room, players, me, host, authenticatedSpectator});
-    if (action === "vote") return await routeVote({body, action, ip, now, started, code, room, players, me, host, authenticatedSpectator});
-    if (action === "resolveVote") return await routeResolveVote({body, action, ip, now, started, code, room, players, me, host, authenticatedSpectator});
     return out({ error: "BAD_ACTION" }, 400);
   } catch (error) {
     if (["STALE_GAME", "STALE_ACTION"].includes(error?.message)) return out({ error: error.message }, 409);
     if (error?.code === "P0001" && ["STALE_GAME", "GAME_STARTED", "ROOM_FULL", "NAME_TAKEN", "ROOM_NOT_FOUND"].includes(error.message)) {
       return out({ error: error.message }, error.message === "ROOM_NOT_FOUND" ? 404 : 409);
     }
+    console.error("[mafia-room] request failed", String(error));
     return out({ error: "SERVER_ERROR" }, 500);
   }
 }
@@ -1754,13 +1399,13 @@ async function reconcileDeparture(room:any,players:any[]) {
   if(!room.enabled_roles?.departure_pending)return false;
   requestDatabase.getStore()!.plan=new TransitionPlan(room,players);
   const settings={...room.enabled_roles};delete settings.departure_pending;
-  await persist(db.from('mafia_rooms').update({enabled_roles:settings}).eq('code',room.code));
+  await db.from('mafia_rooms').update({enabled_roles:settings}).eq('code',room.code);
   if(!['lobby','finished'].includes(room.phase)){
     await promoteMafia(room.code);await checkWin(room.code);
   }
   return true;
 }
-async function commitRequest(request:Request) {
+Deno.serve(async (request) => requestDatabase.run({headers:{}}, async () => {
   try {
   const response=await handleRequest(request);
   const plan=requestDatabase.getStore()!.plan;
@@ -1784,5 +1429,6 @@ async function commitRequest(request:Request) {
   }
   return out(body);
   } catch { return out({error:'SERVER_ERROR'},500); }
-}
-Deno.serve(async (request) => requestDatabase.run({headers:{},requestId:crypto.randomUUID(),started:Date.now()}, async () => recordResponse(await commitRequest(request))));
+}));
+
+

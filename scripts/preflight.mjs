@@ -1,0 +1,13 @@
+import {execFileSync} from 'node:child_process';
+import {readFile,writeFile,mkdir} from 'node:fs/promises';
+const run=args=>execFileSync(process.execPath,args,{stdio:'inherit',windowsHide:true});
+run(['scripts/build-fast-start.mjs']);
+run(['scripts/build-sources.mjs','--check']);
+const pkg=JSON.parse(await readFile('package.json','utf8'));
+run(pkg.scripts.test.split(' ').slice(1));
+run(['tests/performance-cache.mjs']);
+run(['scripts/check-performance.mjs']);
+const release=JSON.parse(await readFile('dist/release.json','utf8'));
+await mkdir('artifacts/assurance',{recursive:true});
+await writeFile('artifacts/assurance/preflight.json',JSON.stringify({passed:true,release:release.release,at:new Date().toISOString()},null,2));
+console.log('Preflight passed for '+release.release);

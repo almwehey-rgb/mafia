@@ -1,0 +1,17 @@
+import {readFile,writeFile} from 'node:fs/promises';
+import assert from 'node:assert/strict';
+const before=JSON.parse(await readFile('artifacts/assurance/before-browser.json','utf8'));
+const after=JSON.parse(await readFile('artifacts/assurance/after-browser.json','utf8'));
+assert.deepEqual(after.conditions,before.conditions);
+const median=values=>[...values].sort((a,b)=>a-b)[Math.floor(values.length/2)];
+const fields={startupLcp:r=>r.startup.lcp,startupBytes:r=>r.startup.bytes,startupRequests:r=>r.startup.requests,loginMs:r=>r.loginMs,revealRenderMs:r=>r.revealMs,voteRenderMs:r=>r.voteMs};
+const comparison=Object.fromEntries(Object.entries(fields).map(([name,fn])=>{const b=median(before.runs.map(fn)),a=median(after.runs.map(fn));return [name,{before:+b.toFixed(2),after:+a.toFixed(2),changePercent:+((a/b-1)*100).toFixed(1)}];}));
+assert(comparison.startupLcp.after<=comparison.startupLcp.before,'Startup LCP regressed');
+assert(after.runs.every(r=>r.errors.length===0&&r.idleRenders===0));
+const runtime=JSON.parse(await readFile('artifacts/assurance/after-runtime.json','utf8'));
+const confirmation=JSON.parse(await readFile('artifacts/assurance/capacity-confirmation-runtime.json','utf8'));
+runtime.testedCapacity=confirmation.testedCapacity||runtime.testedCapacity;
+assert(runtime.testedCapacity?.passed,'No load stage met its thresholds');
+const result={passed:true,comparison,testedCapacity:runtime.testedCapacity,limits:'Local lab; phase rendering uses fixed state, API timings measured separately. Capacity is for the serialized PGlite test adapter, not production.'};
+await writeFile('artifacts/assurance/comparison.json',JSON.stringify(result,null,2));
+console.log(JSON.stringify(result));

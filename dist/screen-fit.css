@@ -1,0 +1,196 @@
+/* The host lobby is a viewport-sized control surface, not a long document. */
+body.screen-lobby {
+  --lobby-gap: clamp(6px, 1.2vh, 14px);
+  min-height: 100dvh;
+}
+html.screen-fitted, body.screen-fitted { overflow: hidden; }
+body.screen-lobby .shell {
+  zoom: var(--screen-scale, 1);
+  width: calc(100% / var(--screen-scale, 1)) !important;
+  height: calc(100dvh / var(--screen-scale, 1));
+  min-height: 0;
+  margin: 0;
+  padding: var(--lobby-gap) clamp(10px, 1.2vw, 24px) !important;
+  display: flex;
+  flex-direction: column;
+  gap: var(--lobby-gap);
+  font-size: clamp(16px, 1.35vw, 22px) !important;
+  line-height: 1.3;
+}
+body.screen-lobby .header {
+  flex: 0 0 auto;
+  display: flex;
+  gap: 12px;
+  margin: 0;
+  align-items: center;
+}
+body.screen-lobby .brand { gap: 8px; margin: 0; }
+body.screen-lobby .brand img { width: 46px; height: 46px; border-radius: 10px; }
+body.screen-lobby .logo { font-size: 32px; }
+body.screen-lobby .logo small { font-size: 12px; margin-top: 4px; letter-spacing: 3px; }
+body.screen-lobby .room-tag { margin-inline-start: auto; font-size: 16px; padding: 7px 12px; }
+body.screen-lobby .header .utility-bar {
+  width: auto !important;
+  margin: 0;
+  padding: 0 !important;
+  gap: 6px;
+  flex: 0 0 auto;
+}
+body.screen-lobby .header .utility-bar button { min-height: 40px; padding: 5px 9px; }
+body.screen-lobby .header .utility-bar .theme-toggle,
+body.screen-lobby .header .utility-bar .fullscreen-toggle { width: 40px; }
+body.screen-lobby #app {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--lobby-gap);
+}
+body.screen-lobby .phase-bar {
+  position: static;
+  width: 100%;
+  margin: 0;
+  min-height: 38px;
+  padding: 4px 12px;
+  flex: 0 0 auto;
+  grid-template-columns: auto 1fr auto;
+  border-radius: 12px;
+}
+body.screen-lobby .phase-bar > span:first-child { font-size: 22px; }
+body.screen-lobby .phase-timer { width: 30px; height: 30px; font-size: 16px; }
+body.screen-lobby .host-lobby {
+  flex: 1;
+  min-height: 0;
+  grid-template-columns: minmax(0, .8fr) minmax(0, 1.2fr);
+  gap: var(--lobby-gap);
+}
+body.screen-lobby .card {
+  min-width: 0;
+  min-height: 0;
+  margin: 0;
+  padding: clamp(10px, 1.4vh, 18px);
+  border-radius: 18px;
+}
+body.screen-lobby .lobby-side {
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--lobby-gap);
+}
+body.screen-lobby .lobby-join {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--lobby-gap);
+}
+body.screen-lobby .code { font-size: clamp(42px, 5.5vw, 88px); letter-spacing: 5px; }
+body.screen-lobby .lobby-join .qr {
+  width: clamp(112px, 20vh, 190px);
+  height: clamp(112px, 20vh, 190px);
+  padding: 7px;
+  border-radius: 12px;
+}
+body.screen-lobby .lobby-join p { margin: 10px 0 0; font-size: clamp(14px, 1.1vw, 19px); }
+body.screen-lobby .lobby-join .actions {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px;
+}
+body.screen-lobby .btn { min-height: 44px; padding: 8px 12px; border-radius: 11px; font-size: inherit; }
+body.screen-lobby .lobby-join .btn { font-size: clamp(14px, 1.05vw, 18px); }
+body.screen-lobby .lobby-players { flex: 1; display: flex; flex-direction: column; gap: var(--lobby-gap); }
+body.screen-lobby .toolbar h2 { margin: 0; font-size: clamp(18px, 1.7vw, 28px); }
+body.screen-lobby .connection-count { font-size: 16px; white-space: nowrap; }
+body.screen-lobby .lobby-roster {
+  flex: 1;
+  align-content: start;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: 6px;
+}
+body.screen-lobby .player { min-width: 0; min-height: 42px; padding: 7px 9px; gap: 7px; font-size: clamp(14px, 1.15vw, 20px); }
+body.screen-lobby .player > span:not(.dot) { min-width: 0; overflow-wrap: anywhere; }
+body.screen-lobby .dot { width: 8px; height: 8px; flex: 0 0 8px; box-shadow: none; }
+body.screen-lobby .kick { flex: 0 0 32px; width: 32px; height: 32px; }
+.lobby-empty { grid-column: 1 / -1; margin: 10px 0; text-align: center; }
+.roster-pages { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: auto; }
+.roster-pages button, .lobby-pane-tabs button {
+  min-height: 36px;
+  padding: 5px 12px;
+  border: 1px solid #3b414d;
+  border-radius: 10px;
+  background: #20242e;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.roster-pages button:disabled { opacity: .35; cursor: default; }
+.lobby-pane-tabs { display: none; }
+body.screen-lobby .setup-card { display: flex; flex-direction: column; gap: var(--lobby-gap); }
+body.screen-lobby .setup-tabs { flex: 0 0 auto; margin: 0; gap: 6px; }
+body.screen-lobby .setup-tabs button { min-height: 44px; padding: 7px; font-size: inherit; }
+body.screen-lobby .setup-card > h2 { margin: 0; font-size: clamp(20px, 2vw, 30px); }
+body.screen-lobby .preset-grid { flex: 1; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 0; }
+body.screen-lobby .preset-grid button { min-height: 44px; padding: 10px 6px; }
+body.screen-lobby .settings { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+body.screen-lobby .setting { min-width: 0; flex-direction: column; justify-content: space-between; gap: 8px; padding: 10px 4px; border: 0; text-align: center; }
+body.screen-lobby .setting h3 { font-size: clamp(16px, 1.4vw, 22px); }
+body.screen-lobby .step { gap: 4px; padding: 4px; border-radius: 12px; }
+body.screen-lobby .step button { width: 36px; height: 36px; font-size: 25px; border-radius: 8px; }
+body.screen-lobby .number { min-width: 28px; font-size: 24px; }
+body.screen-lobby .role-picker-title { margin: 0; font-size: 16px; }
+body.screen-lobby .role-preview { flex: 1; margin: 0; gap: 7px; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+body.screen-lobby .role-toggle { min-width: 0; min-height: 64px; padding: 8px; gap: 3px 5px; border-radius: 12px; font-size: clamp(14px, 1.1vw, 19px); }
+body.screen-lobby .role-toggle b { font-size: 24px; }
+body.screen-lobby .role-toggle small { font-size: 14px; }
+body.screen-lobby .role-toggle > span { overflow-wrap: anywhere; }
+body.screen-lobby .setup-card > .actions { flex: 0 0 auto; gap: 8px; }
+body.screen-lobby .setup-card > .actions .btn { flex: 1; }
+body.screen-lobby .rule-grid { flex: 1; gap: 7px; margin: 0; }
+body.screen-lobby .rule-chip { min-width: 0; min-height: 44px; padding: 8px; font-size: clamp(14px, 1.2vw, 20px); }
+body.screen-lobby .kill-range { grid-template-columns: 32px 1fr 32px; gap: 3px; }
+body.screen-lobby .kill-range > button { width: 32px; height: 36px; font-size: 24px; }
+body.screen-lobby .status { margin: 0; padding: 8px 10px; font-size: 16px; }
+body.screen-lobby .preference-status { margin: 0; font-size: 14px; }
+body.light .roster-pages button, body.light .lobby-pane-tabs button { background: #e7eaf0; color: #15171d; }
+@media (min-width: 1280px) {
+  body.screen-lobby .role-preview { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+@media (max-width: 899px) {
+  body.screen-lobby .header { flex-wrap: wrap; gap: 6px; }
+  body.screen-lobby .brand img { width: 36px; height: 36px; }
+  body.screen-lobby .logo { font-size: 24px; }
+  body.screen-lobby .logo small { font-size: 10px; }
+  body.screen-lobby .room-tag { font-size: 14px; padding: 5px 7px; }
+  body.screen-lobby .header .utility-bar { margin-inline-start: auto; }
+  body.screen-lobby .header .utility-bar .lang-toggle { min-width: 65px; }
+  body.screen-lobby .header .utility-bar button { min-height: 36px; }
+  body.screen-lobby .header .utility-bar .theme-toggle,
+  body.screen-lobby .header .utility-bar .fullscreen-toggle { width: 36px; }
+  .lobby-pane-tabs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+  .lobby-pane-tabs button[aria-pressed="true"] { background: #173522; color: #a7f0bc; border-color: #3da565; }
+  body.screen-lobby .host-lobby { display: flex; flex-direction: column; }
+  body.screen-lobby .host-lobby[data-pane="setup"] .lobby-side,
+  body.screen-lobby .host-lobby:not([data-pane="setup"]) .setup-card,
+  body.screen-lobby .host-lobby[data-pane="room"] .lobby-players,
+  body.screen-lobby .host-lobby[data-pane="players"] .lobby-join { display: none; }
+  body.screen-lobby .lobby-side, body.screen-lobby .setup-card { flex: 1; }
+  body.screen-lobby .host-lobby[data-pane="room"] .lobby-join { flex: 1; grid-template-columns: 1fr; justify-items: center; align-content: space-evenly; }
+  body.screen-lobby .host-lobby[data-pane="room"] .qr { width: clamp(140px, 27vh, 260px); height: clamp(140px, 27vh, 260px); }
+  body.screen-lobby .lobby-join .actions { width: 100%; }
+  body.screen-lobby .settings { gap: 3px; }
+  body.screen-lobby .setting h3 { font-size: 16px; }
+  body.screen-lobby .step { gap: 2px; padding: 3px; }
+  body.screen-lobby .step button { width: 30px; height: 36px; }
+  body.screen-lobby .number { min-width: 22px; font-size: 22px; }
+  body.screen-lobby .rule-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-height: 600px) {
+  body.screen-lobby { --lobby-gap: 6px; }
+  body.screen-lobby .brand img { width: 34px; height: 34px; }
+  body.screen-lobby .logo { font-size: 24px; }
+  body.screen-lobby .card { padding: 9px; }
+  body.screen-lobby .role-toggle { min-height: 58px; padding: 6px; }
+  body.screen-lobby .status { font-size: 14px; padding: 6px; }
+}

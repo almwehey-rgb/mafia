@@ -1,0 +1,15 @@
+{
+  "tool": "built-in image_gen",
+  "cards": [
+    {
+      "file": "face-1.png",
+      "source": "C:\\Users\\Talmuehii\\.codex\\generated_images\\01a096aa-b5b9-7ef3-95a3-3a18e7ebd8ef\\exec-069c4d78-2a1b-4194-9ea4-3e2a7adb6e1e.png",
+      "prompt": "Use case: background-extraction. Keep ONLY the cartoon character's HEAD from this image: face, ears, scalp hair, beard or moustache. Remove EVERYTHING ELSE completely: no neck, no shoulders, no body, no clothing, no hands, no lantern, no background scenery, no card, no frame, no text, no emblem, no shadow beneath head. Isolate the head with a clean natural silhouette ending just under the chin/beard. Preserve exact face identity, facial expression, gaze, head angle and cartoon rendering from this image. Center the single head prominently on a square canvas with small clear margin around hair and ears. Output actual transparent alpha background PNG, not a drawn checkerboard, not a solid colored background. This is a head-only game sprite."
+    },
+    {
+      "file": "face-2.png",
+      "source": "C:\\Users\\Talmuehii\\.codex\\generated_images\\01a096aa-b5b9-7ef3-95a3-3a18e7ebd8ef\\exec-ea775b3c-6544-4a5e-ba58-1ea1382be92f.png",
+      "prompt": "Use case: background-extraction. Keep ONLY the cartoon character's HEAD from this image: face, ears, scalp hair, beard or moustache. Remove EVERYTHING ELSE completely: no neck, no shoulders, no body, no clothing, no hands, no lantern, no background scenery, no card, no frame, no text, no emblem, no shadow beneath head. Isolate the head with a clean natural silhouette ending just under the chin/beard. Preserve exact face identity, facial expression, gaze, head angle and cartoon rendering from this image. Center the single head prominently on a square canvas with small clear margin around hair and ears. Output actual transparent alpha background PNG, not a drawn checkerboard, not a solid colored background. This is a head-only game sprite."
+    }
+  ]
+}

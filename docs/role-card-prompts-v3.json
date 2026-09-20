@@ -1,0 +1,96 @@
+{
+  "tool": "built-in image_gen",
+  "cards": [
+    {
+      "id": "mafia_boss",
+      "title": "العرّاب",
+      "file": "mafia_boss.png",
+      "source": "C:\\Users\\Talmuehii\\.codex\\generated_images\\01a096aa-b5b9-7ef3-95a3-3a18e7ebd8ef\\exec-326823ee-2864-4355-92f9-0858e05e7299.png",
+      "prompt": "Use case: precise-object-edit / stylized-concept. Edit this Arabic Mafia role card. Preserve the EXACT gold ornamental frame, burgundy lower panel, title plaque, exact Arabic title \"العرّاب\", bottom emblem, 2:3 dimensions and premium charming stylized painterly 3D rendering. The user dislikes the repeated head angle and family resemblance. COMPLETELY REPOSE the character and strengthen distinctive facial anatomy using this mandatory direction: Perfectly FRONT-FACING symmetrical head and shoulders, head perfectly vertical, eyes directly into camera, chin slightly lowered, seated upright on throne, both hands resting separately on chair arms. Long old rectangular face, deeply hooded small eyes and stern straight mouth.. Preserve recognizable role outfit, gender and role props. Reconstruct anatomy naturally for the NEW pose, do not merely flip or tilt the old image. Pose and gaze specification takes highest priority: no default smiling three-quarter head tilt. Maintain dark nighttime city atmosphere with gold illumination, composition entirely within existing illustration area. No extra text, no watermark."
+    },
+    {
+      "id": "mafia",
+      "title": "فرد المافيا",
+      "file": "mafia.png",
+      "source": "C:\\Users\\Talmuehii\\.codex\\generated_images\\01a096aa-b5b9-7ef3-95a3-3a18e7ebd8ef\\exec-7a924a37-8452-4bf5-a6a9-99380c92becc.png",
+      "prompt": "Use case: precise-object-edit / stylized-concept. Edit this Arabic Mafia role card. Preserve the EXACT gold ornamental frame, burgundy lower panel, title plaque, exact Arabic title \"فرد المافيا\", bottom emblem, 2:3 dimensions and premium charming stylized painterly 3D rendering. The user dislikes the repeated head angle and family resemblance. COMPLETELY REPOSE the character and strengthen distinctive facial anatomy using this mandatory direction: Head and body turned strongly toward IMAGE LEFT in a 70-degree profile, eyes looking left at a gold coin held at eye level, crooked smirk, narrow triangular jaw and thin pencil moustache. No eye contact with viewer.. Preserve recognizable role outfit, gender and role props. Reconstruct anatomy naturally for the NEW pose, do not merely flip or tilt the old image. Pose and gaze specification takes highest priority: no default smiling three-quarter head tilt. Maintain dark nighttime city atmosphere with gold illumination, composition entirely within existing illustration area. No extra text, no watermark."
+    },
+    {
+      "id": "doctor",
+      "title": "الطبيب",
+      "file": "doctor.png",
+      "source": "C:\\Users\\Talmuehii\\.codex\\generated_images\\01a096aa-b5b9-7ef3-95a3-3a18e7ebd8ef\\exec-23e2939f-f503-440d-af97-ada41b1b1ed6.png",
+      "prompt": "Use case: precise-object-edit / stylized-concept. Edit this Arabic Mafia role card. Preserve the EXACT gold ornamental frame, burgundy lower panel, title plaque, exact Arabic title \"الطبيب\", bottom emblem, 2:3 dimensions and premium charming stylized painterly 3D rendering. The user dislikes the repeated head angle and family resemblance. COMPLETELY REPOSE the character and strengthen distinctive facial anatomy using this mandatory direction: Perfectly FRONT-FACING vertical round bald head, shoulders square, broad open toothy laugh with eyes almost closed, lifting stethoscope with both hands at chest level. Round button nose, plump cheeks, completely clean-shaven.. Preserve recognizable role outfit, gender and role props. Reconstruct anatomy naturally for the NEW pose, do not merely flip or tilt the old image. Pose and gaze specification takes highest priority: no default smiling three-quarter head tilt. Maintain dark nighttime city atmosphere with gold illumination, composition entirely within existing illustration area. No extra text, no watermark."
+    },
+    {
+      "id": "vigilante",
+      "title": "القناص",
+      "file": "vigilante.png",
+      "source": "C:\\Users\\Talmuehii\\.codex\\generated_images\\01a096aa-b5b9-7ef3-95a3-3a18e7ebd8ef\\exec-911b454d-4734-44e5-b66c-4642837a7fbf.png",
+      "prompt": "Use case: precise-object-edit / stylized-concept. Edit this Arabic Mafia role card. Preserve the EXACT gold ornamental frame, burgundy lower panel, title plaque, exact Arabic title \"القناص\", bottom emblem, 2:3 dimensions and premium charming stylized painterly 3D rendering. The user dislikes the repeated head angle and family resemblance. COMPLETELY REPOSE the character and strengthen distinctive facial anatomy using this mandatory direction: Near full PROFILE looking toward IMAGE RIGHT, strong square jaw and buzzcut, narrowed eyes concentrating into the distance, NO eye contact with viewer, body crouched low with shoulders diagonal, scoped rifle held diagonally across torso pointed to upper right safely, no firing.. Preserve recognizable role outfit, gender and role props. Reconstruct anatomy naturally for the NEW pose, do not merely flip or tilt the old image. Pose and gaze specification takes highest priority: no default smiling three-quarter head tilt. Maintain dark nighttime city atmosphere with gold illumination, composition entirely within existing illustration area. No extra text, no watermark."
+    },
+    {
+      "id": "lawyer",
+      "title": "المحامي",
+      "file": "lawyer.png",
+      "source": "C:\\Users\\Talmuehii\\.codex\\generated_images\\01a096aa-b5b9-7ef3-95a3-3a18e7ebd8ef\\exec-6b4146c2-ece1-4048-84b7-d56dc133d9c1.png",
+      "prompt": "Use case: precise-object-edit / stylized-concept. Edit this Arabic Mafia role card. Preserve the EXACT gold ornamental frame, burgundy lower panel, title plaque, exact Arabic title \"المحامي\", bottom emblem, 2:3 dimensions and premium charming stylized painterly 3D rendering. The user dislikes the repeated head angle and family resemblance. COMPLETELY REPOSE the character and strengthen distinctive facial anatomy using this mandatory direction: Head raised proudly, chin lifted high; body in three-quarter view toward IMAGE RIGHT, eyes looking upward to IMAGE RIGHT through narrow rectangular spectacles, thin elongated face with long straight nose, tight confident smile. Legal folder under arm, free hand presenting an argument palm upward.. Preserve recognizable role outfit, gender and role props. Reconstruct anatomy naturally for the NEW pose, do not merely flip or tilt the old image. Pose and gaze specification takes highest priority: no default smiling three-quarter head tilt. Maintain dark nighttime city atmosphere with gold illumination, composition entirely within existing illustration area. No extra text, no watermark."
+    },
+    {
+      "id": "jailer",
+      "title": "السجّان",
+      "file": "jailer.png",
+      "source": "C:\\Users\\Talmuehii\\.codex\\generated_images\\01a096aa-b5b9-7ef3-95a3-3a18e7ebd8ef\\exec-35614720-47f7-4334-aba0-8110841ead05.png",
+      "prompt": "Use case: precise-object-edit / stylized-concept. Edit this Arabic Mafia role card. Preserve the EXACT gold ornamental frame, burgundy lower panel, title plaque, exact Arabic title \"السجّان\", bottom emblem, 2:3 dimensions and premium charming stylized painterly 3D rendering. The user dislikes the repeated head angle and family resemblance. COMPLETELY REPOSE the character and strengthen distinctive facial anatomy using this mandatory direction: Three-quarter view toward IMAGE LEFT, broad square head perfectly upright, thick handlebar moustache and low forehead, suspicious squint looking far left. Arms firmly folded across wide chest, brass keyring hanging visibly at belt.. Preserve recognizable role outfit, gender and role props. Reconstruct anatomy naturally for the NEW pose, do not merely flip or tilt the old image. Pose and gaze specification takes highest priority: no default smiling three-quarter head tilt. Maintain dark nighttime city atmosphere with gold illumination, composition entirely within existing illustration area. No extra text, no watermark."
+    },
+    {
+      "id": "witch",
+      "title": "الساحرة",
+      "file": "witch.png",
+      "source": "C:\\Users\\Talmuehii\\.codex\\generated_images\\01a096aa-b5b9-7ef3-95a3-3a18e7ebd8ef\\exec-63617330-20b6-4581-8830-becdf0613089.png",
+      "prompt": "Use case: precise-object-edit / stylized-concept. Edit this Arabic Mafia role card. Preserve the EXACT gold ornamental frame, burgundy lower panel, title plaque, exact Arabic title \"الساحرة\", bottom emblem, 2:3 dimensions and premium charming stylized painterly 3D rendering. The user dislikes the repeated head angle and family resemblance. COMPLETELY REPOSE the character and strengthen distinctive facial anatomy using this mandatory direction: Head leaning FORWARD and gaze directed DOWN into a green potion bottle held between both hands, mostly front-facing heart-shaped freckled face, delighted curious parted lips, auburn curls and pointed hat, distinct arched brows. No looking sideways at viewer.. Preserve recognizable role outfit, gender and role props. Reconstruct anatomy naturally for the NEW pose, do not merely flip or tilt the old image. Pose and gaze specification takes highest priority: no default smiling three-quarter head tilt. Maintain dark nighttime city atmosphere with gold illumination, composition entirely within existing illustration area. No extra text, no watermark."
+    },
+    {
+      "id": "serial_killer",
+      "title": "القاتل المتسلسل",
+      "file": "serial_killer.png",
+      "source": "C:\\Users\\Talmuehii\\.codex\\generated_images\\01a096aa-b5b9-7ef3-95a3-3a18e7ebd8ef\\exec-4b94f821-aca9-44c4-a17f-adfeb8cf3c7a.png",
+      "prompt": "Use case: precise-object-edit / stylized-concept. Edit this Arabic Mafia role card. Preserve the EXACT gold ornamental frame, burgundy lower panel, title plaque, exact Arabic title \"القاتل المتسلسل\", bottom emblem, 2:3 dimensions and premium charming stylized painterly 3D rendering. The user dislikes the repeated head angle and family resemblance. COMPLETELY REPOSE the character and strengthen distinctive facial anatomy using this mandatory direction: Body mostly turned AWAY, looking back over LEFT SHOULDER toward IMAGE LEFT; hood conceals half of face, only one pale narrow eye prominently visible, gaunt diamond cheeks, tight unsettling half-smile, gloved hand at cloak clasp, sheathed dagger at waist.. Preserve recognizable role outfit, gender and role props. Reconstruct anatomy naturally for the NEW pose, do not merely flip or tilt the old image. Pose and gaze specification takes highest priority: no default smiling three-quarter head tilt. Maintain dark nighttime city atmosphere with gold illumination, composition entirely within existing illustration area. No extra text, no watermark."
+    },
+    {
+      "id": "jester",
+      "title": "المهرج",
+      "file": "jester.png",
+      "source": "C:\\Users\\Talmuehii\\.codex\\generated_images\\01a096aa-b5b9-7ef3-95a3-3a18e7ebd8ef\\exec-fe203381-6b1a-4868-9788-4067b7d60f1e.png",
+      "prompt": "Use case: precise-object-edit / stylized-concept. Edit this Arabic Mafia role card. Preserve the EXACT gold ornamental frame, burgundy lower panel, title plaque, exact Arabic title \"المهرج\", bottom emblem, 2:3 dimensions and premium charming stylized painterly 3D rendering. The user dislikes the repeated head angle and family resemblance. COMPLETELY REPOSE the character and strengthen distinctive facial anatomy using this mandatory direction: Head thrown BACK in joyful laughter, mouth wide open and both eyes shut, slightly low camera angle, head centered, arms spread theatrically displaying playing cards. Broad pear-shaped face, freckles, orange curls and jester cap.. Preserve recognizable role outfit, gender and role props. Reconstruct anatomy naturally for the NEW pose, do not merely flip or tilt the old image. Pose and gaze specification takes highest priority: no default smiling three-quarter head tilt. Maintain dark nighttime city atmosphere with gold illumination, composition entirely within existing illustration area. No extra text, no watermark."
+    },
+    {
+      "id": "escort",
+      "title": "المعطّل",
+      "file": "escort.png",
+      "source": "C:\\Users\\Talmuehii\\.codex\\generated_images\\01a096aa-b5b9-7ef3-95a3-3a18e7ebd8ef\\exec-2eefa76f-957f-461e-ade9-fb6f748eb4af.png",
+      "prompt": "Use case: precise-object-edit / stylized-concept. Edit this Arabic Mafia role card. Preserve the EXACT gold ornamental frame, burgundy lower panel, title plaque, exact Arabic title \"المعطّل\", bottom emblem, 2:3 dimensions and premium charming stylized painterly 3D rendering. The user dislikes the repeated head angle and family resemblance. COMPLETELY REPOSE the character and strengthen distinctive facial anatomy using this mandatory direction: Head absolutely UPRIGHT, full FRONT view, looking directly at viewer with one eyebrow raised and assertive closed-mouth smirk. Angular square jaw, blunt black bob. One gloved palm extended forward in STOP gesture, other hand on hip with padlock hanging from belt.. Preserve recognizable role outfit, gender and role props. Reconstruct anatomy naturally for the NEW pose, do not merely flip or tilt the old image. Pose and gaze specification takes highest priority: no default smiling three-quarter head tilt. Maintain dark nighttime city atmosphere with gold illumination, composition entirely within existing illustration area. No extra text, no watermark."
+    },
+    {
+      "id": "revealer",
+      "title": "الكاشف",
+      "file": "revealer.png",
+      "source": "C:\\Users\\Talmuehii\\.codex\\generated_images\\01a096aa-b5b9-7ef3-95a3-3a18e7ebd8ef\\exec-46048b9a-19fd-4ff6-8015-32ad631af207.png",
+      "prompt": "Use case: precise-object-edit / stylized-concept. Edit this Arabic Mafia role card. Preserve the EXACT gold ornamental frame, burgundy lower panel, title plaque, exact Arabic title \"الكاشف\", bottom emblem, 2:3 dimensions and premium charming stylized painterly 3D rendering. The user dislikes the repeated head angle and family resemblance. COMPLETELY REPOSE the character and strengthen distinctive facial anatomy using this mandatory direction: Body in three-quarter view toward IMAGE LEFT, head lowered with eyes focused DOWN LEFT at the brass radar device held at waist, thoughtful pursed lips. Mature woman with broad face, deep brown skin, short silver curls and octagonal glasses.. Preserve recognizable role outfit, gender and role props. Reconstruct anatomy naturally for the NEW pose, do not merely flip or tilt the old image. Pose and gaze specification takes highest priority: no default smiling three-quarter head tilt. Maintain dark nighttime city atmosphere with gold illumination, composition entirely within existing illustration area. No extra text, no watermark."
+    },
+    {
+      "id": "citizen",
+      "title": "المواطن",
+      "file": "citizen.png",
+      "source": "C:\\Users\\Talmuehii\\.codex\\generated_images\\01a096aa-b5b9-7ef3-95a3-3a18e7ebd8ef\\exec-98eb9a9b-a160-4a62-a89b-a62eddf3f64f.png",
+      "prompt": "Use case: precise-object-edit / stylized-concept. Edit this Arabic Mafia role card. Preserve the EXACT gold ornamental frame, burgundy lower panel, title plaque, exact Arabic title \"المواطن\", bottom emblem, 2:3 dimensions and premium charming stylized painterly 3D rendering. The user dislikes the repeated head angle and family resemblance. COMPLETELY REPOSE the character and strengthen distinctive facial anatomy using this mandatory direction: Broad friendly face turned toward IMAGE LEFT, head tilted slightly DOWN, eyes looking down at warm lantern held low to left, content closed-mouth smile, bulbous nose and salt-and-pepper horseshoe moustache, thinning curly hair, relaxed sloped shoulders.. Preserve recognizable role outfit, gender and role props. Reconstruct anatomy naturally for the NEW pose, do not merely flip or tilt the old image. Pose and gaze specification takes highest priority: no default smiling three-quarter head tilt. Maintain dark nighttime city atmosphere with gold illumination, composition entirely within existing illustration area. No extra text, no watermark."
+    },
+    {
+      "id": "cupid",
+      "title": "كيوبيد",
+      "file": "cupid.png",
+      "source": "C:\\Users\\Talmuehii\\.codex\\generated_images\\01a096aa-b5b9-7ef3-95a3-3a18e7ebd8ef\\exec-3e7315a7-1b68-418c-8b41-d8e1ee99d437.png",
+      "prompt": "Use case: precise-object-edit / stylized-concept. Edit this Arabic Mafia role card. Preserve the EXACT gold ornamental frame, burgundy lower panel, title plaque, exact Arabic title \"كيوبيد\", bottom emblem, 2:3 dimensions and premium charming stylized painterly 3D rendering. The user dislikes the repeated head angle and family resemblance. COMPLETELY REPOSE the character and strengthen distinctive facial anatomy using this mandatory direction: Three-quarter view toward IMAGE RIGHT, gaze UPWARD to right with dreamy open expression, head gently tilted backward, curly golden hair, round rosy cheeks, wings visible, relaxed bow held vertically at side and heart arrow across chest.. Preserve recognizable role outfit, gender and role props. Reconstruct anatomy naturally for the NEW pose, do not merely flip or tilt the old image. Pose and gaze specification takes highest priority: no default smiling three-quarter head tilt. Maintain dark nighttime city atmosphere with gold illumination, composition entirely within existing illustration area. No extra text, no watermark."
+    }
+  ]
+}

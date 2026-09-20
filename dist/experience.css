@@ -1,0 +1,71 @@
+/* Shared experience tokens; retain the site's noir and gold identity. */
+:root{--ux-surface:#171820;--ux-text:#f5f1e8;--ux-muted:#c8c2b7;--ux-border:#716958;--ux-accent:#e5bd72;--ux-danger:#a32438;--ux-radius:14px;--ux-space:12px}
+body.light{--ux-surface:#fffaf0;--ux-text:#241f19;--ux-muted:#595247;--ux-border:#86765b;--ux-accent:#785214;--ux-danger:#a32438}
+.journey-hint,.setup-summary{color:var(--ux-text);background:var(--ux-surface);border-radius:var(--ux-radius);padding:16px;line-height:1.65}
+.journey-hint{width:min(720px,100%);margin:0 auto 16px;border-inline-start:3px solid var(--ux-accent);font-size:16px}
+.setup-summary ul{list-style:none;padding:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(125px,1fr));gap:8px}
+.setup-summary li{display:flex;justify-content:space-between;gap:8px;padding:6px;border-bottom:1px solid var(--ux-border)}
+.advanced-settings{margin:16px 0;color:var(--ux-text)}
+.advanced-settings summary{cursor:pointer;min-height:44px;padding:10px 0;font-size:16px;line-height:1.5}
+.role-reference{width:min(720px,100%);margin:0 auto 16px;color:var(--ux-text)}
+.role-reference summary{cursor:pointer;min-height:44px;padding:12px;background:var(--ux-surface);border-radius:var(--ux-radius);font-size:16px}
+.danger-zone{margin-top:24px;padding-top:16px;border-top:2px solid var(--ux-danger)}
+.player-management{margin-inline-start:auto}.player-management summary{cursor:pointer;min-height:44px;padding:10px;font-size:16px}.player-management .kick{width:auto;padding:10px;font-size:16px}
+.btn{border-radius:var(--ux-radius);min-height:44px}
+.btn.danger{background:var(--ux-danger)!important;color:#fff!important;border:2px solid var(--ux-danger)!important}
+.pick[aria-pressed=true]{outline:3px solid var(--ux-accent);outline-offset:2px}
+.pick[aria-pressed=true]::after{content:' ✓';font-weight:900}
+.action-feedback{width:min(720px,100%);margin:12px auto;overflow-wrap:anywhere}
+.action-feedback.error{border:2px solid var(--ux-danger)}
+.pick,.kick,.mute-btn,.mini-action,.step button{min-width:44px;min-height:44px;touch-action:manipulation}
+:is(button,input,textarea,select,summary,[tabindex]):focus-visible{outline:3px solid var(--ux-accent)!important;outline-offset:3px!important}
+.entry-hint,.preference-status,.player small,.timeline-item span,.preset-choice small{font-size:16px!important;line-height:1.5}
+.muted,.entry-hint{color:var(--ux-muted)}
+.draw-heading p,.draw-first small{font-size:16px!important;line-height:1.5}
+body.light .draw-heading p,body.light .draw-first small{color:#55432d!important}
+.draw-order-heading,.draw-order small{font-size:16px!important;line-height:1.5}
+body.light .draw-order-heading,body.light .draw-order small{color:#55432d!important}
+body.light:has(.cinema-home){background:#f5ecda!important}
+body.light:has(.cinema-home)::after{background:none!important}
+body.light .cinema-brand>p{color:#55432d!important}
+body.light .cinema-home .cinema-cards>p,body.light .cinema-home .cinema-footer,body.light .cinema-home .cinema-more summary{color:#55432d!important}
+.shell button,.game-sheet button,.shell summary{min-height:44px;min-width:44px}
+.chat-message{overflow-wrap:anywhere;min-width:0}
+.sheet-card{max-height:calc(var(--visible-height,100dvh) - 32px);overscroll-behavior:contain;scroll-padding:16px}
+.game-sheet{top:var(--visible-top,0px);bottom:auto;height:var(--visible-height,100dvh);box-sizing:border-box}
+.game-sheet{padding-bottom:max(16px,env(safe-area-inset-bottom))}
+.input{scroll-margin-block:100px;min-width:0;font-size:max(16px,1em)}
+.shell{padding-bottom:max(80px,env(safe-area-inset-bottom))}
+.phase-bar{position:relative;top:auto;display:flex;flex-wrap:wrap;overflow:visible!important}
+.phase-label{flex:1;min-width:80px}.phase-timer{flex-shrink:0}
+.player,.pick,.setup-summary li{overflow-wrap:anywhere;min-width:0}
+@media(max-width:390px){.sheet-card{padding:14px}.phase-bar{gap:8px}.phase-bar .lobby-action{padding:8px}.setup-tabs button{min-height:44px}.setup-summary{padding:12px}.chat-compose{grid-template-columns:minmax(0,1fr)}.chat-compose button{width:100%}}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
+
+/* A shorter setup path and a clear single responsibility for player screens. */
+.preset-primary{grid-template-columns:repeat(2,minmax(0,1fr))}.preset-primary .preset-choice{min-height:92px;border-color:var(--ux-accent);background:linear-gradient(145deg,#302611,#15130e)}
+.preset-more{margin-top:8px}.preset-more>summary{display:flex;align-items:center;justify-content:center;border:1px solid var(--ux-border);border-radius:var(--ux-radius);padding:10px 14px}.setup-choice-actions{margin-top:18px}.setup-choice-actions>.btn{flex:1}
+.role-reveal-name{margin:8px 0 10px;color:var(--ux-accent);font-size:clamp(30px,7vw,52px)}
+.role-quick-summary{display:grid;gap:8px;width:min(620px,100%);margin:0 auto 14px;padding:14px 16px;border:1px solid var(--ux-border);border-radius:var(--ux-radius);background:#0c1010;text-align:start}
+.role-quick-summary span{width:max-content;padding:3px 10px;border:1px solid var(--ux-accent);border-radius:99px;color:var(--ux-accent);font-size:14px;font-weight:900}.role-quick-summary p{margin:0;font-size:18px}.role-quick-summary strong{color:var(--ux-muted);font-size:15px}
+.role-acknowledge{position:sticky;bottom:max(8px,env(safe-area-inset-bottom));z-index:30;width:min(620px,100%);margin:12px auto 0;padding:8px;border:1px solid var(--ux-accent);border-radius:18px;background:color-mix(in srgb,var(--ux-surface) 94%,transparent);box-shadow:0 -8px 30px #0008;backdrop-filter:blur(12px)}
+.player-step-status{display:grid;grid-template-columns:auto 1fr;align-items:center;gap:12px;width:min(720px,100%);margin:0 auto 12px;padding:13px 16px;border:1px solid var(--ux-border);border-radius:var(--ux-radius);background:var(--ux-surface);color:var(--ux-text)}
+.player-step-status>span{display:grid;place-items:center;width:34px;height:34px;border-radius:50%;background:#24272d;color:var(--ux-muted);font-weight:1000}.player-step-status>div{display:grid;gap:2px;text-align:start}.player-step-status strong{font-size:17px}.player-step-status small{color:var(--ux-muted);font-size:14px;line-height:1.45}.player-step-status.action{border-color:var(--ux-accent)}.player-step-status.action>span{background:#6e4b0e;color:#ffe5ac}.player-step-status.done>span{background:#174e30;color:#a7f0bc}
+.player-lobby-roster{display:flex;flex-wrap:wrap;justify-content:center;gap:8px;width:min(620px,100%);margin:12px auto}.player-lobby-roster span{padding:7px 11px;border:1px solid var(--ux-border);border-radius:99px;background:#0c1010;font-size:15px}.player-lobby-roster span::first-letter{color:var(--green)}
+.action-confirmation{display:grid;gap:16px}.action-confirmation p{margin:0;font-size:19px;line-height:1.7}.action-confirmation .actions>*{flex:1}
+body.light .role-quick-summary,body.light .player-lobby-roster span{background:#fff7e7;color:#241f19}
+@media(max-width:520px){.preset-primary{grid-template-columns:1fr}.setup-choice-actions{display:grid}.personal-role-reveal{padding:15px}.personal-role-reveal .role-reader{max-width:min(290px,82vw)}.role-acknowledge{bottom:max(6px,env(safe-area-inset-bottom));padding:6px}.role-quick-summary p{font-size:16px}.player-step-status{padding:11px 12px}.player-step-status small{font-size:13px}}
+@media(max-height:700px){.personal-role-reveal .role-reader{max-width:250px}.personal-role-reveal .role-reader img{max-height:48vh;object-fit:contain}.role-quick-summary{padding:10px 12px}.role-quick-summary p{font-size:15px}}
+
+/* Keep the next action within reach throughout setup and live host phases. */
+.host-progress{position:fixed;inset-inline:12px;bottom:max(12px,env(safe-area-inset-bottom));z-index:85;width:min(720px,calc(100% - 24px));margin-inline:auto;display:grid;gap:10px;padding:14px 16px;border:1px solid var(--ux-accent);border-radius:18px;background:var(--ux-surface);color:var(--ux-text);box-shadow:0 -8px 32px #0005;box-sizing:border-box;text-align:start}
+.host-progress-info{display:grid;gap:3px;min-width:0}.host-progress-info strong{font-size:17px;line-height:1.4;color:var(--ux-accent)}.host-progress-info span{font-size:14px;line-height:1.5;color:var(--ux-muted);overflow-wrap:anywhere}
+.host-progress-actions{display:flex;gap:10px}.host-progress-actions .btn{margin:0;min-width:0;min-height:48px;font-size:18px;flex:1}.host-progress-actions .host-progress-back{flex:0 0 auto;padding-inline:20px}
+#app:has(.host-progress){padding-bottom:calc(var(--host-progress-height,170px) + 36px + env(safe-area-inset-bottom))}
+body:has(.host-progress) .player-tools{bottom:calc(var(--host-progress-height,170px) + 28px + env(safe-area-inset-bottom))}
+html:has(.host-progress){scroll-padding-bottom:calc(var(--host-progress-height,170px) + 36px)}
+@media(min-width:760px){.host-progress{grid-template-columns:minmax(0,1fr) minmax(260px,1fr);align-items:center}}
+
+.review-role-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(240px,100%),1fr));gap:20px;margin:16px 0;align-items:start}
+.review-role-presentation .role-identity{padding:8px 4px 12px}.review-role-presentation .role-identity h2{font-size:20px;margin-bottom:8px}.review-role-presentation .review-role-count{margin-inline-start:8px;font-size:17px;font-weight:800;color:#211b10;background:#e6c47f}
+.review-role-presentation .role-reader .role-rule-sections p{font-size:16px!important;line-height:1.85}

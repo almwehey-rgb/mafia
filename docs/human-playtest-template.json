@@ -1,0 +1,22 @@
+{
+  "templateOnly": true,
+  "matchId": "",
+  "release": "",
+  "date": "",
+  "human": true,
+  "playerCount": null,
+  "roleCounts": {},
+  "settings": {},
+  "devicesAndBrowsers": [],
+  "experienceMix": "",
+  "durationMinutes": null,
+  "rounds": null,
+  "winner": null,
+  "completed": false,
+  "validForBalance": false,
+  "interruptions": [],
+  "confusionPoints": [],
+  "issues": [],
+  "retestEvidence": [],
+  "notes": "انسخ السجل بعد مباراة فعلية إلى human-playtests.json؛ احذف templateOnly ولا تضع أسرار الجلسات."
+}
