@@ -6,7 +6,7 @@ function actorRateLimited(key:string,now:number) {
   return false;
 }
 async function autoAdvanceSolo(code:string, room:any, players:any[]) {
-  if (!room.enabled_roles?.solo_mode || ['lobby','reveal','finished','paused'].includes(room.phase)) return {room,players};
+  if (!room.enabled_roles?.solo_mode || ['lobby','finished','paused'].includes(room.phase)) return {room,players};
   const base:any={body:{hostToken:room.host_token,code},action:'auto',ip:'solo-manager',now:Date.now(),started:Date.now(),code,room,players,me:null,host:true,authenticatedSpectator:null};
   if (room.phase === 'reveal') {
     for (const bot of players.filter((p:any)=>p.is_bot && roleState(p).ack !== true)) await db.from('mafia_players').update({role_state:{...roleState(bot),ack:true}}).eq('room_code',code).eq('id',bot.id);
