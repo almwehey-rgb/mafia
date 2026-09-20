@@ -798,6 +798,8 @@ html:has(.host-progress){scroll-padding-bottom:calc(var(--host-progress-height,1
 .review-role-presentation .role-identity{padding:8px 4px 12px}.review-role-presentation .role-identity h2{font-size:20px;margin-bottom:8px}.review-role-presentation .review-role-count{margin-inline-start:8px;font-size:17px;font-weight:800;color:#211b10;background:#e6c47f}
 .review-role-presentation .role-reader .role-rule-sections p{font-size:16px!important;line-height:1.85}
 
+.preference-status:empty{display:none}
+
 /* Daylight palette. Loaded last so legacy noir accents stay in the dark theme. */
 body.light {
   color-scheme: light;
