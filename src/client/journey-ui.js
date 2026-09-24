@@ -161,7 +161,7 @@ function mountHostProgress() {
   primary.dataset.progressPrimary = '';
   primary.setAttribute('aria-describedby','hostProgressStatus');
   controls.append(primary);
-  app.append(dock);
+  (app.querySelector('.morning-footer') || app).append(dock);
   const measure = () => document.documentElement.style.setProperty('--host-progress-height', Math.ceil(dock.getBoundingClientRect().height) + 'px');
   hostProgressObserver = new ResizeObserver(measure);hostProgressObserver.observe(dock);
   updateHostProgress();measure();

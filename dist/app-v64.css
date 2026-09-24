@@ -979,4 +979,66 @@ body.light .game-sheet { background: #191b226b; }
 body.light #adminQR { background: #fff !important; color: var(--day-ink) !important; border-color: var(--line) !important; }
 body.light #adminQR::backdrop { background: #191b226b; }
 body.light .host-progress { background: #ffffffed; box-shadow: 0 8px 30px #191b2217; }
+/* Responsive morning board: keep the discussion and history reachable on short screens. */
+.morning-host{width:100%;max-width:none;box-sizing:border-box;display:flex;flex-direction:column;gap:14px;text-align:start;}
+.morning-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;}
+.morning-heading .role-title{margin:0;font-size:clamp(24px,2.2vw,36px);}
+.morning-heading>span{color:var(--muted);font-weight:700;}
+.morning-content{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(280px,.95fr);gap:18px;min-height:0;}
+.morning-main,.morning-aside{display:flex;flex-direction:column;gap:12px;min-width:0;min-height:0;}
+.morning-results{min-width:0;}
+.morning-results .status,.morning-results .event{margin:0 0 8px;padding:10px 14px;font-size:16px;line-height:1.5;}
+.morning-role-status{display:flex;flex-wrap:wrap;gap:8px;}
+.morning-role-status>.status{flex:1;min-width:180px;}
+.morning-host h2{margin:0 0 8px;font-size:20px;}
+.morning-roster,.morning-history{border:1px solid var(--line);border-radius:14px;padding:12px;min-height:0;display:flex;flex-direction:column;}
+.morning-roster .players{display:grid;grid-template-columns:repeat(2,minmax(0,1fr)) !important;gap:6px;overflow:auto;min-height:100px;max-height:240px;}
+.morning-roster .player{padding:8px;font-size:15px;min-width:0;overflow-wrap:anywhere;}
+.morning-roster .player .btn,.morning-roster .player button{min-height:32px;padding:4px 8px;}
+.morning-history .timeline{overflow:auto;min-height:90px;max-height:200px;}
+.morning-history .timeline-item{padding:8px 10px;}
+.morning-history .timeline-item span{font-size:14px !important;}
+.morning-footer{flex:none;}
+.morning-footer .host-progress{position:static !important;width:100%;max-width:none;margin:0;box-sizing:border-box;padding:12px 16px;box-shadow:none;}
+#app:has(.morning-host):has(.host-progress){padding-bottom:0 !important;}
+.morning-discussion{min-height:0;overflow:auto;}
+.morning-discussion .discussion-panel{margin:0;padding:14px;}
+.morning-discussion .discussion-panel>p{margin:6px 0;font-size:16px;}
+.morning-discussion .discussion-panel>label{display:flex;align-items:center;gap:10px;font-size:15px;}
+.morning-discussion .discussion-panel>label select{flex:1;width:auto;min-width:0;padding:8px;}
+.morning-discussion .discussion-clock{font-size:clamp(32px,4vw,56px);margin:8px 0;}
+.morning-discussion .btn{min-height:44px;font-size:15px;padding:10px 14px;}
+.morning-discussion .actions{gap:8px;}
+
+@media (min-width:1200px) and (min-height:700px) and (orientation:landscape){
+  body:has(.morning-host) .utility-bar{position:static;margin:0;padding-block:4px;}
+  body:has(.morning-host) .shell{padding-top:8px !important;padding-bottom:8px !important;}
+  body:has(.morning-host) .header{margin-bottom:8px;padding-bottom:8px;}
+  #app:has(.morning-host)>.phase-bar{position:static;width:100%;max-width:none;margin-bottom:10px;padding-block:6px;}
+  .morning-host{height:calc(100dvh - 240px);min-height:380px;margin:0;padding:14px;}
+  .morning-content{flex:1;overflow:hidden;}
+  .morning-main{display:grid;grid-template-columns:minmax(180px,.8fr) minmax(0,1.2fr);overflow:hidden;}
+  .morning-results{overflow:auto;min-height:0;}
+  .morning-discussion{flex:1;}
+  .morning-roster,.morning-history{flex:1;overflow:hidden;}
+  .morning-roster .players,.morning-history .timeline{max-height:none;}
+}
+
+@media (max-width:1199px),(max-height:699px){
+  .morning-host{height:auto;min-height:0;}
+  .morning-content{grid-template-columns:1fr;overflow:visible;flex:none;}
+  .morning-main,.morning-aside{overflow:visible;}
+  .morning-discussion{overflow:visible;}
+  .morning-roster,.morning-history{overflow:visible;}
+}
+
+@media (max-width:599px){
+  .morning-host{padding:12px;gap:10px;}
+  .morning-heading{align-items:flex-start;flex-direction:column;gap:2px;}
+  .morning-content,.morning-main,.morning-aside{gap:10px;}
+  .morning-roster .players{grid-template-columns:1fr !important;max-height:240px;}
+  .morning-role-status{display:block;}
+  .morning-role-status>.status{min-width:0;margin-bottom:8px;}
+  .morning-footer .host-progress{grid-template-columns:1fr;padding:10px;}
+}
 
