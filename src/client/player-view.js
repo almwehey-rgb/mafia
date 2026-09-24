@@ -11,20 +11,8 @@ function personalRoleCard(compact=false) {
   if(personalCardState.key!==key)personalCardState={key,open:false};
   return interactiveRoleCard(role,{personal:true,compact,open:personalCardState.open});
 }
-function roleQuickSummary() {
-  const role=game?.me?.role,rule=detailedRoleRules[role];
-  if(!rule)return '';
-  let first=discussionText('راقب المرحلة وانتظر ظهور اختيارك.','Watch the phase and wait for your choice.');
-  if(role==='detective')first=discussionText('أول إجراء لك: افحص لاعبًا في الليلة الأولى.','First action: investigate a player on the first night.');
-  else if(mafiaRoleClient(role))first=discussionText('أول اغتيال يبدأ من الليلة المحددة في إعداد الغرفة.','Your first kill starts on the night selected by the room settings.');
-  else if(['doctor','witch','serial_killer','revealer','escort'].includes(role))first=discussionText('تظهر قدرتك الليلية عندما تصبح متاحة.','Your night ability appears when it becomes available.');
-  else if(['jailer','lawyer'].includes(role))first=discussionText('يظهر اختيارك أثناء الصباح قبل التصويت.','Your choice appears during the day before voting.');
-  else if(role==='vigilante')first=discussionText('تظهر طلقتك فقط إذا خرجت بالتصويت أو اغتالتك المافيا.','Your shot appears only if you are voted out or killed by Mafia.');
-  else if(role==='cupid')first=discussionText('تظهر قدرتك في الليلة الثانية فقط.','Your ability appears on the second night only.');
-  return `<section class="role-quick-summary" data-no-translate><span>${escapeHtml(rule[0])}</span><p>${escapeHtml(rule[1])}</p><strong>${escapeHtml(first)}</strong></section>`;
-}
 function roleReveal() {
-  $('#app').innerHTML=`<section class="card hero personal-role-reveal">${personalRoleCard()}<div class="role-badge">${discussionText('دورك السري','Your secret role')}</div><h1 class="role-reveal-name">${escapeHtml(roleLabel(game.me.role))}</h1>${roleQuickSummary()}<p class="muted" data-no-translate>${discussionText('اقلب البطاقة لقراءة القواعد الكاملة.','Flip the card to read the full rules.')}</p><div class="role-acknowledge"><button class="btn red wide" onclick="acknowledgeRole()" data-no-translate>${discussionText('فهمت دوري','I understand my role')}</button></div></section>`;
+  $('#app').innerHTML=`<section class="card hero personal-role-reveal">${personalRoleCard()}<div class="role-acknowledge"><button class="btn red wide" onclick="acknowledgeRole()" data-no-translate>${discussionText('فهمت دوري','I understand my role')}</button></div></section>`;
 }
 function mafiaRoleClient(role){return role==='mafia'||role==='mafia_boss'}
 function renderPlayerContent() {

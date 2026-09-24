@@ -7,6 +7,7 @@ import {webcrypto,createHash} from 'node:crypto';
 import {AsyncLocalStorage} from 'node:async_hooks';
 import {PGlite} from '@electric-sql/pglite';
 import {sqlClientFactory} from './helpers/sql-client.mjs';
+import {edgeFixture} from './helpers/edge-fixture.mjs';
 
 test('Real Edge handler and SQL complete two matches with a changed roster and private reconnect',async()=>{
  const db=new PGlite();try{
@@ -99,4 +100,51 @@ test('Real Edge handler and SQL complete two matches with a changed roster and p
   assert.equal(fullStart.phase,'reveal');
   assert.equal((await db.query('select detective_count from mafia_rooms where code=$1',[code])).rows[0].detective_count,8);
  }finally{await db.close();}
+});
+
+test('Host can redeal during a live match without changing seats or exposing old state',async()=>{
+ const fixture=await edgeFixture({fresh:true});
+ try {
+  const request=async(action,args={})=>{
+   const response=await fixture.handler(new Request('https://isolated.test/',{
+    method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({action,...args})
+   }));
+   return {status:response.status,body:await response.json()};
+  };
+  const login=(await request('hostLogin',{pin:'12345678'})).body;
+  const created=(await request('create',{hostAccessToken:login.hostAccessToken})).body;
+  const auth={code:created.code,hostToken:created.hostToken};
+  const seats=[];
+  for(const id of ['one','two','three','four']){
+   const joined=(await request('join',{code:created.code,id,name:id})).body;
+   seats.push({id,playerToken:joined.playerToken});
+  }
+  const settings={doctor:false,detective:false,lawyer:false,jailer:false};
+  const start=(await request('start',{...auth,lifecycleVersion:0,mafiaCount:1,detectiveCount:0,enabledRoles:settings})).body;
+  assert.equal(start.phase,'reveal');
+  const matchId=start.matchId;
+  let version=start.lifecycleVersion;
+  for(const seat of seats){
+   const ack=await request('acknowledgeRole',{code:created.code,...seat,lifecycleVersion:version});
+   assert.equal(ack.status,200);version=ack.body.lifecycleVersion;
+  }
+  const night=await request('beginNight',{...auth,lifecycleVersion:version});
+  assert.equal(night.body.phase,'night');version=night.body.lifecycleVersion;
+  const unauthorized=await request('restart',{code:created.code,lifecycleVersion:version,
+   ...seats[1],mafiaCount:1,detectiveCount:0,enabledRoles:settings});
+  assert.equal(unauthorized.status,403);
+  const stale=await request('restart',{...auth,lifecycleVersion:0,mafiaCount:1,detectiveCount:0,enabledRoles:settings});
+  assert.equal(stale.status,409);
+  const restarted=await request('restart',{...auth,lifecycleVersion:version,mafiaCount:1,detectiveCount:0,enabledRoles:settings});
+  assert.equal(restarted.status,200,JSON.stringify(restarted.body));
+  assert.equal(restarted.body.phase,'reveal');
+  assert.equal(restarted.body.round,1);
+  assert.notEqual(restarted.body.matchId,matchId);
+  assert.equal(restarted.body.lifecycleVersion,version+1);
+  const players=(await fixture.db.query('select id,role,role_state,alive from mafia_players where room_code=$1 order by id',[created.code])).rows;
+  assert.deepEqual(players.map(p=>p.id),seats.map(p=>p.id).sort());
+  assert.equal(players.filter(p=>p.role==='mafia_boss').length,1);
+  assert.ok(players.every(p=>p.alive&&p.role_state.ack===false));
+  assert.equal((await request('restart',{...auth,lifecycleVersion:version,mafiaCount:1,detectiveCount:0,enabledRoles:settings})).status,409);
+ } finally { await fixture.db.close(); }
 });

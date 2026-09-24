@@ -68,7 +68,7 @@ async function handleRequest(request:Request) {
 
     if (action === "returnToLobby") return await routeReturnToLobby({body, action, ip, now, started, code, room, players, me, host, authenticatedSpectator});
 
-    if (action === "start") return await routeStart({body, action, ip, now, started, code, room, players, me, host, authenticatedSpectator});
+    if (action === "start" || action === "restart") return await routeStart({body, action, ip, now, started, code, room, players, me, host, authenticatedSpectator});
 
     if (action === "kick") return await routeKick({body, action, ip, now, started, code, room, players, me, host, authenticatedSpectator});
 

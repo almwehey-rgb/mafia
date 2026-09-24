@@ -49,7 +49,7 @@ function phaseIcon(phase = game?.phase) { return ({ lobby: '🎴', reveal: '👁
 function phaseName(phase = game?.phase) { return ({ lobby: 'الانتظار', reveal: 'كشف الأدوار', night: 'الليل', day: 'الصباح', nomination: 'الترشيح', trial: 'المحاكمة', verdict: 'الحكم', vote: 'التصويت', paused: 'متوقفة مؤقتًا', finished: 'النهاية' })[phase] || ''; }
 function lobbyIcon(name){const paths={wait:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',admin:'<path d="M12 3 4 6v6c0 5 8 9 8 9s8-4 8-9V6z"/><path d="m8 12 3 3 5-6"/>',leave:'<path d="M9 4H4v16h5M10 12h11m-4-4 4 4-4 4"/>',back:'<path d="M5 12h14m-6-6 6 6-6 6"/>'};return '<svg class="lobby-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+paths[name]+'</svg>'}
 function backFromLobby(){pollingEpoch++;clearTimeout(pollTimer);closeSheet();document.querySelector('.player-tools')?.remove();game=null;if(hostAccessToken)renderHostHome();else renderHostLogin()}
-function phaseBar() { const controller=(hostToken||game?.me?.isHost)&&game;const live=controller&&!['lobby','finished'].includes(game.phase);const pause=live?`<button class="phase-pause" aria-label="${discussionText(game.phase==='paused'?'استكمال المباراة':'إيقاف مؤقت',game.phase==='paused'?'Resume game':'Pause game')}" onclick="hostAction('togglePause')">${game.phase==='paused'?'▶️':'⏸️'}</button>`:'';const admin=live?`<button class="phase-pause" aria-label="${discussionText('إدارة المباراة','Game management')}" onclick="showMatchTools()">🛡️</button>`:'';const back=delegatedHostMode?'<button class="phase-pause" onclick="toggleDelegatedHost()">👤</button>':'';return `<div class="phase-bar"><span class="phase-symbol">${game?.phase==='lobby'?lobbyIcon('wait'):phaseIcon()}</span><b class="phase-label">${phaseName()}</b>${game?.round ? `<small>الجولة ${game.round}</small>` : ''}${game&&!["lobby","finished"].includes(game.phase)?`<span class="phase-timer" id="phaseTimer" role="timer" aria-label="الوقت المتبقي / Time remaining">${phaseDuration}</span>`:''}${game?.phase==='lobby'?`<button class="phase-pause lobby-action lobby-back" onclick="backFromLobby()">${lobbyIcon('back')}<span>${discussionText('الرئيسية','Home')}</span></button>`:''}${pause}${admin}${hostToken?`<button class="phase-pause lobby-action" onclick="showAdminQR()" aria-label="وضع الأدمن الخاص">${lobbyIcon('admin')}<span>${discussionText('أدمن','Admin')}</span></button>`:''}${back}${!spectatorMode ? `<button class="phase-pause lobby-action lobby-exit" onclick="leaveRoom()" aria-label="مغادرة الغرفة">${lobbyIcon('leave')}<span>${discussionText('مغادرة','Leave')}</span></button>` : ""}</div>`; }
+function phaseBar() { const controller=(hostToken||game?.me?.isHost)&&game;const live=controller&&!['lobby','finished'].includes(game.phase);const pause=live?`<button class="phase-pause" aria-label="${discussionText(game.phase==='paused'?'استكمال المباراة':'إيقاف مؤقت',game.phase==='paused'?'Resume game':'Pause game')}" onclick="hostAction('togglePause')">${game.phase==='paused'?'▶️':'⏸️'}</button>`:'';const restart=live?`<button class="phase-pause phase-restart" aria-label="${discussionText('إعادة القيم وتوزيع أدوار جديدة','Restart game and deal new roles')}" title="${discussionText('إعادة القيم','Restart game')}" onclick="restartGame()">↻<span>${discussionText('إعادة القيم','Restart')}</span></button>`:'';const admin=live?`<button class="phase-pause" aria-label="${discussionText('إدارة المباراة','Game management')}" onclick="showMatchTools()">🛡️</button>`:'';const back=delegatedHostMode?'<button class="phase-pause" onclick="toggleDelegatedHost()">👤</button>':'';return `<div class="phase-bar"><span class="phase-symbol">${game?.phase==='lobby'?lobbyIcon('wait'):phaseIcon()}</span><b class="phase-label">${phaseName()}</b>${game?.round ? `<small>الجولة ${game.round}</small>` : ''}${game&&!["lobby","finished"].includes(game.phase)?`<span class="phase-timer" id="phaseTimer" role="timer" aria-label="الوقت المتبقي / Time remaining">${phaseDuration}</span>`:''}${game?.phase==='lobby'?`<button class="phase-pause lobby-action lobby-back" onclick="backFromLobby()">${lobbyIcon('back')}<span>${discussionText('الرئيسية','Home')}</span></button>`:''}${restart}${pause}${admin}${hostToken?`<button class="phase-pause lobby-action" onclick="showAdminQR()" aria-label="وضع الأدمن الخاص">${lobbyIcon('admin')}<span>${discussionText('أدمن','Admin')}</span></button>`:''}${back}${!spectatorMode ? `<button class="phase-pause lobby-action lobby-exit" onclick="leaveRoom()" aria-label="مغادرة الغرفة">${lobbyIcon('leave')}<span>${discussionText('مغادرة','Leave')}</span></button>` : ""}</div>`; }
 function clientPhaseRemaining() {
   const clock=game?.phaseClock;
   if(!clock||!Number.isFinite(clock.startedAt))return Infinity;
@@ -457,9 +457,11 @@ function interactiveRoleCard(role, {personal=false, compact=false, image='', ope
  const title=kids?({mafia_boss:'قائد الفريق الغامض',mafia:'الفريق الغامض',doctor:'الطبيب',detective:'المحقق',citizen:'المواطن'}[role]):role==='mafia_boss'?'زعيم المافيا':roleLabel(role).split(' / ')[0];
  const teammates=personal&&mafiaRoleClient(role)?(game.me.mafiaTeam||[]).filter(p=>p.id!==game.me.id):[];
  const team=personal&&mafiaRoleClient(role)?`<aside class="role-allies"><h3>زملاؤك في المافيا <small>خاص بفريقك</small></h3><div>${teammates.map(p=>`<span>${escapeHtml(p.name)}</span>`).join('')||'<p>أنت عضو المافيا الوحيد</p>'}</div></aside>`:'';
+ const teamName=role==='serial_killer'||role==='jester'?'الفريق المستقل':detailedRoleRules[role]?.[0]||'';
+ const teamCapsule=personal?`<span class="personal-team-capsule">${escapeHtml(teamName)}</span>`:'';
  const identity=`<header class="role-identity"><h2>${escapeHtml(title)}</h2><span>${escapeHtml(detailedRoleRules[role]?.[0]||'')}</span>${review?`<span class="review-role-count" data-no-translate aria-label="${discussionText('عدد اللاعبين','Player count')}">× ${count}</span>`:''}</header>`;
- const article=`<article class="role-reader turning-role ${kids?'kids-role-card':''} ${personal?'personal-role-card':''} ${compact?'compact':''}" ${review?`data-review-role="${role}"`:''} data-view="${open?'details':'image'}" style="--role-art:url('${image}')" role="button" tabindex="0" aria-label="${label}، اضغط لقلب الكرت" aria-pressed="${open}" onclick="selectRoleView(this,this.dataset.view!=='details')" onkeydown="if(event.target===this&&(event.key==='Enter'||event.key===' ')){event.preventDefault();selectRoleView(this,this.dataset.view!=='details')}"><div class="role-turn-inner"><div class="role-image-view" aria-hidden="${open}"><img src="${image}" alt="${label}" width="1024" height="1536" loading="lazy" decoding="async"><span class="role-turn-hint">اضغط الكرت لقراءة الدور ↻</span></div><div class="role-details-view" aria-hidden="${!open}"><div class="personal-card-properties">${detailedRoleProperties(role,personal)}</div><span class="role-turn-hint">مرّر لقراءة المزيد · اضغط للعودة ↻</span></div></div></article>`;
- return `<section class="role-presentation ${review?'review-role-presentation':''}">${personal?article+team+identity:identity+team+article}</section>`;
+ const article=`<article class="role-reader turning-role ${kids?'kids-role-card':''} ${personal?'personal-role-card':''} ${compact?'compact':''}" ${review?`data-review-role="${role}"`:''} data-view="${open?'details':'image'}" style="--role-art:url('${image}')" role="button" tabindex="0" aria-label="${label}، اضغط لقلب الكرت" aria-pressed="${open}" onclick="selectRoleView(this,this.dataset.view!=='details')" onkeydown="if(event.target===this&&(event.key==='Enter'||event.key===' ')){event.preventDefault();selectRoleView(this,this.dataset.view!=='details')}"><div class="role-turn-inner"><div class="role-image-view" aria-hidden="${open}"><img src="${image}" alt="${label}" width="1024" height="1536" loading="lazy" decoding="async">${teamCapsule}${personal?'':'<span class="role-turn-hint">اضغط الكرت لقراءة الدور ↻</span>'}</div><div class="role-details-view" aria-hidden="${!open}">${teamCapsule}<div class="personal-card-properties">${detailedRoleProperties(role,personal)}</div>${personal?'':'<span class="role-turn-hint">مرّر لقراءة المزيد · اضغط للعودة ↻</span>'}</div></div></article>`;
+ return `<section class="role-presentation ${review?'review-role-presentation':''}">${personal?article+team:identity+team+article}</section>`;
 }
 let homeGalleryObserver;
 function mountHomeCharacters() {
@@ -955,6 +957,23 @@ async function startGame() {
   } catch (error) { alert(error.code === 'STALE_GAME' ? 'تغيّرت حالة الغرفة. انتظر تحديث الشاشة ثم حاول مجددًا.' : 'تأكد من وجود لاعبين كافين / Check player count'); }
   finally { lifecycleRequestPending = false; }
 }
+async function restartGame() {
+  if (lifecycleRequestPending || !game || ['lobby','finished'].includes(game.phase)) return;
+  if (!confirm(discussionText('إعادة القيم الآن؟ ستُلغى الجولة الحالية وتتوزع أدوار جديدة على نفس اللاعبين.','Restart now? Current progress will be lost and new roles will be dealt to the same players.'))) return;
+  lifecycleRequestPending = true;
+  try {
+    game = await withBusy('جاري إعادة القيم وتوزيع الأدوار…', () => api({
+      action:'restart', code:game.code, lifecycleVersion:game.lifecycleVersion,
+      hostToken, id:playerId, playerToken, mafiaCount:game.mafiaCount,
+      detectiveCount:game.detectiveCount, detectiveQuestions:game.detectiveQuestions,
+      enabledRoles:normalizeEnabledRoles(game.enabledRoles)
+    }));
+    localHistory = []; localStorage.removeItem(`mafia-history-${game.code}`);
+    closeSheet(); signalPhase(); rememberEvent(); renderHost();
+  } catch (error) {
+    alert(error.code === 'STALE_GAME' ? 'تغيّرت حالة الغرفة. انتظر تحديث الشاشة ثم حاول مجددًا.' : 'تعذرت إعادة القيم، حاول مجددًا.');
+  } finally { lifecycleRequestPending = false; }
+}
 async function hostAction(action) {
   try { const previous=game.phase; game = await api({ action, code: game.code, hostToken, id:playerId, playerToken }); if(previous!==game.phase)signalPhase(); rememberEvent(); renderHost(); }
   catch (error) { alert(error.code === 'STALE_GAME' ? 'تغيّرت حالة الغرفة أثناء الطلب. انتظر تحديث الشاشة ثم حاول مجددًا.' : error.code === 'WAITING_ACTIONS' ? 'بانتظار بقية اختيارات الليل' : 'بانتظار بقية اللاعبين'); }
@@ -981,20 +1000,8 @@ function personalRoleCard(compact=false) {
   if(personalCardState.key!==key)personalCardState={key,open:false};
   return interactiveRoleCard(role,{personal:true,compact,open:personalCardState.open});
 }
-function roleQuickSummary() {
-  const role=game?.me?.role,rule=detailedRoleRules[role];
-  if(!rule)return '';
-  let first=discussionText('راقب المرحلة وانتظر ظهور اختيارك.','Watch the phase and wait for your choice.');
-  if(role==='detective')first=discussionText('أول إجراء لك: افحص لاعبًا في الليلة الأولى.','First action: investigate a player on the first night.');
-  else if(mafiaRoleClient(role))first=discussionText('أول اغتيال يبدأ من الليلة المحددة في إعداد الغرفة.','Your first kill starts on the night selected by the room settings.');
-  else if(['doctor','witch','serial_killer','revealer','escort'].includes(role))first=discussionText('تظهر قدرتك الليلية عندما تصبح متاحة.','Your night ability appears when it becomes available.');
-  else if(['jailer','lawyer'].includes(role))first=discussionText('يظهر اختيارك أثناء الصباح قبل التصويت.','Your choice appears during the day before voting.');
-  else if(role==='vigilante')first=discussionText('تظهر طلقتك فقط إذا خرجت بالتصويت أو اغتالتك المافيا.','Your shot appears only if you are voted out or killed by Mafia.');
-  else if(role==='cupid')first=discussionText('تظهر قدرتك في الليلة الثانية فقط.','Your ability appears on the second night only.');
-  return `<section class="role-quick-summary" data-no-translate><span>${escapeHtml(rule[0])}</span><p>${escapeHtml(rule[1])}</p><strong>${escapeHtml(first)}</strong></section>`;
-}
 function roleReveal() {
-  $('#app').innerHTML=`<section class="card hero personal-role-reveal">${personalRoleCard()}<div class="role-badge">${discussionText('دورك السري','Your secret role')}</div><h1 class="role-reveal-name">${escapeHtml(roleLabel(game.me.role))}</h1>${roleQuickSummary()}<p class="muted" data-no-translate>${discussionText('اقلب البطاقة لقراءة القواعد الكاملة.','Flip the card to read the full rules.')}</p><div class="role-acknowledge"><button class="btn red wide" onclick="acknowledgeRole()" data-no-translate>${discussionText('فهمت دوري','I understand my role')}</button></div></section>`;
+  $('#app').innerHTML=`<section class="card hero personal-role-reveal">${personalRoleCard()}<div class="role-acknowledge"><button class="btn red wide" onclick="acknowledgeRole()" data-no-translate>${discussionText('فهمت دوري','I understand my role')}</button></div></section>`;
 }
 function mafiaRoleClient(role){return role==='mafia'||role==='mafia_boss'}
 function renderPlayerContent() {

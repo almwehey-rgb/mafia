@@ -3,7 +3,7 @@ async function routeStart(context:RoomRouteContext) {
   {
       if (!host) return out({ error: "UNAUTHORIZED" }, 403);
       players = players.filter((p) => !p.left_at);
-      if (!["lobby", "finished"].includes(room.phase)) return out({ error: "INVALID_ACTION" }, 400);
+      if (action === "restart" ? ["lobby", "finished"].includes(room.phase) : !["lobby", "finished"].includes(room.phase)) return out({ error: "INVALID_ACTION" }, 400);
       if (players.length < 2) return out({ error: "NEED_2_PLAYERS" }, 400);
       if (players.length > 20) return out({ error: "ROOM_FULL" }, 409);
       if (!Number.isSafeInteger(body.lifecycleVersion) || body.lifecycleVersion !== (room.lifecycle_version || 0)) return out({ error: "STALE_GAME" }, 409);
@@ -37,7 +37,7 @@ async function routeStart(context:RoomRouteContext) {
         const state = roles[i] === "vigilante" ? { bullets: 1, ack } : roles[i] === "witch" ? { life: true, poison: true, ack } : { ack };
         return { id: player.id, role: roles[i], state };
       });
-      const { data: transition, error } = await db.rpc("mafia_start_match", {
+      const { data: transition, error } = await db.rpc(action === "restart" ? "mafia_restart_match" : "mafia_start_match", {
         p_code: code, p_version: body.lifecycleVersion, p_host_token: body.hostToken || null,
         p_player_id: body.id || null, p_player_token: body.playerToken || null,
         p_assignments: assignments, p_settings: selectedRoles,

@@ -80,7 +80,7 @@ type RouteContext = {
 };
 type RoomRouteContext = RouteContext & {code:string;room:any;players:any[];me:any;host:boolean;authenticatedSpectator:any};
 // Shared protocol vocabulary; request/response shape documented in docs/protocol.md.
-const REQUEST_ACTIONS=["acknowledgeRole","act","addBot","adminState","advanceVerdict","beginNight","claimSeat","controlDiscussion","create","createAdminInvite","createReplacement","electMafiaLeader","endGame","expelPlayer","finishDiscussion","health","hostLogin","hostLogout","hostPreferences","id","jail","join","joinSpectator","kick","lastShot","lawyerProtect","leaderboard","leave","listSnapshots","messages","moderationLog","mute","ok","operationsStatus","passDiscussion","profile","recoverProfile","redeemAdminInvite","report","resolveNight","resolveVote","restoreSnapshot","returnToLobby","revokeAdminAccess","saveWill","sendMessage","setDiscussionClaim","spectatorState","start","startDiscussion","startVote","state","systemStatus","togglePause","transferHost","vote","warnPlayer","operationsStatus"];
+const REQUEST_ACTIONS=["acknowledgeRole","act","addBot","adminState","advanceVerdict","beginNight","claimSeat","controlDiscussion","create","createAdminInvite","createReplacement","electMafiaLeader","endGame","expelPlayer","finishDiscussion","health","hostLogin","hostLogout","hostPreferences","id","jail","join","joinSpectator","kick","lastShot","lawyerProtect","leaderboard","leave","listSnapshots","messages","moderationLog","mute","ok","operationsStatus","passDiscussion","profile","recoverProfile","redeemAdminInvite","report","resolveNight","resolveVote","restart","restoreSnapshot","returnToLobby","revokeAdminAccess","saveWill","sendMessage","setDiscussionClaim","spectatorState","start","startDiscussion","startVote","state","systemStatus","togglePause","transferHost","vote","warnPlayer","operationsStatus"];
 // Allowlisted operational fields only. Never record headers, request bodies,
 // credentials, player names, role assignments or action targets.
 const requestTotals={requests:0,failed:0,slow:0};
@@ -866,7 +866,7 @@ async function routeStart(context:RoomRouteContext) {
   {
       if (!host) return out({ error: "UNAUTHORIZED" }, 403);
       players = players.filter((p) => !p.left_at);
-      if (!["lobby", "finished"].includes(room.phase)) return out({ error: "INVALID_ACTION" }, 400);
+      if (action === "restart" ? ["lobby", "finished"].includes(room.phase) : !["lobby", "finished"].includes(room.phase)) return out({ error: "INVALID_ACTION" }, 400);
       if (players.length < 2) return out({ error: "NEED_2_PLAYERS" }, 400);
       if (players.length > 20) return out({ error: "ROOM_FULL" }, 409);
       if (!Number.isSafeInteger(body.lifecycleVersion) || body.lifecycleVersion !== (room.lifecycle_version || 0)) return out({ error: "STALE_GAME" }, 409);
@@ -900,7 +900,7 @@ async function routeStart(context:RoomRouteContext) {
         const state = roles[i] === "vigilante" ? { bullets: 1, ack } : roles[i] === "witch" ? { life: true, poison: true, ack } : { ack };
         return { id: player.id, role: roles[i], state };
       });
-      const { data: transition, error } = await db.rpc("mafia_start_match", {
+      const { data: transition, error } = await db.rpc(action === "restart" ? "mafia_restart_match" : "mafia_start_match", {
         p_code: code, p_version: body.lifecycleVersion, p_host_token: body.hostToken || null,
         p_player_id: body.id || null, p_player_token: body.playerToken || null,
         p_assignments: assignments, p_settings: selectedRoles,
@@ -1849,7 +1849,7 @@ async function handleRequest(request:Request) {
 
     if (action === "returnToLobby") return await routeReturnToLobby({body, action, ip, now, started, code, room, players, me, host, authenticatedSpectator});
 
-    if (action === "start") return await routeStart({body, action, ip, now, started, code, room, players, me, host, authenticatedSpectator});
+    if (action === "start" || action === "restart") return await routeStart({body, action, ip, now, started, code, room, players, me, host, authenticatedSpectator});
 
     if (action === "kick") return await routeKick({body, action, ip, now, started, code, room, players, me, host, authenticatedSpectator});
 

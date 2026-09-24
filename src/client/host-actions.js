@@ -46,6 +46,23 @@ async function startGame() {
   } catch (error) { alert(error.code === 'STALE_GAME' ? 'تغيّرت حالة الغرفة. انتظر تحديث الشاشة ثم حاول مجددًا.' : 'تأكد من وجود لاعبين كافين / Check player count'); }
   finally { lifecycleRequestPending = false; }
 }
+async function restartGame() {
+  if (lifecycleRequestPending || !game || ['lobby','finished'].includes(game.phase)) return;
+  if (!confirm(discussionText('إعادة القيم الآن؟ ستُلغى الجولة الحالية وتتوزع أدوار جديدة على نفس اللاعبين.','Restart now? Current progress will be lost and new roles will be dealt to the same players.'))) return;
+  lifecycleRequestPending = true;
+  try {
+    game = await withBusy('جاري إعادة القيم وتوزيع الأدوار…', () => api({
+      action:'restart', code:game.code, lifecycleVersion:game.lifecycleVersion,
+      hostToken, id:playerId, playerToken, mafiaCount:game.mafiaCount,
+      detectiveCount:game.detectiveCount, detectiveQuestions:game.detectiveQuestions,
+      enabledRoles:normalizeEnabledRoles(game.enabledRoles)
+    }));
+    localHistory = []; localStorage.removeItem(`mafia-history-${game.code}`);
+    closeSheet(); signalPhase(); rememberEvent(); renderHost();
+  } catch (error) {
+    alert(error.code === 'STALE_GAME' ? 'تغيّرت حالة الغرفة. انتظر تحديث الشاشة ثم حاول مجددًا.' : 'تعذرت إعادة القيم، حاول مجددًا.');
+  } finally { lifecycleRequestPending = false; }
+}
 async function hostAction(action) {
   try { const previous=game.phase; game = await api({ action, code: game.code, hostToken, id:playerId, playerToken }); if(previous!==game.phase)signalPhase(); rememberEvent(); renderHost(); }
   catch (error) { alert(error.code === 'STALE_GAME' ? 'تغيّرت حالة الغرفة أثناء الطلب. انتظر تحديث الشاشة ثم حاول مجددًا.' : error.code === 'WAITING_ACTIONS' ? 'بانتظار بقية اختيارات الليل' : 'بانتظار بقية اللاعبين'); }
