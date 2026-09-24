@@ -1,15 +1,15 @@
 {
-  "release": "83240aab02bca4a9",
+  "release": "20ce5f44a3691117",
   "versions": {
     "/admin-qr.js": "9bd94d9c74e96f3a",
     "/admin-remote.js": "346e0cd082235d7c",
     "/admin.js": "06106f01722106e8",
-    "/app-v64.css": "1030f1b8e804b4b9",
+    "/app-v64.css": "d9e9bcd4eb1c6783",
     "/controls.css": "b3fddddb218ed8fb",
     "/controls.js": "284598221d857e98",
     "/discussion.css": "015e0de3d09ffa71",
     "/discussion.js": "fa9d2470222c52f4",
-    "/experience.css": "394efb8df9bab556",
+    "/experience.css": "77a59bb761ad8a2e",
     "/feature-loader.js": "99a0332c0b60b905",
     "/game.js": "94596559ce5dcaad",
     "/landscape.css": "aa8da94e569ac4a7",
