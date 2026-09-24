@@ -262,16 +262,21 @@ body.light .host-progress { background: #ffffffed; box-shadow: 0 8px 30px #191b2
 .morning-role-status>.status{flex:1;min-width:180px;}
 .morning-host h2{margin:0 0 8px;font-size:20px;}
 .morning-roster,.morning-history{border:1px solid var(--line);border-radius:14px;padding:12px;min-height:0;display:flex;flex-direction:column;}
-.morning-roster .players{display:grid;grid-template-columns:repeat(2,minmax(0,1fr)) !important;gap:6px;overflow:auto;min-height:100px;max-height:240px;}
+.morning-roster>summary,.morning-history>summary{cursor:pointer;list-style:none;flex:none;}
+.morning-roster>summary::-webkit-details-marker,.morning-history>summary::-webkit-details-marker{display:none;}
+.morning-roster>summary h2,.morning-history>summary h2{display:inline-block;margin:0 0 8px;}
+.morning-roster>summary::before,.morning-history>summary::before{content:'＋';margin-inline-end:6px;color:var(--gold);font-weight:900;}
+.morning-roster[open]>summary::before,.morning-history[open]>summary::before{content:'−';}
+.morning-roster .players{display:grid;grid-template-columns:repeat(2,minmax(0,1fr)) !important;gap:6px;overflow:visible;min-height:100px;max-height:none;}
 .morning-roster .player{padding:8px;font-size:15px;min-width:0;overflow-wrap:anywhere;}
 .morning-roster .player .btn,.morning-roster .player button{min-height:32px;padding:4px 8px;}
-.morning-history .timeline{overflow:auto;min-height:90px;max-height:200px;}
+.morning-history .timeline{overflow:visible;min-height:90px;max-height:none;}
 .morning-history .timeline-item{padding:8px 10px;}
 .morning-history .timeline-item span{font-size:14px !important;}
 .morning-footer{flex:none;}
 .morning-footer .host-progress{position:static !important;width:100%;max-width:none;margin:0;box-sizing:border-box;padding:12px 16px;box-shadow:none;}
 #app:has(.morning-host):has(.host-progress){padding-bottom:0 !important;}
-.morning-discussion{min-height:0;overflow:auto;}
+.morning-discussion{min-height:0;overflow:visible;}
 .morning-discussion .discussion-panel{margin:0;padding:14px;}
 .morning-discussion .discussion-panel>p{margin:6px 0;font-size:16px;}
 .morning-discussion .discussion-panel>label{display:flex;align-items:center;gap:10px;font-size:15px;}
@@ -279,6 +284,17 @@ body.light .host-progress { background: #ffffffed; box-shadow: 0 8px 30px #191b2
 .morning-discussion .discussion-clock{font-size:clamp(32px,4vw,56px);margin:8px 0;}
 .morning-discussion .btn{min-height:44px;font-size:15px;padding:10px 14px;}
 .morning-discussion .actions{gap:8px;}
+.morning-discussion .opening-roulette.draw-settled{margin-block:4px 8px;}
+.morning-discussion .opening-roulette.draw-settled:not([open]) .draw-content{display:none;}
+.morning-discussion .bot-discussion-feed{margin:10px 0;padding:0;border:1px solid var(--line);border-radius:12px;background:var(--panel2);text-align:start;}
+.morning-discussion .bot-discussion-feed>summary{cursor:pointer;padding:9px 12px;color:var(--gold);font-weight:900;list-style:none;}
+.morning-discussion .bot-discussion-feed>summary::-webkit-details-marker{display:none;}
+.morning-discussion .bot-discussion-feed>summary::before{content:'＋';margin-inline-end:6px;}
+.morning-discussion .bot-discussion-feed[open]>summary::before{content:'−';}
+.morning-discussion .bot-discussion-lines{padding:0 10px 8px;}
+.morning-discussion .bot-discussion-line{display:grid;gap:3px;padding:8px 0;border-top:1px solid var(--line);}
+.morning-discussion .bot-discussion-line b{color:var(--gold);}
+.morning-discussion .bot-discussion-line span{overflow-wrap:anywhere;}
 
 @media (min-width:1200px) and (min-height:700px) and (orientation:landscape){
   body:has(.morning-host) .utility-bar{position:static;margin:0;padding-block:4px;}
@@ -302,16 +318,23 @@ body.light .host-progress { background: #ffffffed; box-shadow: 0 8px 30px #191b2
   .morning-roster,.morning-history{overflow:visible;}
 }
 
-@media (min-width:1000px) and (max-height:699px) and (orientation:landscape){
+@media (min-width:1000px) and (max-height:899px) and (orientation:landscape){
   body:has(.morning-host) .shell{padding-top:8px !important;padding-bottom:8px !important;}
   body:has(.morning-host) .header{margin-bottom:8px;padding-bottom:8px;}
   #app:has(.morning-host)>.phase-bar{margin-bottom:8px;padding-block:6px;}
   #app:has(.morning-host){height:auto;min-height:0;}
-  .morning-content{grid-template-columns:1fr;overflow:visible;}
-  .morning-main{display:flex;overflow:visible;}
+  .morning-host{height:auto;min-height:0;}
+  .morning-content{flex:none;overflow:visible;}
+  .morning-main{overflow:visible;}
   .morning-aside{overflow:visible;}
   .morning-discussion{overflow:visible;}
-  .morning-roster,.morning-history{overflow:visible;}
+  .morning-roster,.morning-history{flex:none;overflow:visible;}
+  .morning-roster .players,.morning-history .timeline{max-height:none;overflow:visible;}
+}
+
+@media (min-width:1000px) and (max-width:1399px) and (max-height:899px) and (orientation:landscape){
+  .morning-content{grid-template-columns:1fr;}
+  .morning-main{display:flex;}
 }
 
 @media (max-width:599px){

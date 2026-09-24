@@ -4,6 +4,21 @@ async function routeElectMafiaLeader(context:RoomRouteContext) {
  let {room,players,me}=context;
  if(!me?.alive||!mafiaRole(me.role)||['lobby','finished','paused'].includes(room.phase))return out({error:'UNAUTHORIZED'},403);
  let election=room.enabled_roles?.leader_election;
+ if(!election?.pending&&body.target!=='RESIGN'&&body.target!=='FINALIZE'){
+  if(me.role!=='mafia_boss')return out({error:'UNAUTHORIZED'},403);
+  const nominee=players.find(p=>p.id===body.target&&p.alive&&p.role==='mafia');
+  if(!nominee)return out({error:'INVALID_ACTION'},400);
+  const {data:resigned,error:resignError}=await db.from('mafia_players').update({role:'mafia'}).eq('room_code',code).eq('id',me.id).eq('role','mafia_boss').eq('session_token',body.playerToken).select('id');
+  if(resignError)throw resignError;
+  if(!resigned?.length)return out({error:'STALE_ACTION'},409);
+  const {data:promoted,error:promoteError}=await db.from('mafia_players').update({role:'mafia_boss',role_state:{...roleState(nominee),promotedBoss:true}}).eq('room_code',code).eq('id',nominee.id).eq('role','mafia').eq('alive',true).select('id');
+  if(promoteError||!promoted?.length){
+   await db.from('mafia_players').update({role:'mafia_boss'}).eq('room_code',code).eq('id',me.id).eq('role','mafia');
+   if(promoteError)throw promoteError;
+   return out({error:'STALE_ACTION'},409);
+  }
+  ({room,players}=await load(code));return out(publicView(room,players,me.id));
+ }
  if(body.target==='RESIGN'){
   if(me.role!=='mafia_boss'||election?.pending)return out({error:'INVALID_ACTION'},409);
   if(!players.some(p=>p.alive&&p.role==='mafia'&&p.id!==me.id))return out({error:'NO_CANDIDATES'},409);

@@ -13,7 +13,7 @@ syncVisibleViewport();
 function mountPlayerTools(){
   if(!game?.me?.alive||['lobby','reveal','finished'].includes(game.phase)||document.querySelector('.player-tools'))return;
   const canChat=game.phase==='day'||(game.phase==='night'&&(game.me.jailed||game.me.role==='jailer'||game.me.role==='mafia'||game.me.role==='mafia_boss'));
-  const tools=document.createElement('div');tools.className='player-tools';tools.innerHTML=`${game.me.isHost?'<button type="button" onclick="toggleDelegatedHost()">👑 التحكم / Host controls</button>':''}<button type="button" onclick="openWill()">📜 وصيتي / My will</button>${canChat?`<button type="button" data-chat-button onclick="openChat()">💬 محادثة / Chat ${chatHasUnread()?' 🔴':''}</button>`:''}<button type="button" onclick="openReport()">🚩 إبلاغ المضيف / Report to host</button>`;document.querySelector('#app').appendChild(tools);
+  const tools=document.createElement('div');tools.className='player-tools';tools.innerHTML=`${game.me.isHost?'<button type="button" onclick="toggleDelegatedHost()">👑 إدارة الغرفة / Host controls</button>':''}<button type="button" onclick="openWill()">📜 وصيتي / My will</button>${canChat?`<button type="button" data-chat-button onclick="openChat()">💬 محادثة / Chat ${chatHasUnread()?' 🔴':''}</button>`:''}<button type="button" onclick="openReport()">🚩 إبلاغ المضيف / Report to host</button>`;document.querySelector('#app').appendChild(tools);
 }
 function toggleDelegatedHost(){delegatedHostMode=!delegatedHostMode;document.querySelector('.player-tools')?.remove();delegatedHostMode?renderHost():renderPlayer()}
 let sheetReturnFocus=null;

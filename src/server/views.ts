@@ -62,6 +62,7 @@ function publicView(room: any, players: any[], meId?: string, host = false) {
       warnings: roleState(me).warnings || [],
       promotedBoss: me.role === "mafia_boss" && roleState(me).promotedBoss === true,
       discussionClaim: me.role === "mafia_boss" && roleState(me).discussionClaim === true,
+      discussionChoiceMade: me.role === "mafia_boss" && typeof roleState(me).discussionClaim === "boolean",
       discussionChoiceLocked: typeof roleState(me).discussionClaim === "boolean" || room.round > 1 || Boolean(room.enabled_roles?.discussion_state),
       jailed: room.round !== 1 && room.jailed_player === me.id,
       jailerSelected: me.role === "jailer" ? room.jailed_player : undefined,
@@ -96,4 +97,3 @@ function publicView(room: any, players: any[], meId?: string, host = false) {
     roleReadyCount: players.filter((x) => roleState(x).ack === true).length,
   };
 }
-

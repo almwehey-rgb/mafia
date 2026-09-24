@@ -30,7 +30,7 @@ try {
  assert.equal(box.height,flipped.height);assert.equal(box.width,flipped.width);
  assert.equal(await page.locator('.personal-role-card').getAttribute('aria-pressed'),'true');
  assert.equal(await page.locator('.role-allies span').count(),2);
- assert.ok(await page.evaluate(()=>document.querySelector('.role-allies').getBoundingClientRect().top<document.querySelector('.role-rule-sections').getBoundingClientRect().top));
+ assert.ok(await page.evaluate(()=>Boolean(document.querySelector('.personal-role-card').compareDocumentPosition(document.querySelector('.role-allies'))&Node.DOCUMENT_POSITION_FOLLOWING)));
  await page.evaluate(()=>renderPlayer());
  assert.equal(await page.locator('.personal-role-card').getAttribute('aria-pressed'),'true');
  assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));

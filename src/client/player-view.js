@@ -24,7 +24,7 @@ function roleQuickSummary() {
   return `<section class="role-quick-summary" data-no-translate><span>${escapeHtml(rule[0])}</span><p>${escapeHtml(rule[1])}</p><strong>${escapeHtml(first)}</strong></section>`;
 }
 function roleReveal() {
-  $('#app').innerHTML=`<section class="card hero personal-role-reveal"><div class="role-badge">${discussionText('دورك السري','Your secret role')}</div><h1 class="role-reveal-name">${escapeHtml(roleLabel(game.me.role))}</h1>${roleQuickSummary()}<p class="muted" data-no-translate>${discussionText('اقلب البطاقة لقراءة القواعد الكاملة.','Flip the card to read the full rules.')}</p>${personalRoleCard()}<div class="role-acknowledge"><button class="btn red wide" onclick="acknowledgeRole()" data-no-translate>${discussionText('فهمت دوري','I understand my role')}</button></div></section>`;
+  $('#app').innerHTML=`<section class="card hero personal-role-reveal">${personalRoleCard()}<div class="role-badge">${discussionText('دورك السري','Your secret role')}</div><h1 class="role-reveal-name">${escapeHtml(roleLabel(game.me.role))}</h1>${roleQuickSummary()}<p class="muted" data-no-translate>${discussionText('اقلب البطاقة لقراءة القواعد الكاملة.','Flip the card to read the full rules.')}</p><div class="role-acknowledge"><button class="btn red wide" onclick="acknowledgeRole()" data-no-translate>${discussionText('فهمت دوري','I understand my role')}</button></div></section>`;
 }
 function mafiaRoleClient(role){return role==='mafia'||role==='mafia_boss'}
 function renderPlayerContent() {

@@ -6,6 +6,9 @@ test('Resignation elects a replacement atomically and keeps votes private',async
  for(const [id,role] of [['a','mafia_boss'],['b','mafia'],['c','mafia'],['d','citizen']])await db.query("insert into mafia_players(room_code,id,name,session_token,role,role_state) values('7654',$1,$1,$2,$3,'{\"ack\":true}')",[id,'token-'+id,role]);
  await db.exec("update mafia_rooms set phase='night',round=2 where code='7654'");
  async function call(id,target){const room=(await db.query("select lifecycle_version from mafia_rooms where code='7654'")).rows[0];const r=await handler(new Request('https://test/',{method:'POST',body:JSON.stringify({action:'electMafiaLeader',code:'7654',id,playerToken:'token-'+id,target,lifecycleVersion:room.lifecycle_version})}));return {status:r.status,body:await r.json()};}
+ const hostRoom=(await db.query("select lifecycle_version from mafia_rooms where code='7654'")).rows[0];
+ const hostChoice=await handler(new Request('https://test/',{method:'POST',body:JSON.stringify({action:'electMafiaLeader',code:'7654',hostToken:'host',target:'b',lifecycleVersion:hostRoom.lifecycle_version})}));
+ assert.equal(hostChoice.status,403);
  assert.equal((await call('b','RESIGN')).status,409);
  assert.equal((await call('a','RESIGN')).status,200);
  assert.equal((await call('d','b')).status,403);
@@ -16,5 +19,23 @@ test('Resignation elects a replacement atomically and keeps votes private',async
  assert.equal((await call('c','b')).status,200);
  const roles=(await db.query("select id,role from mafia_players where room_code='7654' order by id")).rows;
  assert.equal(roles.find(p=>p.id==='a').role,'mafia');assert.equal(roles.find(p=>p.id==='b').role,'mafia_boss');assert.equal(roles.filter(p=>p.role==='mafia_boss').length,1);
+ }finally{await db.close();}
+});
+test('Mafia boss can hand leadership directly to a chosen living teammate',async()=>{
+ const {db,handler}=await edgeFixture({fresh:true});
+ try{
+  await db.exec("insert into mafia_rooms(code,host_token,enabled_roles) values('7653','host','{}');");
+  for(const [id,role] of [['a','mafia_boss'],['b','mafia'],['c','mafia'],['d','citizen']])await db.query("insert into mafia_players(room_code,id,name,session_token,role,role_state) values('7653',$1,$1,$2,$3,'{}')",[id,'token-'+id,role]);
+  await db.exec(`update mafia_rooms set phase='night',round=1,enabled_roles='{"discussion_mode":"turns"}' where code='7653'`);
+  async function call(id,target){const room=(await db.query("select lifecycle_version from mafia_rooms where code='7653'")).rows[0];const r=await handler(new Request('https://test/',{method:'POST',body:JSON.stringify({action:'electMafiaLeader',code:'7653',id,playerToken:'token-'+id,target,lifecycleVersion:room.lifecycle_version})}));return {status:r.status,body:await r.json()};}
+  assert.equal((await call('a','d')).status,400);
+  const response=await call('a','b');assert.equal(response.status,200);assert.equal(response.body.me.role,'mafia');
+  const roles=(await db.query("select id,role from mafia_players where room_code='7653' order by id")).rows;
+  assert.equal(roles.find(p=>p.id==='a').role,'mafia');assert.equal(roles.find(p=>p.id==='b').role,'mafia_boss');assert.equal(roles.filter(p=>p.role==='mafia_boss').length,1);
+  const promoted=(await db.query("select role_state from mafia_players where room_code='7653' and id='b'")).rows[0].role_state;assert.equal(promoted.promotedBoss,true);
+  const room=(await db.query("select lifecycle_version from mafia_rooms where code='7653'")).rows[0];
+  const claimResponse=await handler(new Request('https://test/',{method:'POST',body:JSON.stringify({action:'setDiscussionClaim',code:'7653',id:'b',playerToken:'token-b',claim:true,lifecycleVersion:room.lifecycle_version})}));
+  const claim=await claimResponse.json();
+  assert.equal(claimResponse.status,200,JSON.stringify(claim));assert.equal(claim.me.discussionClaim,true);assert.equal(claim.me.discussionChoiceMade,true);
  }finally{await db.close();}
 });
