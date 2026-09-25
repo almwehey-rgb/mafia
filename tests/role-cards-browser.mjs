@@ -41,6 +41,17 @@ try{
   }
   await page.setViewportSize({width:390,height:844});
   await page.evaluate(()=>{game.me.role='doctor';renderPlayer();});
+  for(const size of [{width:320,height:568},{width:390,height:844}]){
+    await page.setViewportSize(size);
+    await page.evaluate(()=>{game.me.role='citizen';game.me.acknowledged=false;game.phase='reveal';renderPlayer();});
+    assert.ok(await page.evaluate(()=>document.documentElement.scrollHeight<=innerHeight&&document.documentElement.scrollWidth<=innerWidth),'Private role page fits the phone viewport');
+    assert.ok(await page.locator('.role-acknowledge button').evaluate(button=>button.getBoundingClientRect().bottom<=innerHeight),'Role confirmation stays visible');
+    await page.locator('.personal-role-card').click();
+    await page.locator('.personal-role-card .role-rule-item summary').first().click();
+    assert.equal(await page.locator('.personal-role-card').getAttribute('data-view'),'details','Opening a rule does not flip the card back');
+  }
+  await page.setViewportSize({width:390,height:844});
+  await page.evaluate(()=>{game.me.role='doctor';renderPlayer();});
   await mkdir(new URL('../artifacts/',import.meta.url),{recursive:true});
   await page.screenshot({path:new URL('../artifacts/role-card-mobile.png',import.meta.url).pathname.replace(/^\/(\w:)/,'$1'),fullPage:true});
   await page.evaluate(()=>{game.me.acknowledged=true;game.me.doctorAvailable=true;game.phase='night';game.round=2;renderPlayer();});
@@ -60,7 +71,7 @@ try{
   await page.evaluate(()=>{game.phase='reveal';game.me.role='doctor';game.me.acknowledged=false;renderPlayer();});
   await page.locator('.personal-role-card').click();
   await page.waitForTimeout(700);
-  assert.equal(await page.locator('.role-rule-sections section').count(),4);
+  assert.equal(await page.locator('.personal-role-card .role-rule-item').count(),4);
   await page.screenshot({path:'artifacts/detailed-doctor.png',fullPage:true});
   await page.evaluate(()=>document.body.classList.add('light'));
   await page.screenshot({path:'artifacts/detailed-doctor-light.png',fullPage:true});
