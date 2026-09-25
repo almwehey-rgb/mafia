@@ -40,5 +40,4 @@ function renderPlayerContent() {
   else if (game.phase === 'trial') renderTrialPlayer();
   else if (game.phase === 'verdict') renderVerdict();
   else renderVote();
-  $('#app').insertAdjacentHTML('afterbegin', bossDiscussionChoice());
 }

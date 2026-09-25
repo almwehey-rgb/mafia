@@ -1029,7 +1029,6 @@ function renderPlayerContent() {
   else if (game.phase === 'trial') renderTrialPlayer();
   else if (game.phase === 'verdict') renderVerdict();
   else renderVote();
-  $('#app').insertAdjacentHTML('afterbegin', bossDiscussionChoice());
 }
 // VisualViewport follows mobile keyboards that do not resize the layout viewport.
 function syncVisibleViewport(){
@@ -1382,19 +1381,23 @@ async function resignMafiaLeader(){
  if(!candidates.length)return;
  openSheet('التنازل عن قيادة المافيا',`<p class="muted">اختر عضوًا من المافيا لتسليمه القيادة مباشرة.</p>${choiceButtons(candidates,'electMafiaLeader',{icon:'👑'})}`);
 }
-function bossPromotionNotice(){
- const me=game?.me;
- if(!me?.promotedBoss)return '';
- const canOffer=me.discussionChoiceLocked===false&&game.round===1&&['night','day'].includes(game.phase)&&game.enabledRoles?.discussion_mode==='turns';
- let choice='';
- if(me.discussionChoiceMade)choice=me.discussionClaim?`<p>${discussionText('اخترت ادّعاء أنك المحقق المزيف والمشاركة في قرعة البداية.','You chose to pose as the fake detective and enter the opening draw.')}</p>`:`<p>${discussionText('اخترت البقاء متخفيًا وعدم دخول قرعة البداية.','You chose to stay undercover and skip the opening draw.')}</p>`;
- else if(canOffer)choice=`<p>${discussionText('هل تبي تدّعي أنك المحقق المزيف وتدخل قرعة المتحدثين؟','Would you like to pose as the fake detective and enter the speaker draw?')}</p><div class="actions"><button class="btn gold" onclick="setBossDiscussionClaim(true)">${discussionText('إيه، أدخل القرعة','Yes, enter the draw')}</button><button class="btn" onclick="setBossDiscussionClaim(false)">${discussionText('لا، أبقى متخفي','No, stay undercover')}</button></div>`;
- else choice=`<p>${discussionText('قرعة البداية غير متاحة الآن؛ لازم يكون القرار قبل بدء أول نقاش.','The opening draw is no longer available; this choice must be made before the first discussion.')}</p>`;
- return `<section id="bossPromotionNotice" class="status" data-no-translate><strong>${discussionText('👑 صرت زعيم المافيا','👑 You are now Mafia Boss')}</strong><p>${discussionText('اختيار الاغتيال النهائي صار عندك.','You now make the final Mafia kill choice.')}</p>${choice}</section>`;
+async function setBossDiscussionClaim(){
+ if(game?.me?.role!=='mafia_boss'||game.me.discussionChoiceLocked)return;
+ try{
+  game=await withBusy(discussionText('جاري تسجيل قرارك…','Saving your choice…'),()=>api({action:'setDiscussionClaim',code:game.code,id:playerId,playerToken,claim:true}));
+  renderPlayer();
+ }catch{alert(discussionText('تعذّر تسجيل ادّعاء المحقق المزيف. حدّث الحالة وحاول مرة ثانية.','Could not save the fake detective claim. Refresh and try again.'));}
 }
 function leaderElectionCard(){
  if(!game?.me?.alive||!roleAcknowledged()||['lobby','finished','paused'].includes(game.phase))return '';
- if(!game.me.leaderElection)return game.me.role==='mafia_boss'&&(game.me.mafiaTeam||[]).some(p=>p.id!==game.me.id&&p.alive!==false)?'<section id="leaderElectionCard" class="card"><button class="btn" onclick="resignMafiaLeader()">التنازل عن القيادة</button></section>':'';
+ if(!game.me.leaderElection){
+  if(game.me.role!=='mafia_boss')return '';
+  const canResign=(game.me.mafiaTeam||[]).some(p=>p.id!==game.me.id&&p.alive!==false);
+  const canClaim=game.round===1&&['night','day'].includes(game.phase)&&game.enabledRoles?.discussion_mode==='turns'&&!game.me.discussionChoiceLocked;
+  const claimStatus=game.me.discussionClaim?`<p>${discussionText('دخلت قرعة المتحدثين كمحقق مزيف.','You entered the speaker draw as a fake detective.')}</p>`:'';
+  if(!canResign&&!canClaim&&!claimStatus)return '';
+  return `<section id="leaderElectionCard" class="card" data-no-translate><h2>${discussionText(game.me.promotedBoss?'👑 صرت زعيم المافيا':'👑 زعيم المافيا',game.me.promotedBoss?'👑 You are now Mafia Boss':'👑 Mafia Boss')}</h2><div class="actions">${canResign?`<button class="btn" onclick="resignMafiaLeader()">${discussionText('تنازل عن الزعامة','Hand over leadership')}</button>`:''}${canClaim?`<button class="btn gold" onclick="setBossDiscussionClaim()">${discussionText('ادّعِ أنك محقق مزيف وادخل القرعة','Claim to be a fake detective and enter the draw')}</button>`:''}</div>${claimStatus}</section>`;
+ }
  const ended=Date.now()+discussionClockOffset>=game.me.leaderDeadline;
  return `<section id="leaderElectionCard" class="card"><h2>اختيار زعيم المافيا الجديد</h2><p>تصويت سري بعد التنازل. الأكثر أصواتًا يصبح الزعيم، والتعادل بقرعة. تنتهي المهلة خلال 30 ثانية، وتبقى القيادة الحالية حتى حسم البديل.</p>${ended?'<button class="btn gold" onclick="electMafiaLeader(&quot;FINALIZE&quot;)">حسم التصويت وتحديث الكروت</button>':game.me.leaderVote?'<p>تم تسجيل صوتك. بانتظار بقية الفريق.</p>':choiceButtons((game.me.mafiaTeam||[]).filter(p=>p.id!==game.me.leaderFormer&&p.alive!==false),'electMafiaLeader',{icon:'👑'})}</section>`;
 }
@@ -1424,8 +1427,6 @@ function renderWithNotices(content,controller=false) {
     if(!document.getElementById('voteSummaryNotice'))$('#app').insertAdjacentHTML('afterbegin',voteSummaryCard());
     if(!document.getElementById('eliminationNotice'))$('#app').insertAdjacentHTML('afterbegin',eliminationNotice());
     if(game?.me?.alive && game.me.warnings?.length && !controller && !document.getElementById('hostWarningNotice')){const warning=game.me.warnings.at(-1);$('#app').insertAdjacentHTML('afterbegin',`<section id="hostWarningNotice" class="status wait" role="alert" data-no-translate><b>${discussionText('⚠️ إنذار من المضيف','⚠️ Warning from the host')}</b><p>${escapeHtml(warning.reason)}</p></section>`);}
-    const promotionNotice=bossPromotionNotice();
-    if(promotionNotice&&!document.getElementById('bossPromotionNotice'))$('#app').insertAdjacentHTML('afterbegin',promotionNotice);
     if(keepFocus&&!focused.isConnected&&document.activeElement===document.body){
       const replacement=[...app.querySelectorAll('button,[role="button"]')].filter(sameControl)[focusIndex];
       if(replacement&&!replacement.disabled&&!replacement.closest('[inert]')&&replacement.getClientRects().length)replacement.focus({preventScroll:true});
