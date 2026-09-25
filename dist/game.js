@@ -1345,6 +1345,7 @@ function castVote(target) { return playerAction('vote', target); }
 home();
 const eliminationEffectSeen = new Set();
 let eliminationEffectTimer;
+const eliminationEffectStorageKey = 'mafia-elimination-effect-seen';
 function eliminationKind(reason) {
   return ({mafia_kill:'mafia',vote_eliminated:'vote',trial_guilty:'vote',serial_kill:'serial',witch_poison:'poison',jailer_executed:'execution',vigilante_kill:'shot',lovers_died:'lovers',host_expelled:'expelled'})[reason] || 'other';
 }
@@ -1352,14 +1353,37 @@ function closeEliminationEffect() {
   clearTimeout(eliminationEffectTimer);
   document.getElementById('eliminationEffect')?.remove();
 }
+function visibleEliminations() {
+  const now=Number(game?.serverTime)||Date.now();
+  return (game?.eliminations||[]).filter(p=>{
+    if(game.phase==='finished'||(game.phase==='day'&&p.round===game.round))return true;
+    const at=Number(p.at);
+    return at>0&&now>=at&&now-at<20000;
+  });
+}
+function hasSeenEliminationEffect(key) {
+  if(eliminationEffectSeen.has(key))return true;
+  try {
+    const saved=JSON.parse(localStorage.getItem(eliminationEffectStorageKey)||'[]');
+    if(Array.isArray(saved)&&saved.includes(key)){eliminationEffectSeen.add(key);return true;}
+  } catch {}
+  return false;
+}
+function rememberEliminationEffect(key) {
+  eliminationEffectSeen.add(key);
+  try {
+    const saved=JSON.parse(localStorage.getItem(eliminationEffectStorageKey)||'[]');
+    const keys=Array.isArray(saved)?saved:[];
+    localStorage.setItem(eliminationEffectStorageKey,JSON.stringify([...keys.filter(item=>item!==key),key].slice(-60)));
+  } catch {}
+}
 function showEliminationEffect() {
   if(game?.me?.alive!==false)return;
-  const eliminations=game?.eliminations||[];
+  const eliminations=visibleEliminations();
   const eliminated=eliminations.find(p=>p.id===game?.me?.id);
   if(!eliminated)return;
-  const key=[game.code,game.matchId,game.round,eliminated.id,eliminated.reason].join(':');
-  if(eliminationEffectSeen.has(key))return;
-  eliminationEffectSeen.add(key);
+  const key=[game.code,game.matchId,eliminated.id,eliminated.at||'legacy'].join(':');
+  if(hasSeenEliminationEffect(key))return;
   const kind=eliminationKind(eliminated.reason);
   const icons={mafia:'🗡️',vote:'⚖️',serial:'🩸',poison:'☠️',execution:'🔒',shot:'🎯',lovers:'💔',expelled:'⛔',mixed:'✦',other:'✦'};
   const titles={mafia:['اغتيال في الظلام','Mafia assassination'],vote:['حسم التصويت','Vote decided'],serial:['ضربة القاتل المتسلسل','Serial killer strike'],poison:['سم الساحرة','Witch poison'],execution:['حكم السجّان','Jailer execution'],shot:['الطلقة الأخيرة','Final shot'],lovers:['مصير الحبيبين','Linked fate'],expelled:['استبعاد من المضيف','Host expulsion'],mixed:['أحداث الليلة','Night events'],other:['خرج لاعب من المباراة','A player left the game']};
@@ -1374,6 +1398,7 @@ function showEliminationEffect() {
   effect.innerHTML=`<span class="elimination-effect-flash" aria-hidden="true"></span><span class="elimination-effect-ring" aria-hidden="true"></span><div class="elimination-effect-scene"><span class="elimination-effect-icon" aria-hidden="true">${icons[kind]}</span><p class="elimination-effect-kicker">${discussionText('حدث في المباراة','Game event')}</p><h2>${discussionText(...titles[kind])}</h2><p class="elimination-effect-names">${names}</p><span class="elimination-effect-progress" aria-hidden="true"></span><button type="button" class="btn elimination-effect-skip" onclick="closeEliminationEffect()">${discussionText('تجاوز','Skip')}</button></div>`;
   effect.addEventListener('keydown',event=>{if(event.key==='Escape')closeEliminationEffect();});
   document.body.appendChild(effect);
+  rememberEliminationEffect(key);
   if(!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches&&document.visibilityState==='visible')navigator.vibrate?.(({mafia:[180,70,260,80,180],vote:[100,80,180,80,250],serial:[240,90,260,80,150],poison:[160,110,190,90,120],execution:[250,100,230],shot:[90,50,290,80,180],lovers:[130,100,180,100,130],expelled:[180,90,220],mixed:[180,90,220],other:[140,80,180]})[kind]);
   eliminationEffectTimer=setTimeout(closeEliminationEffect,5000);
   effect.querySelector('button')?.focus({preventScroll:true});
@@ -1385,7 +1410,7 @@ function eliminationNotice() {
     jailer_executed:['إعدام السجّان','Jailer execution'], lovers_died:['الارتباط بلاعب مستبعد','Linked partner eliminated'], host_expelled:['استبعاد من المضيف','Expelled by host'], eliminated:['الاستبعاد','Eliminated']
   };
   const icons={vote:'⚖️',serial:'🩸',mafia:'🗡️',poison:'☠️',execution:'🔒',shot:'🎯',lovers:'💔',expelled:'⛔',other:'✦'};
-  const rows=(game?.eliminations||[]).map(p=>{const label=causes[p.reason]||causes.eliminated;const kind=eliminationKind(p.reason);return `<p class="elimination-row elimination-${kind}"><span class="elimination-mark" aria-hidden="true">${icons[kind]}</span><b>${escapeHtml(p.name)}</b> — ${discussionText(...label)}${p.detail?`: ${escapeHtml(p.detail)}`:''}</p>`;}).join('');
+  const rows=visibleEliminations().map(p=>{const label=causes[p.reason]||causes.eliminated;const kind=eliminationKind(p.reason);return `<p class="elimination-row elimination-${kind}"><span class="elimination-mark" aria-hidden="true">${icons[kind]}</span><b>${escapeHtml(p.name)}</b> — ${discussionText(...label)}${p.detail?`: ${escapeHtml(p.detail)}`:''}</p>`;}).join('');
   return rows?`<section id="eliminationNotice" class="card elimination-notice elimination-card" role="status" data-no-translate><b>${discussionText('المستبعدون','Eliminated players')}</b>${rows}</section>`:'';
 }
 function renderPendingShot(controller=false) {

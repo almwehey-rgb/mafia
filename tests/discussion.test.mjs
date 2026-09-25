@@ -672,7 +672,9 @@ test('Simulated game moves through roles, night, discussion, voting and next rou
  r=await f.call('resolveNight',f.host);assert.equal(r.body.phase,'day');
  r=await f.call('startDiscussion',f.host);assert.equal(r.status,200);
  await f.call('finishDiscussion',{...f.host,discussionId:r.body.discussion.id});
- assert.equal((await f.call('startVote',f.host)).body.phase,'vote');
+ f.rooms[0].last_deaths=['b'];f.rooms[0].last_event='mafia_kill';f.rooms[0].last_eliminated='b';
+ const vote=await f.call('startVote',f.host);
+ assert.equal(vote.body.phase,'vote');assert.deepEqual(vote.body.eliminations,[]);assert.equal(vote.body.lastEvent,null);
  for(const p of f.players.filter(p=>!p.is_bot&&p.alive))assert.equal((await f.call('vote',{id:p.id,playerToken:'token-'+p.id,target:'SKIP'})).status,200);
  r=await f.call('resolveVote',f.host);assert.equal(r.body.phase,'night');assert.equal(r.body.round,2);
 });
@@ -710,6 +712,7 @@ test('Sniper waits until Mafia elimination, gets one final shot, and victory wai
  assert.equal((await f.call('act',{...auth,target:'c'})).status,400);
  let r=await f.call('resolveNight',f.host);assert.equal(r.status,200);assert.equal(r.body.phase,'day');assert.equal(r.body.winner,undefined);assert.equal(r.body.pendingShot.playerId,'a');
  assert.equal(r.body.eliminations[0].reason,'mafia_kill');assert.equal(r.body.eliminations[0].name,'a');
+ assert.equal(r.body.eliminations[0].round,2);assert.ok(Number.isFinite(r.body.eliminations[0].at));
  const shotId=r.body.pendingShot.id;
  assert.equal((await f.call('startVote',f.host)).status,409);
  assert.equal((await f.call('lastShot',{id:'b',playerToken:'token-b',shotId,target:'c'})).status,403);

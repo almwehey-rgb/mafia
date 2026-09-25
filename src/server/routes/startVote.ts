@@ -9,7 +9,7 @@ async function routeStartVote(context:RoomRouteContext) {
       if (jailer && !room.jailed_player && !phaseExpired(room)) return out({ error: "WAITING_JAILER" }, 409);
       await persist(db.from("mafia_players").update({ vote_target: null }).eq("room_code", code));
       const phase = enabledRoles(room.enabled_roles).full_trial ? "nomination" : "vote";
-      await persist(db.from("mafia_rooms").update({ phase, accused_player: null }).eq("code", code));
+      await persist(db.from("mafia_rooms").update({ phase, accused_player: null, last_event: null, last_deaths: [], last_eliminated: null, last_saved: false }).eq("code", code));
       ({ room, players } = await load(code));
       await botVotes(room, players);
       ({ room, players } = await load(code));

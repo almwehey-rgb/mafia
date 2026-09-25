@@ -21,7 +21,7 @@ test('exit scene lasts five seconds, can close, and does not replay on polling',
   let appended=0,removed=0,duration,vibrations=0;
   const effect={className:'',innerHTML:'',setAttribute(){},addEventListener(){},querySelector:()=>({focus(){}}),remove(){removed++;}};
   const context={
-    game:{code:'1234',matchId:'one',round:1,me:{id:'a',alive:false},eliminations:[{id:'a',name:'Player A',reason:'mafia_kill'}]},
+    game:{code:'1234',matchId:'one',phase:'day',round:1,serverTime:100000,me:{id:'a',alive:false},eliminations:[{id:'a',name:'Player A',reason:'mafia_kill',round:1,at:99000}]},
     document:{body:{appendChild(){appended++;}},visibilityState:'visible',createElement:()=>effect,getElementById:()=>appended>removed?effect:null},
     window:{matchMedia:()=>({matches:false})},navigator:{vibrate:()=>{vibrations++;}},
     discussionText:arabic=>arabic,escapeHtml:value=>value,
@@ -45,9 +45,9 @@ test('exit scene lasts five seconds, can close, and does not replay on polling',
 test('exit scene appears only for the eliminated player, with their own cause',()=>{
   let appended=0,vibrations=0;
   const effect={className:'',innerHTML:'',setAttribute(){},addEventListener(){},querySelector:()=>({focus(){}})};
-  const game={code:'5678',matchId:'two',round:2,me:{id:'alive',alive:true},eliminations:[
-    {id:'a',name:'Player A',reason:'mafia_kill'},
-    {id:'b',name:'Player B',reason:'lovers_died'},
+  const game={code:'5678',matchId:'two',phase:'night',round:2,serverTime:100000,me:{id:'alive',alive:true},eliminations:[
+    {id:'a',name:'Player A',reason:'mafia_kill',round:1,at:99000},
+    {id:'b',name:'Player B',reason:'lovers_died',round:1,at:99000},
   ]};
   const context={game,
     document:{body:{appendChild(){appended++;}},visibilityState:'visible',createElement:()=>effect,getElementById:()=>null},
@@ -70,4 +70,37 @@ test('exit scene appears only for the eliminated player, with their own cause',(
   assert.match(effect.className,/effect-lovers/);
   assert.match(effect.innerHTML,/Player B/);
   assert.doesNotMatch(effect.innerHTML,/Player A/);
+});
+
+test('a saved elimination does not replay after reload or round change, but a new elimination does',()=>{
+  const saved=new Map(),storage={getItem:key=>saved.get(key)||null,setItem:(key,value)=>saved.set(key,value)};
+  const game={code:'7777',matchId:'match-a',phase:'day',round:1,serverTime:100000,me:{id:'a',alive:false},eliminations:[{id:'a',name:'Player A',reason:'mafia_kill',round:1,at:99000}]};
+  let shown=0;
+  const context=()=>vm.createContext({game,localStorage:storage,
+    document:{body:{appendChild(){shown++;}},visibilityState:'hidden',createElement:()=>({setAttribute(){},addEventListener(){},querySelector:()=>({focus(){}})}),getElementById:()=>null},
+    window:{matchMedia:()=>({matches:false})},navigator:{},discussionText:arabic=>arabic,escapeHtml:value=>value,
+    setTimeout:()=>1,clearTimeout:()=>{},
+  });
+  const first=context();vm.runInContext(journey,first);vm.runInContext('showEliminationEffect()',first);
+  assert.equal(shown,1);
+  const reloaded=context();vm.runInContext(journey,reloaded);vm.runInContext('showEliminationEffect()',reloaded);
+  game.phase='night';game.round=2;game.serverTime=102000;
+  vm.runInContext('showEliminationEffect()',reloaded);
+  assert.equal(shown,1);
+  game.eliminations[0].at=101000;
+  vm.runInContext('showEliminationEffect()',reloaded);
+  assert.equal(shown,2);
+});
+
+test('old exit notices disappear outside the day result and recent vote result window',()=>{
+  const game={phase:'day',round:2,serverTime:100000,eliminations:[{id:'a',name:'Player A',reason:'mafia_kill',round:2,at:50000}]};
+  const context=vm.createContext({game,discussionText:arabic=>arabic,escapeHtml:value=>value,Date});
+  vm.runInContext(journey,context);
+  assert.match(vm.runInContext('eliminationNotice()',context),/Player A/);
+  game.phase='vote';
+  assert.equal(vm.runInContext('eliminationNotice()',context),'');
+  game.phase='night';game.round=3;game.eliminations=[{id:'b',name:'Player B',reason:'vote_eliminated',round:2,at:99000}];
+  assert.match(vm.runInContext('eliminationNotice()',context),/Player B/);
+  game.serverTime=120000;
+  assert.equal(vm.runInContext('eliminationNotice()',context),'');
 });
