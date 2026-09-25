@@ -94,6 +94,13 @@ function renderWithNotices(content,controller=false) {
   }
 }
 function renderPlayer(){
+  // Keep the private role reveal independent of post-reveal Mafia controls.
+  // Those controls must never prevent a newly assigned boss from seeing the card.
+  if(game?.me?.alive && !roleAcknowledged() && !['lobby','paused','finished'].includes(game.phase)){
+    roleReveal();
+    enhanceJourney(false);
+    return;
+  }
   renderWithNotices(renderPlayerContent);
   enhanceJourney(false);
   if(game?.me?.alive&&roleAcknowledged()&&!['lobby','finished'].includes(game.phase)&&!document.querySelector('.personal-role-card')){

@@ -12,6 +12,7 @@ function personalRoleCard(compact=false) {
   return interactiveRoleCard(role,{personal:true,compact,open:personalCardState.open});
 }
 function roleReveal() {
+  document.querySelector('.player-tools')?.remove();
   $('#app').innerHTML=`<section class="card hero personal-role-reveal">${personalRoleCard()}<div class="role-acknowledge"><button class="btn red wide" onclick="acknowledgeRole()" data-no-translate>${discussionText('فهمت دوري','I understand my role')}</button></div></section>`;
 }
 function mafiaRoleClient(role){return role==='mafia'||role==='mafia_boss'}

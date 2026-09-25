@@ -5,6 +5,8 @@ import vm from 'node:vm';
 
 const journey=await readFile(new URL('../src/client/journey-ui.js',import.meta.url),'utf8');
 const playerView=await readFile(new URL('../src/client/player-view.js',import.meta.url),'utf8');
+const roleCards=await readFile(new URL('../src/client/role-cards.js',import.meta.url),'utf8');
+const roleDefinitions=await readFile(new URL('../src/client/role-definitions.js',import.meta.url),'utf8');
 
 function bossGame(){
  return {code:'1234',round:1,phase:'night',enabledRoles:{discussion_mode:'turns'},me:{id:'boss',role:'mafia_boss',alive:true,acknowledged:true,discussionChoiceLocked:false,mafiaTeam:[{id:'boss',name:'الزعيم'},{id:'mate',name:'زميل'}]}};
@@ -42,4 +44,23 @@ test('Acknowledged role renders night screen without missing bossDiscussionChoic
  vm.createContext(context);vm.runInContext(playerView,context);
  assert.doesNotThrow(()=>vm.runInContext('renderPlayerContent()',context));
  assert.equal(app.innerHTML,'night');
+});
+
+test('New Mafia boss gets a private role card before any leadership controls render',()=>{
+ const app={innerHTML:''};
+ const game={...bossGame(),phase:'reveal',matchId:'new-match',players:[],me:{...bossGame().me,acknowledged:false}};
+ let enhanced=0;
+ const context={game,Map,$:()=>app,document:{querySelector:()=>null},escapeHtml:value=>String(value),discussionText:arabic=>arabic,
+  renderWithNotices:()=>assert.fail('Post-reveal controls must not run before role acknowledgement'),
+  enhanceJourney:()=>{enhanced++;}};
+ vm.createContext(context);
+ vm.runInContext(roleDefinitions+roleCards+playerView,context);
+ vm.runInContext(journey.slice(journey.indexOf('function renderPlayer(){'),journey.indexOf('function playerStepStatus()')),context);
+ assert.doesNotThrow(()=>vm.runInContext('renderPlayer()',context));
+ assert.match(app.innerHTML,/mafia_boss\.webp/);
+ assert.match(app.innerHTML,/زعيم المافيا/);
+ assert.match(app.innerHTML,/فهمت دوري/);
+ assert.match(app.innerHTML,/زميل/);
+ assert.doesNotMatch(app.innerHTML,/تنازل عن الزعامة|محقق مزيف/);
+ assert.equal(enhanced,1);
 });

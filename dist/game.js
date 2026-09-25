@@ -1001,6 +1001,7 @@ function personalRoleCard(compact=false) {
   return interactiveRoleCard(role,{personal:true,compact,open:personalCardState.open});
 }
 function roleReveal() {
+  document.querySelector('.player-tools')?.remove();
   $('#app').innerHTML=`<section class="card hero personal-role-reveal">${personalRoleCard()}<div class="role-acknowledge"><button class="btn red wide" onclick="acknowledgeRole()" data-no-translate>${discussionText('فهمت دوري','I understand my role')}</button></div></section>`;
 }
 function mafiaRoleClient(role){return role==='mafia'||role==='mafia_boss'}
@@ -1435,6 +1436,13 @@ function renderWithNotices(content,controller=false) {
   }
 }
 function renderPlayer(){
+  // Keep the private role reveal independent of post-reveal Mafia controls.
+  // Those controls must never prevent a newly assigned boss from seeing the card.
+  if(game?.me?.alive && !roleAcknowledged() && !['lobby','paused','finished'].includes(game.phase)){
+    roleReveal();
+    enhanceJourney(false);
+    return;
+  }
   renderWithNotices(renderPlayerContent);
   enhanceJourney(false);
   if(game?.me?.alive&&roleAcknowledged()&&!['lobby','finished'].includes(game.phase)&&!document.querySelector('.personal-role-card')){
