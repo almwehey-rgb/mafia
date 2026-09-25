@@ -18,6 +18,8 @@ function normalizeEnabledRoles(value = {}) {
     mafia_kill_start_round: killStartRound,
     mafia_kill_mode: killStartRound === 0 ? 'disabled' : killStartRound === 1 ? 'always' : killStartRound === 2 ? 'after_first' : 'scheduled',
     mafia_kill_enabled: killStartRound > 0,
+    mafia_no_repeat: value.mafia_no_repeat === true,
+    doctor_no_repeat: value.doctor_no_repeat !== false,
     reveal_dead_roles: value.reveal_dead_roles === true,
     allow_no_vote: value.allow_no_vote !== false,
     full_trial: value.full_trial !== false,

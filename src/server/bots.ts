@@ -5,9 +5,9 @@ async function botNightActions(room: any, players: any[]) {
     if (room.round === 1 && bot.role !== "detective") continue;
     let target: string | null = null;
     const others = alive.filter((x) => x.id !== bot.id);
-    if (mafiaRole(bot.role) && mafiaKillEnabledForRound(room) && !isMafiaLocked(room, players)) target = randomItem(others.filter((x) => !mafiaRole(x.role)))?.id || "SKIP";
+    if (mafiaRole(bot.role) && mafiaKillEnabledForRound(room) && !isMafiaLocked(room, players)) target = randomItem(others.filter((x) => !mafiaRole(x.role) && (!settings.mafia_no_repeat || x.id !== mafiaLastTarget(players))))?.id || "SKIP";
     else if (bot.role === "revealer" && !roleState(bot).mafiaCountResult) target = "COUNT";
-    else if (bot.role === "doctor" && doctorAvailable(room)) target = randomItem(alive.filter((x) => x.id !== room.doctor_last_target))?.id || null;
+    else if (bot.role === "doctor" && doctorAvailable(room)) target = randomItem(alive.filter((x) => !settings.doctor_no_repeat || x.id !== room.doctor_last_target))?.id || null;
     else if (bot.role === "detective") target = shuffle([...others]).slice(0, detectiveLimit(room, players)).map((x) => x.id).join(",") || null;
     else if (["serial_killer", "escort"].includes(bot.role)) target = randomItem(others)?.id || null;
     else if (bot.role === "witch") {
@@ -87,4 +87,3 @@ async function botVotes(room: any, players: any[], verdict = false) {
     await persist(db.from("mafia_players").update({ vote_target: value }).eq("room_code", room.code).eq("id", bot.id));
   }
 }
-

@@ -69,6 +69,7 @@ function publicView(room: any, players: any[], meId?: string, host = false) {
       jailedPlayer: me.role === "jailer" && room.jailed_player ? players.find((x) => x.id === room.jailed_player)?.name : undefined,
       executionsLeft: me.role === "jailer" ? room.jailer_executions : undefined,
       doctorLastTarget: me.role === "doctor" ? room.doctor_last_target : undefined,
+      mafiaLastTarget: mafiaRole(me.role) ? mafiaLastTarget(players) : undefined,
       doctorAvailable: me.role === "doctor" ? doctorAvailable(room) : undefined,
       doctorProtectionRounds: me.role === "doctor" ? null : undefined,
       mafiaLocked: mafiaRole(me.role) ? locked : undefined,

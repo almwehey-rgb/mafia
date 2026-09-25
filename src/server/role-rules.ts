@@ -2,7 +2,7 @@ const shuffle = <T>(items: T[]) => { for (let i = items.length - 1; i > 0; i--) 
 const mafiaRole = (role: string | null) => role === "mafia" || role === "mafia_boss";
 const selected = (player: any) => String(player.action_target || "").split(",").filter(Boolean);
 const results = (player: any) => { try { return JSON.parse(player.investigation_result || "[]"); } catch { return []; } };
-const defaultEnabledRoles = { doctor: true, detective: true, lawyer: true, jailer: true, vigilante: false, witch: false, serial_killer: false, jester: false, cupid: false, escort: false, godfather_innocent: true, mafia_kill_start_round: 2, mafia_kill_mode: "always", mafia_kill_enabled: true, reveal_dead_roles: false, allow_no_vote: true, full_trial: true, kids_mode: false, paused_phase: null };
+const defaultEnabledRoles = { doctor: true, detective: true, lawyer: true, jailer: true, vigilante: false, witch: false, serial_killer: false, jester: false, cupid: false, escort: false, godfather_innocent: true, mafia_kill_start_round: 2, mafia_kill_mode: "always", mafia_kill_enabled: true, mafia_no_repeat: false, doctor_no_repeat: true, reveal_dead_roles: false, allow_no_vote: true, full_trial: true, kids_mode: false, paused_phase: null };
 const enabledRoles = (value: any) => {
   const legacyRound = value?.mafia_kill_mode === "disabled" || value?.mafia_kill_enabled === false ? 0 : value?.mafia_kill_mode === "after_first" ? 2 : 1;
   let mafiaKillStartRound = Number.isFinite(+value?.mafia_kill_start_round) ? Math.max(0, Math.min(10, Math.round(+value.mafia_kill_start_round))) : legacyRound;
@@ -23,6 +23,8 @@ const enabledRoles = (value: any) => {
   mafia_kill_start_round: mafiaKillStartRound,
   mafia_kill_mode: mafiaKillStartRound === 0 ? "disabled" : mafiaKillStartRound === 1 ? "always" : mafiaKillStartRound === 2 ? "after_first" : "scheduled",
   mafia_kill_enabled: mafiaKillStartRound > 0,
+  mafia_no_repeat: value?.mafia_no_repeat === true,
+  doctor_no_repeat: value?.doctor_no_repeat !== false,
   reveal_dead_roles: value?.reveal_dead_roles === true,
   allow_no_vote: value?.allow_no_vote !== false,
   full_trial: value?.full_trial !== false,
@@ -42,6 +44,7 @@ const mafiaKillEnabledForRound = (room: any) => {
   return startRound > 0 && Number(room.round) >= Math.max(2, startRound);
 };
 const roleState = (player: any) => player?.role_state && typeof player.role_state === "object" ? player.role_state : {};
+const mafiaLastTarget = (players: any[]) => players.find((player) => mafiaRole(player.role) && roleState(player).lastMafiaTarget)?.role_state.lastMafiaTarget || null;
 // Merge a small state change without erasing a concurrent vote, charge or claim.
 async function patchRoleState(code: string, player: any, patch: Record<string, any>) {
   let state = roleState(player);
@@ -73,4 +76,3 @@ function discussionView(room: any, now = Date.now()) {
   const deadline = saved.mode === "group" ? saved.endsAt : saved.turnStartedAt + (index - saved.cursor + 1) * saved.seconds * 1000;
   return { ...saved, status: complete ? "done" : saved.pausedAt ? "paused" : "active", complete: Boolean(complete), index, speakerId: !complete && saved.mode === "turns" ? saved.order[index] : null, deadline, remainingMs: complete ? 0 : Math.max(0, deadline - at) };
 }
-

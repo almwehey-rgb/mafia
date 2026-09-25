@@ -77,6 +77,12 @@ async function routeResolveNight(context:RoomRouteContext) {
         if (error) throw error;
       }
       await eliminatePlayers(room, players, causes);
+      // Remember the faction's final choice, including a target saved by the doctor.
+      // Keep this in Mafia-only role state, never in public room settings.
+      const resolvedPlayers = (await load(code)).players;
+      for (const member of resolvedPlayers.filter((player) => mafiaRole(player.role))) {
+        await patchRoleState(code, member, { lastMafiaTarget: victim?.id || null });
+      }
       await persist(db.from("mafia_players").update({ action_target: null, vote_target: null }).eq("room_code", code));
       await persist(db.from("mafia_rooms").update({ phase: "day", jailed_player: null, jailer_executions: executions, doctor_last_target: doctorTarget || null, linked_players: linkedPlayers, last_event: events.join(","), last_deaths: deaths, last_eliminated: deaths[0] || null, last_saved: events.some((x) => x.endsWith("saved")) }).eq("code", code));
       await prepareLastShot(code, causes, "day", room.round);

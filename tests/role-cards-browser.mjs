@@ -60,7 +60,7 @@ try{
   await page.evaluate(()=>{game.phase='reveal';game.me.role='doctor';game.me.acknowledged=false;renderPlayer();});
   await page.locator('.personal-role-card').click();
   await page.waitForTimeout(700);
-  assert.equal(await page.locator('.role-rule-sections section').count(),4);
+  assert.equal(await page.locator('.personal-role-card .role-rule-item').count(),4);
   await page.screenshot({path:'artifacts/detailed-doctor.png',fullPage:true});
   await page.evaluate(()=>document.body.classList.add('light'));
   await page.screenshot({path:'artifacts/detailed-doctor-light.png',fullPage:true});

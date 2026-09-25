@@ -6,7 +6,7 @@ async function routeAct(context:RoomRouteContext) {
       const target = players.find((x) => x.id === body.target);
       if (mafiaRole(me.role)) {
         if (isMafiaLocked(room, players)) return out({ error: "MAFIA_LOCKED" }, 409);
-        if (body.target !== "SKIP" && (!target?.alive || mafiaRole(target.role))) return out({ error: "INVALID_ACTION" }, 400);
+        if (body.target !== "SKIP" && (!target?.alive || mafiaRole(target.role) || (enabledRoles(room.enabled_roles).mafia_no_repeat && target.id === mafiaLastTarget(players)))) return out({ error: "INVALID_ACTION" }, 400);
         await persist(db.from("mafia_players").update({ action_target: body.target }).eq("room_code", code).eq("id", me.id));
       } else if (me.role === "revealer") {
         if (!["COUNT","SKIP"].includes(body.target) || me.action_target || roleState(me).mafiaCountResult) return out({ error: "INVALID_ACTION" }, 400);
@@ -16,7 +16,7 @@ async function routeAct(context:RoomRouteContext) {
         if(!data?.length)return out({error:"STALE_ACTION"},409);
       } else if (me.role === "doctor") {
         if (!doctorAvailable(room)) return out({ error: "DOCTOR_UNAVAILABLE" }, 409);
-        if (!target?.alive || target.id === room.doctor_last_target) return out({ error: "INVALID_ACTION" }, 400);
+        if (!target?.alive || (enabledRoles(room.enabled_roles).doctor_no_repeat && target.id === room.doctor_last_target)) return out({ error: "INVALID_ACTION" }, 400);
         await persist(db.from("mafia_players").update({ action_target: target.id }).eq("room_code", code).eq("id", me.id));
       } else if (me.role === "detective") {
         const picked = selected(me), limit = detectiveLimit(room, players);

@@ -9,7 +9,7 @@ let mafiaCount = 3;
 let detectiveCount = 1;
 let detectiveQuestions = 3;
 const detectiveQuestionCount = (value) => Number.isFinite(Number(value)) && value != null ? Math.max(1, Math.min(5, Math.round(Number(value)))) : 3;
-let enabledRoles = { doctor: true, detective: true, lawyer: true, jailer: true, vigilante: false, witch: false, serial_killer: false, jester: false, cupid: false, escort: false, godfather_innocent: true, mafia_kill_start_round: 2, mafia_kill_mode: 'always', mafia_kill_enabled: true, reveal_dead_roles: false, allow_no_vote: true, full_trial: true, kids_mode: false };
+let enabledRoles = { doctor: true, detective: true, lawyer: true, jailer: true, vigilante: false, witch: false, serial_killer: false, jester: false, cupid: false, escort: false, godfather_innocent: true, mafia_kill_start_round: 2, mafia_kill_mode: 'always', mafia_kill_enabled: true, mafia_no_repeat: false, doctor_no_repeat: true, reveal_dead_roles: false, allow_no_vote: true, full_trial: true, kids_mode: false };
 let spectatorToken = '';
 Object.assign(enabledRoles, { discussion_mode: 'turns', discussion_seconds: 180, speaker_seconds: 30 });
 let spectatorId = '';
@@ -29,7 +29,6 @@ let phaseDuration = Number(localStorage.getItem('mafia-phase-seconds')) || 60;
 let soundEnabled = localStorage.getItem('mafia-sound') !== 'off';
 let localHistory = [];
 let preferenceSaveTimer;
-
 function signalPhase() {
   phaseStartedAt = Date.now();
   if (navigator.vibrate) navigator.vibrate([120, 60, 120]);
@@ -129,7 +128,7 @@ const roleNames = {
 const roleDescriptions = {
   mafia_boss: ['فريق المافيا', 'اختر هدف الاغتيال أو تخطَّ الليلة. قرارك هو النهائي.'],
   mafia: ['فريق المافيا', 'صوّت على هدف الاغتيال أو تخطَّ الليلة.'],
-  doctor: ['فريق القرية', 'تحمي لاعبًا كل ليلة من الليلة الثانية حتى نهاية القيم، بدون حد للاستخدامات. تقدر تحمي نفسك، ولا تكرر نفس اللاعب ليلتين. / Protect one player every night from night two until the game ends, with unlimited uses. You may protect yourself, but not the same player on consecutive nights.'],
+  doctor: ['فريق القرية', 'تحمي لاعبًا كل ليلة من الليلة الثانية حتى نهاية القيم، بدون حد للاستخدامات. تقدر تحمي نفسك، وتكرار حماية نفس اللاعب يعتمد على إعدادات الغرفة. / Protect one player each night from night two. Consecutive protection depends on room settings.'],
   detective: ['فريق القرية', 'افحص لاعبًا واحدًا كل جولة، بعدد جولات يحدده المضيف، واعرف سرًا إن كان مافيا أو بريئًا. / Investigate one player per round for the number of rounds set by the host. Results are private.'],
   jailer: ['فريق القرية', 'اختر سجينًا نهارًا، ثم قرر ليلًا إطلاقه أو إعدامه. لديك 3 إعدامات.'],
   lawyer: ['فريق القرية', 'احمِ أي لاعب من نتيجة التصويت في كل جولة.'],
@@ -145,7 +144,7 @@ const roleDescriptions = {
 const detailedRoleRules = {
  mafia_boss: ['فريق المافيا','تقود اختيار هدف الاغتيال وتتعاون سرًا مع أعضاء فريقك.','اختر لاعبًا حيًا من خارج المافيا أو تخطَّ الاغتيال. اختيار الزعيم القادر على العمل يتقدم على اختيارات بقية المافيا.','الليلة الأولى للمحقق فقط؛ بدء الاغتيال وتوفره لاحقًا يتبعان إعدادات الغرفة. ظهورك بريئًا للمحقق يعتمد على تفعيل تمويه العرّاب.'],
  mafia: ['فريق المافيا','تعاون مع فريقك سرًا، وناقش نهارًا لإبعاد الشك عنكم.','اختر هدفًا حيًا من خارج المافيا أو تخطَّ. يُعتمد اختيار الزعيم المتاح؛ وفي غيابه تُستخدم اختيارات الأعضاء لتحديد الهدف.','لا تستطيع استهداف عضو من المافيا. الاغتيال غير متاح في الليلة الأولى، ويتبع بعد ذلك إعدادات الغرفة.'],
- doctor: ['فريق القرية','تحمي لاعبًا من هجمات الليل، وقد تنقذ نفسك أو أحد أفراد القرية.','ابتداءً من الليلة الثانية اختر لاعبًا حيًا كل ليلة. الاستخدامات غير محدودة، ويمكنك اختيار نفسك.','لا تختَر اللاعب نفسه ليلتين متتاليتين. الحماية تمنع هجمات المافيا والقاتل والسم، لكنها لا تمنع إعدام السجّان أو الموت بسبب الربط.'],
+ doctor: ['فريق القرية','تحمي لاعبًا من هجمات الليل، وقد تنقذ نفسك أو أحد أفراد القرية.','ابتداءً من الليلة الثانية اختر لاعبًا حيًا كل ليلة. الاستخدامات غير محدودة، ويمكنك اختيار نفسك.','تكرار حماية نفس اللاعب ليلتين متتاليتين يتبع إعدادات الغرفة. الحماية تمنع هجمات المافيا والقاتل والسم، لكنها لا تمنع إعدام السجّان أو الموت بسبب الربط.'],
  detective: ['فريق القرية','تجمع نتائج سرية تساعدك على كشف المافيا أثناء النقاش.','اختر لاعبًا حيًا غير نفسك لفحصه مرة واحدة في الجولة. تبدأ الفحوص من الليلة الأولى، ولعدد الجولات الذي يحدده المضيف. تظهر النتائج بعد حسم الليل.','الفحوص الفائتة لا تتراكم. «بريء» تعني أن الفحص لم يكشف مافيا؛ لا تضمن أن اللاعب من القرية، وقد يظهر العرّاب بريئًا عند تفعيل التمويه.'],
  jailer: ['فريق القرية','تحتجز مشتبهًا به وتقرر إن كان يستحق الإعدام.','اختر نهارًا لاعبًا حيًا غير نفسك ليسجن في الليل التالي. تواصل معه في قناة السجن، ثم اختر العفو أو الإعدام.','لديك 3 إعدامات طوال المباراة. السجين لا ينفذ قدرته الليلية ويحتمي من الهجمات المعتادة؛ إعدامك يتجاوز تلك الحماية.'],
  lawyer: ['فريق القرية','تمنع إقصاء لاعب تختاره بنتيجة تصويت الجولة.','اختر أثناء النهار لاعبًا حيًا لحمايته، ويمكنك اختيار نفسك. تُلغى نتيجة الإقصاء إذا وقعت على اللاعب المحمي.','الحماية خاصة بالتصويت، ولا تحمي من هجمات الليل. اختر من جديد في الجولة التالية؛ الحماية لا تكشف لك دور اللاعب.'],
@@ -165,8 +164,10 @@ function detailedRoleProperties(role, personal=false) {
  const win=mafiaRoleClient(role)?'يفوز فريق المافيا عندما لا يبقى قاتل متسلسل، ويصبح عدد المافيا مساويًا لبقية الأحياء أو أكبر منهم.':role==='serial_killer'?'تفوز عند عدم بقاء أي مافيا، ووصول عدد القتلة المتسلسلين إلى عدد بقية الأحياء أو تجاوزه.':role==='jester'?'تفوز وحدك بمجرد إقصائك فعليًا بنتيجة التصويت.':'تفوز القرية بعد خروج جميع أفراد المافيا والقتلة المتسلسلين.';
  const sections=[['مهمتك',rule[1]],['استخدام القدرة',rule[2]],['القيود المهمة',rule[3]],['شرط الفوز',win]];
  if(personal&&role==='mafia_boss')sections.push(['إعداد غرفتك',game.enabledRoles?.godfather_innocent?'تمويه العرّاب مفعّل: تظهر بريئًا في فحص المحقق.':'تمويه العرّاب غير مفعّل: يكشفك فحص المحقق كعضو مافيا.']);
+ if(personal&&mafiaRoleClient(role))sections.push(['تكرار الاغتيال',game.enabledRoles?.mafia_no_repeat?'ممنوع اختيار هدف الاغتيال نفسه في ليلتين متتاليتين.':'تستطيع المافيا تكرار هدف الاغتيال في ليلتين متتاليتين.']);
+ if(personal&&role==='doctor')sections.push(['تكرار الحماية',game.enabledRoles?.doctor_no_repeat?'ممنوع حماية نفس اللاعب في ليلتين متتاليتين.':'تستطيع حماية نفس اللاعب في ليلتين متتاليتين.']);
  if(personal&&role==='detective')sections.push(['إعداد غرفتك',`عدد جولات الفحص المحدد: ${detectiveQuestionCount(game.detectiveQuestions ?? game.detective_questions)}. فحص واحد في كل جولة مؤهلة.`]);
- return `<div class="role-rule-sections">${sections.map(([heading,text])=>`<section><h3>${heading}</h3><p>${escapeHtml(text)}</p></section>`).join('')}</div>`;
+ return `<div class="role-rule-sections">${sections.map(([heading,text],index)=>personal?`<details class="role-rule-item" data-disclosure-key="private-rule-${index}" onclick="event.stopPropagation()"><summary>${escapeHtml(heading)}</summary><p>${escapeHtml(text)}</p></details>`:`<section><h3>${heading}</h3><p>${escapeHtml(text)}</p></section>`).join('')}</div>`;
 }
 function roleLabel(role){
   if(!game?.enabledRoles?.kids_mode)return roleNames[role]||role;
@@ -278,6 +279,8 @@ function normalizeEnabledRoles(value = {}) {
     mafia_kill_start_round: killStartRound,
     mafia_kill_mode: killStartRound === 0 ? 'disabled' : killStartRound === 1 ? 'always' : killStartRound === 2 ? 'after_first' : 'scheduled',
     mafia_kill_enabled: killStartRound > 0,
+    mafia_no_repeat: value.mafia_no_repeat === true,
+    doctor_no_repeat: value.doctor_no_repeat !== false,
     reveal_dead_roles: value.reveal_dead_roles === true,
     allow_no_vote: value.allow_no_vote !== false,
     full_trial: value.full_trial !== false,
@@ -456,7 +459,7 @@ function interactiveRoleCard(role, {personal=false, compact=false, image='', ope
  image = kids?art:(!image||image.includes('/role-cards-kids/')?art:image);
  const title=kids?({mafia_boss:'قائد الفريق الغامض',mafia:'الفريق الغامض',doctor:'الطبيب',detective:'المحقق',citizen:'المواطن'}[role]):role==='mafia_boss'?'زعيم المافيا':roleLabel(role).split(' / ')[0];
  const teammates=personal&&mafiaRoleClient(role)?(game.me.mafiaTeam||[]).filter(p=>p.id!==game.me.id):[];
- const team=personal&&mafiaRoleClient(role)?`<aside class="role-allies"><h3>زملاؤك في المافيا <small>خاص بفريقك</small></h3><div>${teammates.map(p=>`<span>${escapeHtml(p.name)}</span>`).join('')||'<p>أنت عضو المافيا الوحيد</p>'}</div></aside>`:'';
+ const team=personal&&mafiaRoleClient(role)?`<details class="role-allies" data-disclosure-key="mafia-team"><summary>زملاؤك في المافيا <small>خاص بفريقك</small></summary><div>${teammates.map(p=>`<span>${escapeHtml(p.name)}</span>`).join('')||'<p>أنت عضو المافيا الوحيد</p>'}</div></details>`:'';
  const teamName=role==='serial_killer'||role==='jester'?'الفريق المستقل':detailedRoleRules[role]?.[0]||'';
  const teamCapsule=personal?`<span class="personal-team-capsule">${escapeHtml(teamName)}</span>`:'';
  const identity=`<header class="role-identity"><h2>${escapeHtml(title)}</h2><span>${escapeHtml(detailedRoleRules[role]?.[0]||'')}</span>${review?`<span class="review-role-count" data-no-translate aria-label="${discussionText('عدد اللاعبين','Player count')}">× ${count}</span>`:''}</header>`;
@@ -804,7 +807,7 @@ function setupPanel(roles){
   if(setupStep===2)return `${setupTabs()}<h3 class="role-picker-title">اضغط البطاقة لتفعيلها أو إلغائها</h3>${setupRoleCards(roles)}<div class="actions"><button class="btn" onclick="setSetupStep(1)">رجوع</button><button class="btn red" onclick="setSetupStep(3)">التالي</button></div>`;
   const killStart=Number.isFinite(+enabledRoles.mafia_kill_start_round)?+enabledRoles.mafia_kill_start_round:1;
   const killLabel=killStart===0?'مغلق':`من الليلة ${killStart}`;
-  return `${setupTabs()}<h3 class="role-picker-title" data-no-translate>${discussionText("الأدوار المختارة — من الأكثر عددًا للأقل","Selected roles — highest count first")}</h3><p class="muted" data-no-translate>${discussionText("اضغط الكرت لقلبه وقراءة خصائصه ومهامه.","Tap a card to flip it and read its abilities and tasks.")}</p>${setupRoleCards(roles,true)}<button class="btn" onclick="setSetupStep(2)" data-no-translate>${discussionText("تعديل الأدوار","Edit roles")}</button>${setupSummary(roles,false)}<details class="advanced-settings" data-disclosure-key="setup-rules" open><summary data-no-translate>${discussionText('خيارات بدء اللعبة','Game start options')}</summary><div class="rule-grid"><button class="rule-chip ${enabledRoles.kids_mode?'on':''}" onclick="toggleOption('kids_mode')">🧒 وضع الأطفال: ${enabledRoles.kids_mode?'مفعّل':'ملغي'}</button><div class="rule-chip kill-range ${killStart>0?'on':''}"><button onclick="changeMafiaKillStart(-1)" aria-label="تقليل ليلة بدء الاغتيال">−</button><span>🌙 اغتيال المافيا<br><b>${killLabel}</b></span><button onclick="changeMafiaKillStart(1)" aria-label="زيادة ليلة بدء الاغتيال">+</button></div><button class="rule-chip ${enabledRoles.godfather_innocent?'on':''}" onclick="toggleGodfatherReveal()">🕵️ العرّاب: ${enabledRoles.godfather_innocent?'يظهر بريئًا':'ينكشف مافيا'}</button><button class="rule-chip ${enabledRoles.reveal_dead_roles?'on':''}" onclick="toggleOption('reveal_dead_roles')">🎭 كشف دور الميت: ${enabledRoles.reveal_dead_roles?'نعم':'لا'}</button><button class="rule-chip ${enabledRoles.allow_no_vote?'on':''}" onclick="toggleOption('allow_no_vote')">✋ عدم التصويت: ${enabledRoles.allow_no_vote?'مسموح':'ممنوع'}</button><button class="rule-chip ${enabledRoles.full_trial?'on':''}" onclick="toggleOption('full_trial')">⚖️ المحاكمة: ${enabledRoles.full_trial?'كاملة':'تصويت مباشر'}</button><button class="rule-chip on" onclick="cycleTimer()">⏱️ المؤقت: ${phaseDuration} ثانية</button><button class="rule-chip ${soundEnabled?'on':''}" onclick="toggleSound()">${soundEnabled?'🔊':'🔇'} الصوت</button></div></details><div class="preference-status" id="prefsStatus">تم حفظ الإعدادات تلقائيًا ✓</div>${enabledRoles.kids_mode?'<div class="status">🧒 لعب بسيط: الفريق الغامض، الحارس، المحقق والأصدقاء فقط.</div>':''}${roles.valid?`<div class="status" data-no-translate>${discussionText(game.players.length<2?'بانتظار لاعبين على الأقل لبدء المباراة.':'✓ عدد الأدوار مناسب للاعبين.',game.players.length<2?'Waiting for at least two players.':'✓ Role counts fit the players.')}</div>`:`<div class="status wait">⚠️ اخترت ${roles.selectedTotal} دورًا ويوجد ${game.players.length} لاعبين فقط</div>`}<button class="btn red wide" ${game.players.length<2||!roles.valid?'disabled':''} onclick="startGame()" data-no-translate>${discussionText("توزيع الأدوار وبدء اللعبة","Deal roles and start game")}</button>`;
+  return `${setupTabs()}<h3 class="role-picker-title" data-no-translate>${discussionText("الأدوار المختارة — من الأكثر عددًا للأقل","Selected roles — highest count first")}</h3><p class="muted" data-no-translate>${discussionText("اضغط الكرت لقلبه وقراءة خصائصه ومهامه.","Tap a card to flip it and read its abilities and tasks.")}</p>${setupRoleCards(roles,true)}<button class="btn" onclick="setSetupStep(2)" data-no-translate>${discussionText("تعديل الأدوار","Edit roles")}</button>${setupSummary(roles,false)}<details class="advanced-settings" data-disclosure-key="setup-rules" open><summary data-no-translate>${discussionText('خيارات بدء اللعبة','Game start options')}</summary><div class="rule-grid"><button class="rule-chip ${enabledRoles.kids_mode?'on':''}" onclick="toggleOption('kids_mode')">🧒 وضع الأطفال: ${enabledRoles.kids_mode?'مفعّل':'ملغي'}</button><div class="rule-chip kill-range ${killStart>0?'on':''}"><button onclick="changeMafiaKillStart(-1)" aria-label="تقليل ليلة بدء الاغتيال">−</button><span>🌙 اغتيال المافيا<br><b>${killLabel}</b></span><button onclick="changeMafiaKillStart(1)" aria-label="زيادة ليلة بدء الاغتيال">+</button></div><button class="rule-chip ${enabledRoles.godfather_innocent?'on':''}" onclick="toggleGodfatherReveal()">🕵️ العرّاب: ${enabledRoles.godfather_innocent?'يظهر بريئًا':'ينكشف مافيا'}</button><button class="rule-chip ${enabledRoles.reveal_dead_roles?'on':''}" onclick="toggleOption('reveal_dead_roles')">🎭 كشف دور الميت: ${enabledRoles.reveal_dead_roles?'نعم':'لا'}</button><button class="rule-chip ${enabledRoles.allow_no_vote?'on':''}" onclick="toggleOption('allow_no_vote')">✋ عدم التصويت: ${enabledRoles.allow_no_vote?'مسموح':'ممنوع'}</button><button class="rule-chip ${enabledRoles.full_trial?'on':''}" onclick="toggleOption('full_trial')">⚖️ المحاكمة: ${enabledRoles.full_trial?'كاملة':'تصويت مباشر'}</button><button class="rule-chip on" onclick="cycleTimer()">⏱️ المؤقت: ${phaseDuration} ثانية</button><button class="rule-chip ${soundEnabled?'on':''}" onclick="toggleSound()">${soundEnabled?'🔊':'🔇'} الصوت</button><button class="rule-chip ${enabledRoles.mafia_no_repeat?'on':''}" onclick="toggleOption('mafia_no_repeat')" data-no-translate>🔪 منع تكرار اغتيال نفس الشخص ليلتين: ${enabledRoles.mafia_no_repeat?'نعم':'لا'}</button><button class="rule-chip ${enabledRoles.doctor_no_repeat?'on':''}" onclick="toggleOption('doctor_no_repeat')" data-no-translate>🩺 منع تكرار حماية نفس الشخص ليلتين: ${enabledRoles.doctor_no_repeat?'نعم':'لا'}</button></div></details><div class="preference-status" id="prefsStatus">تم حفظ الإعدادات تلقائيًا ✓</div>${enabledRoles.kids_mode?'<div class="status">🧒 لعب بسيط: الفريق الغامض، الحارس، المحقق والأصدقاء فقط.</div>':''}${roles.valid?`<div class="status" data-no-translate>${discussionText(game.players.length<2?'بانتظار لاعبين على الأقل لبدء المباراة.':'✓ عدد الأدوار مناسب للاعبين.',game.players.length<2?'Waiting for at least two players.':'✓ Role counts fit the players.')}</div>`:`<div class="status wait">⚠️ اخترت ${roles.selectedTotal} دورًا ويوجد ${game.players.length} لاعبين فقط</div>`}<button class="btn red wide" ${game.players.length<2||!roles.valid?'disabled':''} onclick="startGame()" data-no-translate>${discussionText("توزيع الأدوار وبدء اللعبة","Deal roles and start game")}</button>`;
 }
 
 // Keep the QR local and reuse it across lobby updates.
@@ -1187,8 +1190,8 @@ function renderNight() {
   }
   if (me.role === 'mafia' || me.role === 'mafia_boss') {
     const teamIds = new Set((me.mafiaTeam || []).map((x) => x.id));
-    const targets = alivePlayers().filter((player) => !teamIds.has(player.id));
-    $('#app').innerHTML = `<div class="card"><div class="role-title">${roleNames[me.role]}</div><div class="status wait">فريقك: ${(me.mafiaTeam || []).map((x) => escapeHtml(x.name)).join('، ')}</div>${me.acted ? '<h2 class="ok">تم تسجيل اختيارك ✅</h2>' : `<h2>اختر هدف الاغتيال</h2>${choiceButtons(targets, 'confirmNightTarget', { icon: '🔪' })}<button class="pick skip" onclick="nightAction('SKIP')">⏭️ تخطي الاغتيال / Skip kill</button>`}<p class="muted">اختيار زعيم المافيا هو النهائي عند الاختلاف.</p></div>`;
+    const targets = alivePlayers().filter((player) => !teamIds.has(player.id) && (!game.enabledRoles?.mafia_no_repeat || player.id !== me.mafiaLastTarget));
+    $('#app').innerHTML = `<div class="card"><div class="role-title">${roleNames[me.role]}</div><div class="status wait">فريقك: ${(me.mafiaTeam || []).map((x) => escapeHtml(x.name)).join('، ')}</div>${me.acted ? '<h2 class="ok">تم تسجيل اختيارك ✅</h2>' : `<h2>اختر هدف الاغتيال</h2>${choiceButtons(targets, 'confirmNightTarget', { icon: '🔪' })}<button class="pick skip" onclick="nightAction('SKIP')">⏭️ تخطي الاغتيال / Skip kill</button>`}<p class="muted">${game.enabledRoles?.mafia_no_repeat ? 'لا يمكن تكرار هدف الليلة الماضية. ' : ''}اختيار زعيم المافيا هو النهائي عند الاختلاف.</p></div>`;
     return;
   }
   if (me.role === 'doctor') {
@@ -1196,8 +1199,8 @@ function renderNight() {
     $('#app').innerHTML = `<div class="card" data-no-translate><h2>${discussionText('🩺 الطبيب','🩺 Doctor')}</h2><p>${discussionText('تبدأ الحماية من الليلة الثانية وتستمر حتى نهاية القيم.','Protection starts on night two and continues until the game ends.')}</p></div>`;
       return;
     }
-    const targets = alivePlayers().filter((player) => player.id !== me.doctorLastTarget);
-    $('#app').innerHTML = `<div class="card"><div class="role-title">${roleNames.doctor}</div>${me.acted ? '<h2 class="ok">تم تسجيل الحماية ✅</h2>' : `<h2>من ستحمي الليلة؟</h2>${choiceButtons(targets, 'nightAction', { icon: '🩺' })}`}<p class="muted">تقدر تحمي نفسك، ولا تقدر تكرر نفس اللاعب ليلتين.</p></div>`;
+    const targets = alivePlayers().filter((player) => !game.enabledRoles?.doctor_no_repeat || player.id !== me.doctorLastTarget);
+    $('#app').innerHTML = `<div class="card"><div class="role-title">${roleNames.doctor}</div>${me.acted ? '<h2 class="ok">تم تسجيل الحماية ✅</h2>' : `<h2>من ستحمي الليلة؟</h2>${choiceButtons(targets, 'nightAction', { icon: '🩺' })}`}<p class="muted">${game.enabledRoles?.doctor_no_repeat ? 'تقدر تحمي نفسك، لكن ما تقدر تكرر حماية نفس اللاعب ليلتين متتاليتين.' : 'تقدر تحمي نفسك أو تكرر حماية نفس اللاعب.'}</p></div>`;
     return;
   }
   if (me.role === 'revealer') {
@@ -1264,7 +1267,7 @@ function renderDay() {
     $('#app').innerHTML = `<div class="card"><div class="role-title">${roleNames.lawyer}</div>${me.acted ? '<h2 class="ok">تم تسجيل الحماية ✅</h2>' : `<h2>من ستحمي من التصويت؟</h2>${choiceButtons(alivePlayers(), 'lawyerProtect', { icon: '⚖️' })}`}</div>`;
     return;
   }
-  $('#app').innerHTML = `<div class="card hero"><div class="role-title">☀️ الصباح</div>${eventCards()}<p>انتظر المضيف لبدء التصويت.</p></div>`;
+  $('#app').innerHTML = `<div class="card hero player-day-status">${eventCards()}<p>انتظر المضيف لبدء التصويت.</p></div>`;
 }
 function renderVote() {
   const me = game.me;
@@ -1340,13 +1343,48 @@ function lawyerProtect(target) { return playerAction('lawyerProtect', target); }
 function castVote(target) { return playerAction('vote', target); }
 
 home();
+const eliminationEffectSeen = new Set();
+let eliminationEffectTimer;
+function eliminationKind(reason) {
+  return ({mafia_kill:'mafia',vote_eliminated:'vote',trial_guilty:'vote',serial_kill:'serial',witch_poison:'poison',jailer_executed:'execution',vigilante_kill:'shot',lovers_died:'lovers',host_expelled:'expelled'})[reason] || 'other';
+}
+function closeEliminationEffect() {
+  clearTimeout(eliminationEffectTimer);
+  document.getElementById('eliminationEffect')?.remove();
+}
+function showEliminationEffect() {
+  const eliminations=game?.eliminations||[];
+  if(!eliminations.length)return;
+  const key=[game.code,game.matchId,game.round,eliminations.map(p=>`${p.id||p.name}:${p.reason}`).join('|')].join(':');
+  if(eliminationEffectSeen.has(key))return;
+  eliminationEffectSeen.add(key);
+  const kinds=[...new Set(eliminations.map(p=>eliminationKind(p.reason)))];
+  const kind=kinds.length===1?kinds[0]:'mixed';
+  const icons={mafia:'🗡️',vote:'⚖️',serial:'🩸',poison:'☠️',execution:'🔒',shot:'🎯',lovers:'💔',expelled:'⛔',mixed:'✦',other:'✦'};
+  const titles={mafia:['اغتيال في الظلام','Mafia assassination'],vote:['حسم التصويت','Vote decided'],serial:['ضربة القاتل المتسلسل','Serial killer strike'],poison:['سم الساحرة','Witch poison'],execution:['حكم السجّان','Jailer execution'],shot:['الطلقة الأخيرة','Final shot'],lovers:['مصير الحبيبين','Linked fate'],expelled:['استبعاد من المضيف','Host expulsion'],mixed:['أحداث الليلة','Night events'],other:['خرج لاعب من المباراة','A player left the game']};
+  const names=eliminations.map(p=>escapeHtml(p.name)).join(' · ');
+  closeEliminationEffect();
+  const effect=document.createElement('div');
+  effect.id='eliminationEffect';
+  effect.className=`elimination-effect effect-${kind}`;
+  effect.setAttribute('role','dialog');
+  effect.setAttribute('aria-modal','true');
+  effect.setAttribute('aria-label',discussionText(...titles[kind]));
+  effect.innerHTML=`<div class="elimination-effect-scene"><span class="elimination-effect-icon" aria-hidden="true">${icons[kind]}</span><p class="elimination-effect-kicker">${discussionText('حدث في المباراة','Game event')}</p><h2>${discussionText(...titles[kind])}</h2><p class="elimination-effect-names">${names}</p><span class="elimination-effect-progress" aria-hidden="true"></span><button type="button" class="btn elimination-effect-skip" onclick="closeEliminationEffect()">${discussionText('تجاوز','Skip')}</button></div>`;
+  effect.addEventListener('keydown',event=>{if(event.key==='Escape')closeEliminationEffect();});
+  document.body.appendChild(effect);
+  if(!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches&&document.visibilityState==='visible')navigator.vibrate?.(({mafia:[100,60,180],vote:[70,70,70],serial:[170,80,170],poison:[130,100,60],execution:[180],shot:[60,40,200],lovers:[80,90,80],expelled:[130],mixed:[120,80,120],other:[80]})[kind]);
+  eliminationEffectTimer=setTimeout(closeEliminationEffect,5000);
+  effect.querySelector('button')?.focus({preventScroll:true});
+}
 function eliminationNotice() {
   const causes = {
     mafia_kill:['اغتيال المافيا','Killed by Mafia'], vote_eliminated:['الاستبعاد بالتصويت','Voted out'], trial_guilty:['حكم التصويت بالإدانة','Voted guilty'],
     vigilante_kill:['طلقة القناص الأخيرة','Sniper final shot'], serial_kill:['اغتيال القاتل المتسلسل','Killed by Serial Killer'], witch_poison:['سم الساحرة','Witch poison'],
     jailer_executed:['إعدام السجّان','Jailer execution'], lovers_died:['الارتباط بلاعب مستبعد','Linked partner eliminated'], host_expelled:['استبعاد من المضيف','Expelled by host'], eliminated:['الاستبعاد','Eliminated']
   };
-  const rows=(game?.eliminations||[]).map(p=>{const label=causes[p.reason]||causes.eliminated;const kind=p.reason==='vote_eliminated'||p.reason==='trial_guilty'?'vote':p.reason==='serial_kill'?'serial':p.reason==='mafia_kill'?'mafia':'other';return `<p class="elimination-row elimination-${kind}"><span class="elimination-mark" aria-hidden="true">${kind==='vote'?'⚖️':kind==='serial'?'🩸':kind==='mafia'?'🗡️':'☠️'}</span><b>${escapeHtml(p.name)}</b> — ${discussionText(...label)}${p.detail?`: ${escapeHtml(p.detail)}`:''}</p>`;}).join('');
+  const icons={vote:'⚖️',serial:'🩸',mafia:'🗡️',poison:'☠️',execution:'🔒',shot:'🎯',lovers:'💔',expelled:'⛔',other:'✦'};
+  const rows=(game?.eliminations||[]).map(p=>{const label=causes[p.reason]||causes.eliminated;const kind=eliminationKind(p.reason);return `<p class="elimination-row elimination-${kind}"><span class="elimination-mark" aria-hidden="true">${icons[kind]}</span><b>${escapeHtml(p.name)}</b> — ${discussionText(...label)}${p.detail?`: ${escapeHtml(p.detail)}`:''}</p>`;}).join('');
   return rows?`<section id="eliminationNotice" class="card elimination-notice elimination-card" role="status" data-no-translate><b>${discussionText('المستبعدون','Eliminated players')}</b>${rows}</section>`:'';
 }
 function renderPendingShot(controller=false) {
@@ -1411,6 +1449,7 @@ function voteSummaryCard() {
 function renderWithNotices(content,controller=false) {
   const app=$('#app'), focused=document.activeElement;
   const focusPhase=[game?.matchId,game?.phase,game?.round].join('|');
+  const changedPhase=app?.dataset?.focusPhase&&app.dataset.focusPhase!==focusPhase;
   const keepFocus=app?.dataset?.focusPhase===focusPhase&&app.contains(focused)&&focused?.matches('button,[role="button"]');
   const focusAttributes=['id','onclick','data-target','aria-label'];
   const focusValues=keepFocus?focusAttributes.map(name=>focused.getAttribute(name)):null;
@@ -1427,12 +1466,14 @@ function renderWithNotices(content,controller=false) {
     if(game?.me?.alive&&game.me.mafiaCountResult&&!document.getElementById('revealerResult')){const result=game.me.mafiaCountResult;$('#app').insertAdjacentHTML('afterbegin',`<section id="revealerResult" class="card" data-no-translate><h3>${discussionText('📡 نتيجة كشف الجولة','📡 Reveal result, round')} ${escapeHtml(result.round)}</h3><p>${discussionText('عدد المافيا الباقين عند إعلان الصباح','Mafia alive at dawn')}: <strong>${escapeHtml(result.count)}</strong></p></section>`);}
     if(!document.getElementById('voteSummaryNotice'))$('#app').insertAdjacentHTML('afterbegin',voteSummaryCard());
     if(!document.getElementById('eliminationNotice'))$('#app').insertAdjacentHTML('afterbegin',eliminationNotice());
+    showEliminationEffect();
     if(game?.me?.alive && game.me.warnings?.length && !controller && !document.getElementById('hostWarningNotice')){const warning=game.me.warnings.at(-1);$('#app').insertAdjacentHTML('afterbegin',`<section id="hostWarningNotice" class="status wait" role="alert" data-no-translate><b>${discussionText('⚠️ إنذار من المضيف','⚠️ Warning from the host')}</b><p>${escapeHtml(warning.reason)}</p></section>`);}
     if(keepFocus&&!focused.isConnected&&document.activeElement===document.body){
       const replacement=[...app.querySelectorAll('button,[role="button"]')].filter(sameControl)[focusIndex];
       if(replacement&&!replacement.disabled&&!replacement.closest('[inert]')&&replacement.getClientRects().length)replacement.focus({preventScroll:true});
     }
     if(app?.dataset)app.dataset.focusPhase=focusPhase;
+    if(changedPhase && !controller && typeof window!=='undefined')window.scrollTo?.({top:0,left:0,behavior:'instant'});
   }
 }
 function renderPlayer(){

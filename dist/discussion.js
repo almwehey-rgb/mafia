@@ -72,7 +72,8 @@ function discussionQueue(view) {
     const label = state==='done'?discussionText('انتهى','Done'):state==='current'?discussionText(view.status==='paused'?'متوقف مؤقتًا':'يتحدث الآن',view.status==='paused'?'Paused':'Speaking now'):i===cursor+1?discussionText('التالي','Up next'):discussionText('بانتظار دوره','Waiting');
     return `<li class="speaker-row ${state}" ${state==='current'?'aria-current="step"':''}><span class="speaker-position">${i+1}</span><bdi class="speaker-name">${escapeHtml(nameOf(id))}</bdi><span class="speaker-state">${label}</span></li>`;
   };
-  return `<div class="speaker-queue"><h3>${discussionText('ترتيب المتحدثين','Speaking order')}</h3><ol class="speaker-list">${view.order.slice(cursor).map((id,i)=>row(id,i+cursor)).join('')}</ol>${cursor>0?`<details class="speakers-finished"><summary>${discussionText('أنهوا دورهم','Completed turns')} (${cursor})</summary><ol class="speaker-list">${view.order.slice(0,cursor).map(row).join('')}</ol></details>`:''}</div>`;
+  const remaining=view.order.slice(cursor);
+  return `<div class="speaker-queue"><h3>${discussionText('ترتيب المتحدثين','Speaking order')}</h3><ol class="speaker-list">${remaining.slice(0,1).map((id,i)=>row(id,i+cursor)).join('')}</ol>${remaining.length>1?`<details class="speakers-upcoming" data-disclosure-key="upcoming-speakers"><summary>${discussionText('عرض بقية الترتيب','Show remaining order')} (${remaining.length-1})</summary><ol class="speaker-list">${remaining.slice(1).map((id,i)=>row(id,i+cursor+1)).join('')}</ol></details>`:''}${cursor>0?`<details class="speakers-finished"><summary>${discussionText('أنهوا دورهم','Completed turns')} (${cursor})</summary><ol class="speaker-list">${view.order.slice(0,cursor).map(row).join('')}</ol></details>`:''}</div>`;
 }
 function discussionPanel(controller) {
   const view = clientDiscussion();

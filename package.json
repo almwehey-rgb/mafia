@@ -6,7 +6,7 @@
     "node": ">=24"
   },
   "scripts": {
-    "test": "node --test --test-isolation=none tests/discussion.test.mjs tests/lifecycle-postgres.test.mjs tests/lifecycle-edge-sql.test.mjs tests/atomic-transitions.test.mjs tests/join-feedback.test.mjs tests/discussion-display.test.mjs tests/review-probes.mjs tests/assurance.test.mjs tests/feature-loader.test.mjs tests/transport.test.mjs tests/monitor.test.mjs tests/operations.test.mjs tests/join-atomic.test.mjs tests/role-interactions.test.mjs",
+    "test": "node --test --test-isolation=none tests/discussion.test.mjs tests/lifecycle-postgres.test.mjs tests/lifecycle-edge-sql.test.mjs tests/atomic-transitions.test.mjs tests/join-feedback.test.mjs tests/discussion-display.test.mjs tests/review-probes.mjs tests/assurance.test.mjs tests/feature-loader.test.mjs tests/transport.test.mjs tests/monitor.test.mjs tests/operations.test.mjs tests/join-atomic.test.mjs tests/role-interactions.test.mjs tests/consecutive-night-targets.test.mjs",
     "predev": "npm run build",
     "dev": "node tests/browser-server.mjs",
     "test:performance": "node tests/performance-cache.mjs && node --test --test-isolation=none tests/feature-loader.test.mjs",

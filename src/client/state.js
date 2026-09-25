@@ -9,7 +9,7 @@ let mafiaCount = 3;
 let detectiveCount = 1;
 let detectiveQuestions = 3;
 const detectiveQuestionCount = (value) => Number.isFinite(Number(value)) && value != null ? Math.max(1, Math.min(5, Math.round(Number(value)))) : 3;
-let enabledRoles = { doctor: true, detective: true, lawyer: true, jailer: true, vigilante: false, witch: false, serial_killer: false, jester: false, cupid: false, escort: false, godfather_innocent: true, mafia_kill_start_round: 2, mafia_kill_mode: 'always', mafia_kill_enabled: true, reveal_dead_roles: false, allow_no_vote: true, full_trial: true, kids_mode: false };
+let enabledRoles = { doctor: true, detective: true, lawyer: true, jailer: true, vigilante: false, witch: false, serial_killer: false, jester: false, cupid: false, escort: false, godfather_innocent: true, mafia_kill_start_round: 2, mafia_kill_mode: 'always', mafia_kill_enabled: true, mafia_no_repeat: false, doctor_no_repeat: true, reveal_dead_roles: false, allow_no_vote: true, full_trial: true, kids_mode: false };
 let spectatorToken = '';
 Object.assign(enabledRoles, { discussion_mode: 'turns', discussion_seconds: 180, speaker_seconds: 30 });
 let spectatorId = '';
@@ -29,4 +29,3 @@ let phaseDuration = Number(localStorage.getItem('mafia-phase-seconds')) || 60;
 let soundEnabled = localStorage.getItem('mafia-sound') !== 'off';
 let localHistory = [];
 let preferenceSaveTimer;
-

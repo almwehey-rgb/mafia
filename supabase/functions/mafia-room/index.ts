@@ -112,7 +112,7 @@ const shuffle = <T>(items: T[]) => { for (let i = items.length - 1; i > 0; i--) 
 const mafiaRole = (role: string | null) => role === "mafia" || role === "mafia_boss";
 const selected = (player: any) => String(player.action_target || "").split(",").filter(Boolean);
 const results = (player: any) => { try { return JSON.parse(player.investigation_result || "[]"); } catch { return []; } };
-const defaultEnabledRoles = { doctor: true, detective: true, lawyer: true, jailer: true, vigilante: false, witch: false, serial_killer: false, jester: false, cupid: false, escort: false, godfather_innocent: true, mafia_kill_start_round: 2, mafia_kill_mode: "always", mafia_kill_enabled: true, reveal_dead_roles: false, allow_no_vote: true, full_trial: true, kids_mode: false, paused_phase: null };
+const defaultEnabledRoles = { doctor: true, detective: true, lawyer: true, jailer: true, vigilante: false, witch: false, serial_killer: false, jester: false, cupid: false, escort: false, godfather_innocent: true, mafia_kill_start_round: 2, mafia_kill_mode: "always", mafia_kill_enabled: true, mafia_no_repeat: false, doctor_no_repeat: true, reveal_dead_roles: false, allow_no_vote: true, full_trial: true, kids_mode: false, paused_phase: null };
 const enabledRoles = (value: any) => {
   const legacyRound = value?.mafia_kill_mode === "disabled" || value?.mafia_kill_enabled === false ? 0 : value?.mafia_kill_mode === "after_first" ? 2 : 1;
   let mafiaKillStartRound = Number.isFinite(+value?.mafia_kill_start_round) ? Math.max(0, Math.min(10, Math.round(+value.mafia_kill_start_round))) : legacyRound;
@@ -133,6 +133,8 @@ const enabledRoles = (value: any) => {
   mafia_kill_start_round: mafiaKillStartRound,
   mafia_kill_mode: mafiaKillStartRound === 0 ? "disabled" : mafiaKillStartRound === 1 ? "always" : mafiaKillStartRound === 2 ? "after_first" : "scheduled",
   mafia_kill_enabled: mafiaKillStartRound > 0,
+  mafia_no_repeat: value?.mafia_no_repeat === true,
+  doctor_no_repeat: value?.doctor_no_repeat !== false,
   reveal_dead_roles: value?.reveal_dead_roles === true,
   allow_no_vote: value?.allow_no_vote !== false,
   full_trial: value?.full_trial !== false,
@@ -152,6 +154,7 @@ const mafiaKillEnabledForRound = (room: any) => {
   return startRound > 0 && Number(room.round) >= Math.max(2, startRound);
 };
 const roleState = (player: any) => player?.role_state && typeof player.role_state === "object" ? player.role_state : {};
+const mafiaLastTarget = (players: any[]) => players.find((player) => mafiaRole(player.role) && roleState(player).lastMafiaTarget)?.role_state.lastMafiaTarget || null;
 // Merge a small state change without erasing a concurrent vote, charge or claim.
 async function patchRoleState(code: string, player: any, patch: Record<string, any>) {
   let state = roleState(player);
@@ -183,7 +186,6 @@ function discussionView(room: any, now = Date.now()) {
   const deadline = saved.mode === "group" ? saved.endsAt : saved.turnStartedAt + (index - saved.cursor + 1) * saved.seconds * 1000;
   return { ...saved, status: complete ? "done" : saved.pausedAt ? "paused" : "active", complete: Boolean(complete), index, speakerId: !complete && saved.mode === "turns" ? saved.order[index] : null, deadline, remainingMs: complete ? 0 : Math.max(0, deadline - at) };
 }
-
 async function load(code: string) {
   const [roomResult, playersResult] = await Promise.all([
     db.from("mafia_rooms").select("*").eq("code", code).single(),
@@ -236,9 +238,9 @@ async function botNightActions(room: any, players: any[]) {
     if (room.round === 1 && bot.role !== "detective") continue;
     let target: string | null = null;
     const others = alive.filter((x) => x.id !== bot.id);
-    if (mafiaRole(bot.role) && mafiaKillEnabledForRound(room) && !isMafiaLocked(room, players)) target = randomItem(others.filter((x) => !mafiaRole(x.role)))?.id || "SKIP";
+    if (mafiaRole(bot.role) && mafiaKillEnabledForRound(room) && !isMafiaLocked(room, players)) target = randomItem(others.filter((x) => !mafiaRole(x.role) && (!settings.mafia_no_repeat || x.id !== mafiaLastTarget(players))))?.id || "SKIP";
     else if (bot.role === "revealer" && !roleState(bot).mafiaCountResult) target = "COUNT";
-    else if (bot.role === "doctor" && doctorAvailable(room)) target = randomItem(alive.filter((x) => x.id !== room.doctor_last_target))?.id || null;
+    else if (bot.role === "doctor" && doctorAvailable(room)) target = randomItem(alive.filter((x) => !settings.doctor_no_repeat || x.id !== room.doctor_last_target))?.id || null;
     else if (bot.role === "detective") target = shuffle([...others]).slice(0, detectiveLimit(room, players)).map((x) => x.id).join(",") || null;
     else if (["serial_killer", "escort"].includes(bot.role)) target = randomItem(others)?.id || null;
     else if (bot.role === "witch") {
@@ -318,7 +320,6 @@ async function botVotes(room: any, players: any[], verdict = false) {
     await persist(db.from("mafia_players").update({ vote_target: value }).eq("room_code", room.code).eq("id", bot.id));
   }
 }
-
 async function recordStats(room: any, players: any[]) {
   if (!room.winner || room.stats_recorded) return;
   const plan=requestDatabase.getStore()?.plan;
@@ -407,6 +408,7 @@ function publicView(room: any, players: any[], meId?: string, host = false) {
       jailedPlayer: me.role === "jailer" && room.jailed_player ? players.find((x) => x.id === room.jailed_player)?.name : undefined,
       executionsLeft: me.role === "jailer" ? room.jailer_executions : undefined,
       doctorLastTarget: me.role === "doctor" ? room.doctor_last_target : undefined,
+      mafiaLastTarget: mafiaRole(me.role) ? mafiaLastTarget(players) : undefined,
       doctorAvailable: me.role === "doctor" ? doctorAvailable(room) : undefined,
       doctorProtectionRounds: me.role === "doctor" ? null : undefined,
       mafiaLocked: mafiaRole(me.role) ? locked : undefined,
@@ -1364,7 +1366,7 @@ async function routeAct(context:RoomRouteContext) {
       const target = players.find((x) => x.id === body.target);
       if (mafiaRole(me.role)) {
         if (isMafiaLocked(room, players)) return out({ error: "MAFIA_LOCKED" }, 409);
-        if (body.target !== "SKIP" && (!target?.alive || mafiaRole(target.role))) return out({ error: "INVALID_ACTION" }, 400);
+        if (body.target !== "SKIP" && (!target?.alive || mafiaRole(target.role) || (enabledRoles(room.enabled_roles).mafia_no_repeat && target.id === mafiaLastTarget(players)))) return out({ error: "INVALID_ACTION" }, 400);
         await persist(db.from("mafia_players").update({ action_target: body.target }).eq("room_code", code).eq("id", me.id));
       } else if (me.role === "revealer") {
         if (!["COUNT","SKIP"].includes(body.target) || me.action_target || roleState(me).mafiaCountResult) return out({ error: "INVALID_ACTION" }, 400);
@@ -1374,7 +1376,7 @@ async function routeAct(context:RoomRouteContext) {
         if(!data?.length)return out({error:"STALE_ACTION"},409);
       } else if (me.role === "doctor") {
         if (!doctorAvailable(room)) return out({ error: "DOCTOR_UNAVAILABLE" }, 409);
-        if (!target?.alive || target.id === room.doctor_last_target) return out({ error: "INVALID_ACTION" }, 400);
+        if (!target?.alive || (enabledRoles(room.enabled_roles).doctor_no_repeat && target.id === room.doctor_last_target)) return out({ error: "INVALID_ACTION" }, 400);
         await persist(db.from("mafia_players").update({ action_target: target.id }).eq("room_code", code).eq("id", me.id));
       } else if (me.role === "detective") {
         const picked = selected(me), limit = detectiveLimit(room, players);
@@ -1493,6 +1495,12 @@ async function routeResolveNight(context:RoomRouteContext) {
         if (error) throw error;
       }
       await eliminatePlayers(room, players, causes);
+      // Remember the faction's final choice, including a target saved by the doctor.
+      // Keep this in Mafia-only role state, never in public room settings.
+      const resolvedPlayers = (await load(code)).players;
+      for (const member of resolvedPlayers.filter((player) => mafiaRole(player.role))) {
+        await patchRoleState(code, member, { lastMafiaTarget: victim?.id || null });
+      }
       await persist(db.from("mafia_players").update({ action_target: null, vote_target: null }).eq("room_code", code));
       await persist(db.from("mafia_rooms").update({ phase: "day", jailed_player: null, jailer_executions: executions, doctor_last_target: doctorTarget || null, linked_players: linkedPlayers, last_event: events.join(","), last_deaths: deaths, last_eliminated: deaths[0] || null, last_saved: events.some((x) => x.endsWith("saved")) }).eq("code", code));
       await prepareLastShot(code, causes, "day", room.round);

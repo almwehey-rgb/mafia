@@ -122,8 +122,8 @@ function renderNight() {
   }
   if (me.role === 'mafia' || me.role === 'mafia_boss') {
     const teamIds = new Set((me.mafiaTeam || []).map((x) => x.id));
-    const targets = alivePlayers().filter((player) => !teamIds.has(player.id));
-    $('#app').innerHTML = `<div class="card"><div class="role-title">${roleNames[me.role]}</div><div class="status wait">فريقك: ${(me.mafiaTeam || []).map((x) => escapeHtml(x.name)).join('، ')}</div>${me.acted ? '<h2 class="ok">تم تسجيل اختيارك ✅</h2>' : `<h2>اختر هدف الاغتيال</h2>${choiceButtons(targets, 'confirmNightTarget', { icon: '🔪' })}<button class="pick skip" onclick="nightAction('SKIP')">⏭️ تخطي الاغتيال / Skip kill</button>`}<p class="muted">اختيار زعيم المافيا هو النهائي عند الاختلاف.</p></div>`;
+    const targets = alivePlayers().filter((player) => !teamIds.has(player.id) && (!game.enabledRoles?.mafia_no_repeat || player.id !== me.mafiaLastTarget));
+    $('#app').innerHTML = `<div class="card"><div class="role-title">${roleNames[me.role]}</div><div class="status wait">فريقك: ${(me.mafiaTeam || []).map((x) => escapeHtml(x.name)).join('، ')}</div>${me.acted ? '<h2 class="ok">تم تسجيل اختيارك ✅</h2>' : `<h2>اختر هدف الاغتيال</h2>${choiceButtons(targets, 'confirmNightTarget', { icon: '🔪' })}<button class="pick skip" onclick="nightAction('SKIP')">⏭️ تخطي الاغتيال / Skip kill</button>`}<p class="muted">${game.enabledRoles?.mafia_no_repeat ? 'لا يمكن تكرار هدف الليلة الماضية. ' : ''}اختيار زعيم المافيا هو النهائي عند الاختلاف.</p></div>`;
     return;
   }
   if (me.role === 'doctor') {
@@ -131,8 +131,8 @@ function renderNight() {
     $('#app').innerHTML = `<div class="card" data-no-translate><h2>${discussionText('🩺 الطبيب','🩺 Doctor')}</h2><p>${discussionText('تبدأ الحماية من الليلة الثانية وتستمر حتى نهاية القيم.','Protection starts on night two and continues until the game ends.')}</p></div>`;
       return;
     }
-    const targets = alivePlayers().filter((player) => player.id !== me.doctorLastTarget);
-    $('#app').innerHTML = `<div class="card"><div class="role-title">${roleNames.doctor}</div>${me.acted ? '<h2 class="ok">تم تسجيل الحماية ✅</h2>' : `<h2>من ستحمي الليلة؟</h2>${choiceButtons(targets, 'nightAction', { icon: '🩺' })}`}<p class="muted">تقدر تحمي نفسك، ولا تقدر تكرر نفس اللاعب ليلتين.</p></div>`;
+    const targets = alivePlayers().filter((player) => !game.enabledRoles?.doctor_no_repeat || player.id !== me.doctorLastTarget);
+    $('#app').innerHTML = `<div class="card"><div class="role-title">${roleNames.doctor}</div>${me.acted ? '<h2 class="ok">تم تسجيل الحماية ✅</h2>' : `<h2>من ستحمي الليلة؟</h2>${choiceButtons(targets, 'nightAction', { icon: '🩺' })}`}<p class="muted">${game.enabledRoles?.doctor_no_repeat ? 'تقدر تحمي نفسك، لكن ما تقدر تكرر حماية نفس اللاعب ليلتين متتاليتين.' : 'تقدر تحمي نفسك أو تكرر حماية نفس اللاعب.'}</p></div>`;
     return;
   }
   if (me.role === 'revealer') {
@@ -199,7 +199,7 @@ function renderDay() {
     $('#app').innerHTML = `<div class="card"><div class="role-title">${roleNames.lawyer}</div>${me.acted ? '<h2 class="ok">تم تسجيل الحماية ✅</h2>' : `<h2>من ستحمي من التصويت؟</h2>${choiceButtons(alivePlayers(), 'lawyerProtect', { icon: '⚖️' })}`}</div>`;
     return;
   }
-  $('#app').innerHTML = `<div class="card hero"><div class="role-title">☀️ الصباح</div>${eventCards()}<p>انتظر المضيف لبدء التصويت.</p></div>`;
+  $('#app').innerHTML = `<div class="card hero player-day-status">${eventCards()}<p>انتظر المضيف لبدء التصويت.</p></div>`;
 }
 function renderVote() {
   const me = game.me;
