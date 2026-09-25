@@ -14,6 +14,7 @@ test('each elimination reason has a distinct visual cue',()=>{
     assert.match(css,new RegExp(`effect-${kind}`));
   }
   assert.match(css,/prefers-reduced-motion: reduce/);
+  for(const cue of ['exit-flash','exit-ring','exit-burst','exit-shake'])assert.match(css,new RegExp(cue));
 });
 
 test('exit scene lasts five seconds, can close, and does not replay on polling',()=>{
@@ -33,6 +34,8 @@ test('exit scene lasts five seconds, can close, and does not replay on polling',
   assert.equal(vibrations,1);
   assert.match(effect.className,/effect-mafia/);
   assert.match(effect.innerHTML,/تجاوز/);
+  assert.match(effect.innerHTML,/elimination-effect-flash/);
+  assert.match(effect.innerHTML,/elimination-effect-ring/);
   vm.runInContext('showEliminationEffect()',context);
   assert.equal(appended,1);
   vm.runInContext('closeEliminationEffect()',context);

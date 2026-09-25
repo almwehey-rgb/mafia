@@ -1371,10 +1371,10 @@ function showEliminationEffect() {
   effect.setAttribute('role','dialog');
   effect.setAttribute('aria-modal','true');
   effect.setAttribute('aria-label',discussionText(...titles[kind]));
-  effect.innerHTML=`<div class="elimination-effect-scene"><span class="elimination-effect-icon" aria-hidden="true">${icons[kind]}</span><p class="elimination-effect-kicker">${discussionText('حدث في المباراة','Game event')}</p><h2>${discussionText(...titles[kind])}</h2><p class="elimination-effect-names">${names}</p><span class="elimination-effect-progress" aria-hidden="true"></span><button type="button" class="btn elimination-effect-skip" onclick="closeEliminationEffect()">${discussionText('تجاوز','Skip')}</button></div>`;
+  effect.innerHTML=`<span class="elimination-effect-flash" aria-hidden="true"></span><span class="elimination-effect-ring" aria-hidden="true"></span><div class="elimination-effect-scene"><span class="elimination-effect-icon" aria-hidden="true">${icons[kind]}</span><p class="elimination-effect-kicker">${discussionText('حدث في المباراة','Game event')}</p><h2>${discussionText(...titles[kind])}</h2><p class="elimination-effect-names">${names}</p><span class="elimination-effect-progress" aria-hidden="true"></span><button type="button" class="btn elimination-effect-skip" onclick="closeEliminationEffect()">${discussionText('تجاوز','Skip')}</button></div>`;
   effect.addEventListener('keydown',event=>{if(event.key==='Escape')closeEliminationEffect();});
   document.body.appendChild(effect);
-  if(!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches&&document.visibilityState==='visible')navigator.vibrate?.(({mafia:[100,60,180],vote:[70,70,70],serial:[170,80,170],poison:[130,100,60],execution:[180],shot:[60,40,200],lovers:[80,90,80],expelled:[130],mixed:[120,80,120],other:[80]})[kind]);
+  if(!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches&&document.visibilityState==='visible')navigator.vibrate?.(({mafia:[180,70,260,80,180],vote:[100,80,180,80,250],serial:[240,90,260,80,150],poison:[160,110,190,90,120],execution:[250,100,230],shot:[90,50,290,80,180],lovers:[130,100,180,100,130],expelled:[180,90,220],mixed:[180,90,220],other:[140,80,180]})[kind]);
   eliminationEffectTimer=setTimeout(closeEliminationEffect,5000);
   effect.querySelector('button')?.focus({preventScroll:true});
 }
