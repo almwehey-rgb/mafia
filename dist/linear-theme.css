@@ -1,0 +1,643 @@
+/* Linear-inspired dark system: midnight surfaces, hairline geometry, one acid-lime action. */
+:root {
+  color-scheme: dark;
+  --linear-void: #08090a;
+  --linear-carbon: #0f1011;
+  --linear-obsidian: #161718;
+  --linear-graphite: #23252a;
+  --linear-smoke: #383b3f;
+  --linear-ash: #62666d;
+  --linear-fog: #8a8f98;
+  --linear-mist: #d0d6e0;
+  --linear-bone: #e5e5e6;
+  --linear-paper: #ffffff;
+  --linear-lime: #e4f222;
+  --linear-green: #27a644;
+  --linear-coral: #eb5757;
+  --linear-teal: #02b8cc;
+  --linear-violet: #6366f1;
+  --linear-lavender: #8b5cf6;
+}
+
+body:not(.light) {
+  --bg: var(--linear-void);
+  --panel: var(--linear-carbon);
+  --panel2: var(--linear-obsidian);
+  --line: var(--linear-graphite);
+  --red: var(--linear-coral);
+  --gold: var(--linear-lime);
+  --green: var(--linear-green);
+  --muted: var(--linear-fog);
+  background: var(--linear-void) !important;
+  color: var(--linear-mist);
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: 16px;
+  line-height: 1.5;
+  font-feature-settings: "cv01" 1, "ss03" 1, "zero" 1;
+}
+
+body:not(.light)::before,
+body:not(.light)::after {
+  display: none !important;
+}
+
+body:not(.light) .shell {
+  width: min(1200px, 100%);
+  max-width: 1200px !important;
+  padding: 24px 24px 80px;
+}
+
+body:not(.light) .header {
+  padding-bottom: 16px;
+  margin-bottom: 24px;
+  border-bottom: 1px solid var(--linear-graphite);
+}
+
+body:not(.light) .brand {
+  gap: 12px;
+}
+
+body:not(.light) .brand img,
+body:not(.light) .cinema-brand > img,
+body:not(.light) .home-emblem img {
+  width: 48px;
+  height: 48px;
+  border: 1px solid var(--linear-graphite);
+  border-radius: 12px;
+  box-shadow: none;
+  object-fit: contain;
+  filter: none;
+}
+
+body:not(.light) .logo {
+  color: var(--linear-paper) !important;
+  font-family: inherit;
+  font-size: clamp(26px, 4vw, 40px);
+  font-weight: 510;
+  letter-spacing: -0.03em;
+}
+
+body:not(.light) .logo small {
+  color: var(--linear-fog);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 10px;
+  letter-spacing: 0.14em;
+}
+
+body:not(.light) .room-tag {
+  padding: 4px 12px;
+  border: 1px solid var(--linear-graphite);
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--linear-mist);
+  font-size: 12px;
+  font-weight: 400;
+  letter-spacing: 0;
+}
+
+body:not(.light) :is(h1, h2, h3, .logo, .role-title, .code, .counter, .number, .accused-name, .stat-grid b) {
+  color: var(--linear-paper);
+  font-weight: 510;
+  letter-spacing: -0.012em;
+  text-shadow: none;
+}
+
+body:not(.light) h1 { font-size: clamp(28px, 4vw, 48px); line-height: 1; }
+body:not(.light) h2 { font-size: clamp(22px, 3vw, 32px); line-height: 1.13; }
+body:not(.light) h3 { font-size: 20px; line-height: 1.25; }
+
+body:not(.light) :is(.muted, .eyebrow, .hint, small, .noir-intro, .noir-caption, .entry-hint, .phase-label, .lobby-empty, .preference-status) {
+  color: var(--linear-fog);
+}
+
+body:not(.light) .card,
+body:not(.light) .sheet-card,
+body:not(.light) .demo-box,
+body:not(.light) .busy-box {
+  background: var(--linear-carbon);
+  border: 1px solid var(--linear-graphite);
+  border-radius: 12px;
+  box-shadow: inset 0 0 0 1px rgba(35, 37, 42, 0.45);
+}
+
+body:not(.light) .card {
+  padding: 24px;
+}
+
+body:not(.light) .btn,
+body:not(.light) .pick,
+body:not(.light) .mini-card,
+body:not(.light) .role-toggle,
+body:not(.light) .preset-grid button,
+body:not(.light) .setup-tabs button,
+body:not(.light) .rule-chip,
+body:not(.light) .utility-bar button,
+body:not(.light) .phase-pause,
+body:not(.light) .mini-action,
+body:not(.light) .close-sheet,
+body:not(.light) .mute-btn,
+body:not(.light) .player-tools button,
+body:not(.light) .step button,
+body:not(.light) .kill-range > button {
+  min-height: 44px;
+  border: 1px solid var(--linear-graphite);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--linear-mist);
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 510;
+  letter-spacing: -0.011em;
+  box-shadow: none;
+  text-shadow: none;
+  transition: background 150ms ease, border-color 150ms ease, color 150ms ease, transform 150ms ease;
+}
+
+body:not(.light) .btn,
+body:not(.light) .pick {
+  padding: 10px 16px;
+}
+
+body:not(.light) :is(.btn:hover, .pick:hover, .mini-card:hover, .setup-tabs button:hover, .rule-chip:hover, .role-toggle:hover) {
+  border-color: var(--linear-smoke);
+  background: rgba(255, 255, 255, 0.08);
+  filter: none;
+  transform: none;
+}
+
+body:not(.light) :is(.btn:focus-visible, .pick:focus-visible, button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible) {
+  outline: 2px solid var(--linear-lime);
+  outline-offset: 3px;
+}
+
+body:not(.light) :is(.btn.red, .btn.gold, .start, .cinema-actions .cinema-create) {
+  background: var(--linear-lime);
+  border-color: var(--linear-lime);
+  color: var(--linear-void);
+  font-weight: 510;
+}
+
+body:not(.light) :is(.btn.red:hover, .btn.gold:hover, .start:hover, .cinema-actions .cinema-create:hover) {
+  background: #effb42;
+  border-color: #effb42;
+  color: var(--linear-void);
+}
+
+body:not(.light) :is(.btn.green, .pick.innocent) {
+  background: var(--linear-bone);
+  border-color: var(--linear-bone);
+  color: var(--linear-void);
+}
+
+body:not(.light) :is(.btn.danger, .pick.execute, .kick, .phase-pause.danger) {
+  background: rgba(235, 87, 87, 0.12);
+  border-color: rgba(235, 87, 87, 0.45);
+  color: #ff9a9a;
+}
+
+body:not(.light) .pick.skip {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: var(--linear-graphite);
+}
+
+body:not(.light) :is(.input, .step, .stepper, .discussion-settings select) {
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.02);
+  color: var(--linear-mist);
+  font: inherit;
+}
+
+body:not(.light) .input::placeholder {
+  color: var(--linear-ash);
+}
+
+body:not(.light) :is(.input, .discussion-settings select):focus {
+  border-color: var(--linear-mist);
+  outline: 2px solid rgba(228, 242, 34, 0.32);
+  outline-offset: 2px;
+}
+
+body:not(.light) .step {
+  width: auto;
+  padding: 6px;
+}
+
+body:not(.light) .step button,
+body:not(.light) .kill-range > button {
+  width: 44px;
+  height: 44px;
+  min-height: 44px;
+  padding: 0;
+}
+
+body:not(.light) :is(.setting, .setup-tabs, .header, .count, .rules li) {
+  border-color: var(--linear-graphite);
+}
+
+body:not(.light) :is(.player, .result, .role-preview > div, .role, .actor, .stage, .stat-grid > div, .achievement, .leader-row, .chat-message, .timeline-item) {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--linear-graphite);
+  border-radius: 6px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
+}
+
+body:not(.light) .player {
+  padding: 12px;
+  font-weight: 400;
+}
+
+body:not(.light) .player small,
+body:not(.light) .leader-row small,
+body:not(.light) .chat-message b {
+  color: var(--linear-fog);
+}
+
+body:not(.light) .dot.on {
+  background: var(--linear-green);
+  box-shadow: 0 0 0 4px rgba(39, 166, 68, 0.16);
+}
+
+body:not(.light) .phase-bar,
+body:not(.light) .player-tools {
+  border: 1px solid var(--linear-graphite);
+  border-radius: 6px;
+  background: rgba(15, 16, 17, 0.96);
+  box-shadow: none;
+  backdrop-filter: none;
+}
+
+body:not(.light) .phase-bar {
+  padding: 8px 12px;
+}
+
+body:not(.light) .phase-symbol {
+  color: var(--linear-mist);
+}
+
+body:not(.light) .phase-timer {
+  width: 44px;
+  height: 44px;
+  border-radius: 6px;
+  background: var(--linear-obsidian);
+  color: var(--linear-paper);
+}
+
+body:not(.light) .phase-timer.urgent {
+  background: var(--linear-coral);
+  color: var(--linear-paper);
+}
+
+body:not(.light) :is(.setup-tabs button.on, .rule-chip.on, .role-toggle.active, .lobby-pane-tabs button[aria-pressed="true"], .utility-bar button.active) {
+  background: rgba(228, 242, 34, 0.08);
+  border-color: var(--linear-lime);
+  color: var(--linear-lime);
+  box-shadow: inset 0 -2px var(--linear-lime);
+}
+
+body:not(.light) .role-toggle.off,
+body:not(.light) .role-toggle.locked {
+  background: rgba(255, 255, 255, 0.02);
+  border-color: var(--linear-graphite);
+  color: var(--linear-fog);
+}
+
+body:not(.light) .progress {
+  height: 8px;
+  border-radius: 9999px;
+  background: var(--linear-graphite);
+}
+
+body:not(.light) .progress span {
+  border-radius: inherit;
+  background: var(--linear-lime);
+}
+
+body:not(.light) :is(.status, .discussion-panel) {
+  background: rgba(39, 166, 68, 0.08);
+  border: 1px solid rgba(39, 166, 68, 0.45);
+  border-radius: 6px;
+  color: var(--linear-mist);
+}
+
+body:not(.light) :is(.status.wait, .season-card, .opening-roulette) {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: var(--linear-graphite);
+  color: var(--linear-mist);
+}
+
+body:not(.light) :is(.event, .report) {
+  background: rgba(235, 87, 87, 0.08);
+  border-color: rgba(235, 87, 87, 0.45);
+  color: var(--linear-mist);
+}
+
+body:not(.light) :is(.code, .counter, .accused-name) {
+  color: var(--linear-paper);
+  font-weight: 510;
+}
+
+body:not(.light) .role-title {
+  font-weight: 510;
+  letter-spacing: -0.022em;
+}
+
+body:not(.light) .role-badge,
+body:not(.light) .connection-count,
+body:not(.light) .ok {
+  color: var(--linear-green);
+}
+
+body:not(.light) :is(.warn, .danger-text) {
+  color: #ff9a9a;
+}
+
+/* Home and entry screens keep the game's identity while adopting Linear's quiet chrome. */
+body:not(.light) :is(.noir-entry, .noir-home, .cinema-home) {
+  color: var(--linear-mist);
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+}
+
+body:not(.light) :is(.noir-heading, .cinema-brand h1) {
+  color: var(--linear-paper) !important;
+  font-family: inherit;
+  font-weight: 510;
+  letter-spacing: -0.022em;
+  text-shadow: none;
+}
+
+body:not(.light) .noir-kicker {
+  color: var(--linear-lime);
+  letter-spacing: 0.12em;
+}
+
+body:not(.light) .noir-kicker::before {
+  background: var(--linear-lime);
+}
+
+body:not(.light) :is(.cinema-brand > p, .cinema-home .cinema-cards > p, .cinema-home .cinema-footer, .cinema-more summary, .home-emblem p, .home-emblem span) {
+  color: var(--linear-fog);
+}
+
+body:not(.light) :is(.noir-deck img, .cinema-character img) {
+  border: 1px solid var(--linear-graphite);
+  border-radius: 12px;
+  box-shadow: 0 4px 32px rgba(0, 0, 0, 0.6);
+}
+
+body:not(.light) :is(.cinema-tools button, .noir-links .btn, .cinema-more summary) {
+  background: transparent;
+  border: 1px solid var(--linear-graphite);
+  border-radius: 6px;
+  color: var(--linear-mist);
+}
+
+body:not(.light) :is(.cinema-tools button:hover, .noir-links .btn:hover, .cinema-more summary:hover) {
+  border-color: var(--linear-lime);
+  color: var(--linear-lime);
+}
+
+body:not(.light) .mini-card {
+  background: rgba(255, 255, 255, 0.02);
+  border-color: var(--linear-graphite);
+}
+
+/* Role surfaces: artwork remains untouched; surrounding UI follows the same tokens. */
+body:not(.light) :is(.role-reader, .personal-role-card) {
+  border-color: var(--linear-graphite);
+  border-radius: 12px;
+  background: var(--linear-carbon);
+  color: var(--linear-mist);
+}
+
+body:not(.light) :is(.turning-role .role-image-view, .turning-role .role-details-view) {
+  border-color: var(--linear-graphite);
+  border-radius: 12px;
+}
+
+body:not(.light) .turning-role .role-details-view {
+  background: var(--linear-carbon);
+  color: var(--linear-mist);
+}
+
+body:not(.light) :is(.role-identity h2, .role-reader .role-rules-header h2, .personal-card-properties h2) {
+  color: var(--linear-paper);
+  font-weight: 510;
+}
+
+body:not(.light) :is(.role-identity > span, .role-team, .personal-team-capsule, .role-quick-summary span) {
+  border: 1px solid var(--linear-graphite);
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--linear-mist);
+}
+
+body:not(.light) :is(.role-allies, .role-quick-summary, .role-rule-sections, .role-private-team) {
+  background: rgba(255, 255, 255, 0.02);
+  border-color: var(--linear-graphite);
+  border-radius: 6px;
+  color: var(--linear-mist);
+}
+
+body:not(.light) .role-turn-hint {
+  background: rgba(8, 9, 10, 0.92);
+  border-color: var(--linear-graphite);
+  color: var(--linear-fog);
+}
+
+body:not(.light) .personal-role-card .personal-team-capsule {
+  box-shadow: none;
+}
+
+@media (max-width: 760px) {
+  body:not(.light) .shell {
+    padding: 16px 14px 72px;
+  }
+
+  body:not(.light) .header {
+    margin-bottom: 18px;
+  }
+
+  body:not(.light) .brand img,
+  body:not(.light) .cinema-brand > img,
+  body:not(.light) .home-emblem img {
+    width: 42px;
+    height: 42px;
+  }
+
+  body:not(.light) .card {
+    padding: 18px;
+  }
+
+  body:not(.light) .role-title {
+    font-size: clamp(32px, 8vw, 54px);
+  }
+}
+
+/* Legacy experience polish uses !important on the home chrome; keep the final
+   theme layer authoritative for those same entry points. */
+body:not(.light) .utility-bar button,
+body:not(.light) .utility-bar .theme-toggle,
+body:not(.light) .utility-bar .fullscreen-toggle {
+  background: rgba(255, 255, 255, 0.05) !important;
+  border: 1px solid var(--linear-graphite) !important;
+  border-radius: 6px !important;
+  color: var(--linear-mist) !important;
+  box-shadow: none !important;
+  font-family: inherit !important;
+  font-weight: 400 !important;
+}
+
+body:not(.light) :is(.cinema-actions .btn, .cinema-actions .cinema-create) {
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 16px;
+  border: 1px solid var(--linear-graphite) !important;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.05) !important;
+  color: var(--linear-mist) !important;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 510 !important;
+  box-shadow: none !important;
+}
+
+body:not(.light) .cinema-actions .cinema-create {
+  background: var(--linear-lime) !important;
+  border-color: var(--linear-lime) !important;
+  color: var(--linear-void) !important;
+}
+
+body:not(.light) .cinema-tools button {
+  min-height: 44px;
+  border: 1px solid var(--linear-graphite) !important;
+  border-radius: 6px;
+  background: transparent !important;
+  color: var(--linear-mist) !important;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 400 !important;
+  box-shadow: none !important;
+}
+
+body:not(.light) .cinema-tools button span {
+  color: var(--linear-lime) !important;
+}
+
+/* Lobby-specific selectors in the legacy layout are intentionally stronger;
+   mirror them here so the host flow has the same precision surfaces. */
+body:not(.light).screen-lobby .phase-bar .lobby-action {
+  min-height: 44px;
+  padding: 8px 12px;
+  border: 1px solid var(--linear-graphite) !important;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.05) !important;
+  color: var(--linear-mist) !important;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 400 !important;
+  box-shadow: none !important;
+}
+
+body:not(.light).screen-lobby .phase-bar .lobby-action:hover {
+  border-color: var(--linear-lime) !important;
+  color: var(--linear-lime) !important;
+}
+
+body:not(.light).screen-lobby .preset-grid .preset-choice {
+  min-height: 88px;
+  padding: 14px;
+  border: 1px solid var(--linear-graphite) !important;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.02) !important;
+  color: var(--linear-mist) !important;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.4) !important;
+  font-weight: 400 !important;
+}
+
+body:not(.light).screen-lobby .preset-grid .preset-choice:hover {
+  border-color: var(--linear-lime) !important;
+  background: rgba(228, 242, 34, 0.08) !important;
+  transform: none;
+}
+
+body:not(.light).screen-lobby .preset-choice .preset-icon {
+  border: 1px solid var(--linear-graphite) !important;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.05) !important;
+  color: var(--linear-lime) !important;
+}
+
+body:not(.light).screen-lobby .preset-choice strong {
+  color: var(--linear-paper) !important;
+  font-weight: 510 !important;
+}
+
+body:not(.light).screen-lobby .preset-choice small {
+  color: var(--linear-fog) !important;
+}
+
+body:not(.light).screen-lobby .preset-choice .preset-arrow {
+  color: var(--linear-lime) !important;
+}
+
+body:not(.light).screen-lobby .discussion-settings {
+  border: 1px solid var(--linear-graphite) !important;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.02) !important;
+  color: var(--linear-mist);
+}
+
+body:not(.light).screen-lobby .discussion-settings select {
+  border-color: rgba(255, 255, 255, 0.08) !important;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.02) !important;
+  color: var(--linear-mist) !important;
+}
+
+body:not(.light).screen-lobby .host-progress {
+  border: 1px solid var(--linear-graphite) !important;
+  border-radius: 6px;
+  background: var(--linear-carbon) !important;
+  box-shadow: 0 4px 32px rgba(8, 9, 10, 0.6) !important;
+}
+
+body:not(.light).screen-lobby .host-progress-info strong {
+  color: var(--linear-lime);
+}
+
+body:not(.light).screen-lobby .lobby-join .btn,
+body:not(.light).screen-lobby .setup-tabs button,
+body:not(.light).screen-lobby .rule-chip,
+body:not(.light).screen-lobby .preset-more > summary {
+  font-family: inherit;
+  font-weight: 510 !important;
+}
+
+body:not(.light).screen-lobby .lobby-join .btn {
+  background: rgba(255, 255, 255, 0.05) !important;
+  border-color: var(--linear-graphite) !important;
+  color: var(--linear-mist) !important;
+}
+
+body:not(.light).screen-lobby .lobby-join .btn:hover {
+  border-color: var(--linear-lime) !important;
+  color: var(--linear-lime) !important;
+}
+
+body:not(.light).screen-lobby .setup-card > h2 {
+  color: var(--linear-paper) !important;
+  font-weight: 510 !important;
+  letter-spacing: -0.012em;
+}
+
+body:not(.light).screen-lobby .preset-more > summary {
+  border-color: var(--linear-graphite) !important;
+  border-radius: 6px;
+  color: var(--linear-mist) !important;
+  background: transparent !important;
+}

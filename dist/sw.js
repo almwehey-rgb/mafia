@@ -1,4 +1,4 @@
-const CACHE = 'mafia-6c2ce5569400999b';
+const CACHE = 'mafia-f8665d4c14dc85e0';
 // Warm only the entry point, not megabytes of unused artwork.
 self.addEventListener('install', event => {
   event.waitUntil(caches.open(CACHE).then(cache => cache.add('/game.html')));
