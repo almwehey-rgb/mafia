@@ -1353,16 +1353,17 @@ function closeEliminationEffect() {
   document.getElementById('eliminationEffect')?.remove();
 }
 function showEliminationEffect() {
+  if(game?.me?.alive!==false)return;
   const eliminations=game?.eliminations||[];
-  if(!eliminations.length)return;
-  const key=[game.code,game.matchId,game.round,eliminations.map(p=>`${p.id||p.name}:${p.reason}`).join('|')].join(':');
+  const eliminated=eliminations.find(p=>p.id===game?.me?.id);
+  if(!eliminated)return;
+  const key=[game.code,game.matchId,game.round,eliminated.id,eliminated.reason].join(':');
   if(eliminationEffectSeen.has(key))return;
   eliminationEffectSeen.add(key);
-  const kinds=[...new Set(eliminations.map(p=>eliminationKind(p.reason)))];
-  const kind=kinds.length===1?kinds[0]:'mixed';
+  const kind=eliminationKind(eliminated.reason);
   const icons={mafia:'🗡️',vote:'⚖️',serial:'🩸',poison:'☠️',execution:'🔒',shot:'🎯',lovers:'💔',expelled:'⛔',mixed:'✦',other:'✦'};
   const titles={mafia:['اغتيال في الظلام','Mafia assassination'],vote:['حسم التصويت','Vote decided'],serial:['ضربة القاتل المتسلسل','Serial killer strike'],poison:['سم الساحرة','Witch poison'],execution:['حكم السجّان','Jailer execution'],shot:['الطلقة الأخيرة','Final shot'],lovers:['مصير الحبيبين','Linked fate'],expelled:['استبعاد من المضيف','Host expulsion'],mixed:['أحداث الليلة','Night events'],other:['خرج لاعب من المباراة','A player left the game']};
-  const names=eliminations.map(p=>escapeHtml(p.name)).join(' · ');
+  const names=escapeHtml(eliminated.name);
   closeEliminationEffect();
   const effect=document.createElement('div');
   effect.id='eliminationEffect';
