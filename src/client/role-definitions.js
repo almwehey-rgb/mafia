@@ -54,7 +54,7 @@ function detailedRoleProperties(role, personal=false) {
  const sections=[['مهمتك',rule[1]],['استخدام القدرة',rule[2]],['القيود المهمة',rule[3]],['شرط الفوز',win]];
  if(personal&&role==='mafia_boss')sections.push(['إعداد غرفتك',game.enabledRoles?.godfather_innocent?'تمويه العرّاب مفعّل: تظهر بريئًا في فحص المحقق.':'تمويه العرّاب غير مفعّل: يكشفك فحص المحقق كعضو مافيا.']);
  if(personal&&role==='detective')sections.push(['إعداد غرفتك',`عدد جولات الفحص المحدد: ${detectiveQuestionCount(game.detectiveQuestions ?? game.detective_questions)}. فحص واحد في كل جولة مؤهلة.`]);
- return `<div class="role-rule-sections">${sections.map(([heading,text],index)=>personal?`<details class="role-rule-item" name="private-role-rules" data-disclosure-key="private-rule-${index}" onclick="event.stopPropagation()"><summary>${escapeHtml(heading)}</summary><p>${escapeHtml(text)}</p></details>`:`<section><h3>${heading}</h3><p>${escapeHtml(text)}</p></section>`).join('')}</div>`;
+ return `<div class="role-rule-sections">${sections.map(([heading,text])=>`<section><h3>${heading}</h3><p>${escapeHtml(text)}</p></section>`).join('')}</div>`;
 }
 function roleLabel(role){
   if(!game?.enabledRoles?.kids_mode)return roleNames[role]||role;
