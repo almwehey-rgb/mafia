@@ -7,6 +7,7 @@ const journey=await readFile(new URL('../src/client/journey-ui.js',import.meta.u
 const playerView=await readFile(new URL('../src/client/player-view.js',import.meta.url),'utf8');
 const roleCards=await readFile(new URL('../src/client/role-cards.js',import.meta.url),'utf8');
 const roleDefinitions=await readFile(new URL('../src/client/role-definitions.js',import.meta.url),'utf8');
+const controls=await readFile(new URL('../dist/controls.js',import.meta.url),'utf8');
 
 function bossGame(){
  return {code:'1234',round:1,phase:'night',enabledRoles:{discussion_mode:'turns'},me:{id:'boss',role:'mafia_boss',alive:true,acknowledged:true,discussionChoiceLocked:false,mafiaTeam:[{id:'boss',name:'الزعيم'},{id:'mate',name:'زميل'}]}};
@@ -63,4 +64,35 @@ test('New Mafia boss gets a private role card before any leadership controls ren
  assert.match(app.innerHTML,/زميل/);
  assert.doesNotMatch(app.innerHTML,/تنازل عن الزعامة|محقق مزيف/);
  assert.equal(enhanced,1);
+});
+
+test('Boss utility menu does not loop when its crown becomes an icon',()=>{
+ let writes=0;
+ const children=[];
+ const options={querySelector:selector=>children.find(child=>child.className.includes(selector.slice(1)))||null,append:child=>children.push(child)};
+ const document={
+  addEventListener:()=>{},
+  querySelector:selector=>selector==='.utility-options'?options:selector==='.utility-menu>summary'?{setAttribute:()=>{}}:null,
+  createElement:()=>{
+   const button={dataset:{},className:'',remove(){children.splice(children.indexOf(this),1)}};
+   Object.defineProperty(button,'textContent',{get(){return this.visibleText||''},set(value){writes++;this.visibleText=value.replace('👑','')}});
+   return button;
+  },
+ };
+ const context={document,navigator:{},window:{},localStorage:{getItem:()=>null},spectatorMode:false,
+  game:{code:'1234',me:{id:'boss',role:'mafia_boss',alive:true,acknowledged:false,mafiaTeam:[{id:'boss'},{id:'mate'}]}}};
+ vm.createContext(context);
+ vm.runInContext(controls.replace('function syncRoomUtilityActions(){','globalThis.testSyncRoomUtilityActions=syncRoomUtilityActions;function syncRoomUtilityActions(){'),context);
+ vm.runInContext('testSyncRoomUtilityActions()',context);
+ assert.equal(options.querySelector('.resign-mafia-leader-option'),null);
+ context.game.me.acknowledged=true;
+ vm.runInContext('testSyncRoomUtilityActions()',context);
+ const handoff=options.querySelector('.resign-mafia-leader-option');
+ assert.ok(handoff);
+ const firstWrites=writes;
+ for(let i=0;i<10;i++)vm.runInContext('testSyncRoomUtilityActions()',context);
+ assert.equal(writes,firstWrites);
+ context.game.me.mafiaTeam=[{id:'boss'}];
+ vm.runInContext('testSyncRoomUtilityActions()',context);
+ assert.equal(options.querySelector('.resign-mafia-leader-option'),null);
 });
