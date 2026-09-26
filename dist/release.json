@@ -1,11 +1,11 @@
 {
-  "release": "f13ffcbfa12d673e",
+  "release": "314015ff88d71ec4",
   "versions": {
     "/admin-qr.js": "9bd94d9c74e96f3a",
     "/admin-remote.js": "346e0cd082235d7c",
     "/admin.js": "06106f01722106e8",
-    "/app-v64.css": "d35e34aa35684128",
-    "/compact-live.css": "c940e0bc21b0605d",
+    "/app-v64.css": "dd51a4c483fcd66a",
+    "/compact-live.css": "0980285c8c912ee7",
     "/controls.css": "b3fddddb218ed8fb",
     "/controls.js": "80d10deaa37aca6e",
     "/discussion.css": "015e0de3d09ffa71",
