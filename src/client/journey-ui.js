@@ -1,6 +1,37 @@
 const eliminationEffectSeen = new Set();
 let eliminationEffectTimer;
 const eliminationEffectStorageKey = 'mafia-elimination-effect-seen';
+let victoryEffectTimer, victoryReturnFocus;
+let victoryBackground=[];
+function closeVictoryEffect(){
+ clearTimeout(victoryEffectTimer);
+ const effect=document.getElementById('victoryEffect');if(!effect)return;
+ effect.remove();
+ for(const [element,wasInert] of victoryBackground)if(!wasInert)element.removeAttribute('inert');
+ victoryBackground=[];
+ if(victoryReturnFocus?.isConnected)victoryReturnFocus.focus({preventScroll:true});
+ victoryReturnFocus=null;
+}
+function showVictoryEffect(){
+ if(game?.phase!=='finished'||!['mafia','village'].includes(game.winner)){closeVictoryEffect();return false;}
+ const key=`victory:${game.code}:${game.matchId||game.lifecycleVersion}:${game.winner}`;
+ if(hasSeenEliminationEffect(key))return true;
+ closeEliminationEffect();closeVictoryEffect();
+ const mafia=game.winner==='mafia';
+ const title=discussionText(mafia?'فازت المافيا':'فازت القرية',mafia?'MAFIA WINS':'VILLAGE WINS');
+ const emblem=mafia?'<path d="m16 30 17 15 17-27 17 27 17-15-9 46H25ZM27 86h46"/>':'<path d="M50 12 20 24v25c0 20 30 39 30 39s30-19 30-39V24Z"/><path d="m34 49 11 11 23-25"/>';
+ const effect=document.createElement('div');effect.id='victoryEffect';effect.className=`elimination-effect victory-effect victory-${game.winner}`;
+ effect.setAttribute('role','dialog');effect.setAttribute('aria-modal','true');effect.setAttribute('aria-label',title);
+ effect.innerHTML=`<div class="exit-atmosphere" aria-hidden="true"><span class="exit-beam"></span><span class="exit-orbit"></span>${Array.from({length:24},(_,i)=>`<i style="--i:${i};--x:${(i*37)%100}%;--drift:${(i%2?1:-1)*(20+i*3)}px;--delay:${(i%6)*.12}s"></i>`).join('')}</div><span class="elimination-effect-ring" aria-hidden="true"></span><div class="exit-cinema-brand" aria-hidden="true">M A F I A ◆ N I G H T</div><div class="elimination-effect-scene"><p class="elimination-effect-kicker">${discussionText('حُسمت المباراة','THE MATCH IS DECIDED')}</p><div class="exit-sigil"><span class="elimination-effect-icon"><svg viewBox="0 0 100 100" fill="none" stroke="currentColor" stroke-width="3" stroke-linejoin="round" aria-hidden="true">${emblem}</svg></span></div><h2>${title}</h2><div class="exit-cause-line" aria-hidden="true"><span></span>◆<span></span></div><p class="exit-afterword">${discussionText(mafia?'سيطرت المافيا على المدينة':'كشفت القرية الأسرار وحسمت المواجهة',mafia?'The Mafia controls the city':'The village uncovered the truth')}</p></div><footer class="exit-cinema-footer"><button type="button" class="btn elimination-effect-skip" onclick="closeVictoryEffect()">${discussionText('تجاوز وعرض النتائج','Skip to results')} ←</button><span class="elimination-effect-progress" aria-hidden="true"></span></footer>`;
+ effect.addEventListener('keydown',event=>{if(event.key==='Escape'){event.preventDefault();closeVictoryEffect();}else if(event.key==='Tab'){event.preventDefault();effect.querySelector('button')?.focus();}});
+ victoryReturnFocus=document.activeElement;
+ victoryBackground=[...document.querySelectorAll('main.shell,.utility-bar,.game-sheet')].map(element=>[element,element.hasAttribute('inert')]);
+ victoryBackground.forEach(([element])=>element.setAttribute('inert',''));
+ document.body.appendChild(effect);rememberEliminationEffect(key);
+ if(!window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches&&document.visibilityState==='visible')navigator.vibrate?.([140,70,220,90,300]);
+ victoryEffectTimer=setTimeout(closeVictoryEffect,5000);effect.querySelector('button')?.focus({preventScroll:true});
+ return true;
+}
 function eliminationKind(reason) {
   return ({mafia_kill:'mafia',vote_eliminated:'vote',trial_guilty:'vote',serial_kill:'serial',witch_poison:'poison',jailer_executed:'execution',vigilante_kill:'shot',lovers_died:'lovers',host_expelled:'expelled'})[reason] || 'other';
 }
@@ -64,12 +95,17 @@ function showEliminationEffect() {
   effect.setAttribute('aria-modal','true');
   effect.setAttribute('aria-label',discussionText(...titles[kind]));
   effect.innerHTML=`<div class="exit-atmosphere" aria-hidden="true"><span class="exit-beam"></span><span class="exit-orbit"></span>${Array.from({length:18},(_,i)=>`<i style="--i:${i};--x:${(i*37)%100}%;--drift:${(i%2?1:-1)*(20+i*3)}px;--delay:${(i%6)*.12}s"></i>`).join('')}</div><span class="exit-shutter exit-shutter-top" aria-hidden="true"></span><span class="exit-shutter exit-shutter-bottom" aria-hidden="true"></span><span class="elimination-effect-flash" aria-hidden="true"></span><span class="elimination-effect-ring" aria-hidden="true"></span><div class="exit-cinema-brand" aria-hidden="true">M A F I A <span>◆</span> N I G H T</div><div class="elimination-effect-scene"><p class="elimination-effect-kicker">${discussionText('انتهى دورك في هذه المباراة','YOUR PART IN THIS MATCH HAS ENDED')}</p><div class="exit-sigil"><span class="elimination-effect-icon">${eliminationEmblem(kind)}</span><span class="exit-sigil-mark" aria-hidden="true">◆</span></div><h2>${discussionText(...titles[kind])}</h2><p class="elimination-effect-names">${names}</p><div class="exit-cause-line" aria-hidden="true"><span></span>◆<span></span></div><p class="exit-afterword">${discussionText('تبقى الأسرار… وتستمر اللعبة','The secrets remain. The game continues.')}</p></div><footer class="exit-cinema-footer"><button type="button" class="btn elimination-effect-skip" onclick="closeEliminationEffect()">${discussionText('تجاوز المشهد','Skip scene')} <span aria-hidden="true">←</span></button><span class="elimination-effect-progress" aria-hidden="true"></span></footer>`;
+  effect.innerHTML=bloodyExitLayer(kind)+effect.innerHTML;
   effect.addEventListener('keydown',event=>{if(event.key==='Escape')closeEliminationEffect();});
   document.body.appendChild(effect);
   rememberEliminationEffect(key);
   if(!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches&&document.visibilityState==='visible')navigator.vibrate?.(({mafia:[180,70,260,80,180],vote:[100,80,180,80,250],serial:[240,90,260,80,150],poison:[160,110,190,90,120],execution:[250,100,230],shot:[90,50,290,80,180],lovers:[130,100,180,100,130],expelled:[180,90,220],mixed:[180,90,220],other:[140,80,180]})[kind]);
   eliminationEffectTimer=setTimeout(closeEliminationEffect,5000);
   effect.querySelector('button')?.focus({preventScroll:true});
+}
+function bloodyExitLayer(kind){
+ const splashes=Array.from({length:22},(_,i)=>`<circle cx="${(i*43)%100}" cy="${(i*29)%100}" r="${2+i%7}"/>`).join('');
+ return `<div class="blood-theatre blood-${kind}" aria-hidden="true"><svg class="blood-spray blood-spray-left" viewBox="0 0 100 100"><path d="M0 0h60L45 14l30 8-41 8 17 17-28-6 10 36-18-20-8 35L0 100Z"/>${splashes}</svg><svg class="blood-spray blood-spray-right" viewBox="0 0 100 100"><path d="M0 0h60L45 14l30 8-41 8 17 17-28-6 10 36-18-20-8 35L0 100Z"/>${splashes}</svg><div class="blood-cuts"><i></i><i></i><i></i></div><div class="blood-drips">${Array.from({length:7},(_,i)=>`<i style="--drop:${i};--drop-height:${12+(i*11)%29}vh"></i>`).join('')}</div><span class="exit-verdict-stamp">${kind==='vote'?'حُكم بالخروج':kind==='expelled'?'تم الاستبعاد':'انتهت نجاتك'}</span></div>`;
 }
 function eliminationNotice() {
   const causes = {
@@ -78,7 +114,7 @@ function eliminationNotice() {
     jailer_executed:['إعدام السجّان','Jailer execution'], lovers_died:['الارتباط بلاعب مستبعد','Linked partner eliminated'], host_expelled:['استبعاد من المضيف','Expelled by host'], eliminated:['الاستبعاد','Eliminated']
   };
   const icons={vote:'⚖️',serial:'🩸',mafia:'🗡️',poison:'☠️',execution:'🔒',shot:'🎯',lovers:'💔',expelled:'⛔',other:'✦'};
-  const rows=visibleEliminations().map(p=>{const label=causes[p.reason]||causes.eliminated;const kind=eliminationKind(p.reason);return `<p class="elimination-row elimination-${kind}"><span class="elimination-mark" aria-hidden="true">${icons[kind]}</span><b>${escapeHtml(p.name)}</b> — ${discussionText(...label)}${p.detail?`: ${escapeHtml(p.detail)}`:''}</p>`;}).join('');
+  const rows=visibleEliminations().map(p=>{const label=causes[p.reason]||causes.eliminated;const kind=eliminationKind(p.reason);return `<article class="elimination-row elimination-${kind}"><span class="elimination-mark" aria-hidden="true">${icons[kind]}</span><div><strong class="eliminated-name">${escapeHtml(p.name)}</strong><p class="elimination-cause">${discussionText(...label)}</p>${p.detail?`<small>${escapeHtml(p.detail)}</small>`:''}</div></article>`;}).join('');
   return rows?`<section id="eliminationNotice" class="card elimination-notice elimination-card" role="status" data-no-translate><b>${discussionText('المستبعدون','Eliminated players')}</b>${rows}</section>`:'';
 }
 function renderPendingShot(controller=false) {
@@ -139,12 +175,34 @@ function voteCountRow(name,count,voters,key) {
   if(!game?.enabledRoles?.public_voting || !Array.isArray(voters))return `<div class="vote-count-row">${heading}</div>`;
   return `<details class="vote-count-details" data-disclosure-key="${escapeHtml(key)}"><summary>${heading}<span class="vote-expand-mark" aria-hidden="true">⌄</span></summary><ul class="vote-voter-list">${voters.map(v=>`<li>${escapeHtml(v.name)}</li>`).join('')}</ul></details>`;
 }
-function voteSummaryCard() {
+function voteSummaryCard(expanded=false) {
   if(['vote','nomination','verdict'].includes(game?.phase==='paused'?game.enabledRoles?.paused_phase:game?.phase))return '';
   const summary=game?.voteSummary;
   if(!summary)return '';
+  if(!expanded)return `<section id="voteSummaryNotice" class="vote-summary-launch"><button class="btn wide" onclick="openSheet('نتائج التصويت',voteSummaryCard(true))">${discussionText('نتائج تصويت الجولة','Voting results, round')} ${escapeHtml(summary.round)} <span aria-hidden="true">⌄</span></button></section>`;
   const label=name=>summary.phase==='verdict'?(name==='GUILTY'?discussionText('مذنب','Guilty'):discussionText('بريء','Innocent')):name;
   return `<section id="voteSummaryNotice" class="card" data-no-translate><h3>${discussionText('نتائج التصويت — الجولة','Voting results — round')} ${escapeHtml(summary.round)}</h3>${summary.counts.map(item=>voteCountRow(label(item.name),item.count,item.voters,`result-${game.matchId}-${summary.round}-${summary.phase}-${item.id||item.name}`)).join('')}${voteCountRow(discussionText('امتناع / لم يصوّت','Abstained / did not vote'),summary.abstained,null,'')}</section>`;
+}
+let votePreviewTimer, voteFoldTimer, votePreviewKey='';
+const votePreviewsSeen=new Set();
+function queueVoteResultPreview(){
+ const summary=game?.voteSummary;
+ if(!summary||['vote','nomination','verdict','finished','lobby','paused'].includes(game.phase))return;
+ const key=[game.code,game.matchId,summary.round,summary.phase].join(':');
+ if(votePreviewsSeen.has(key)||votePreviewKey===key)return;
+ votePreviewKey=key;clearTimeout(votePreviewTimer);
+ const show=()=>{
+  if(votePreviewKey!==key)return;
+  if(!game?.voteSummary||[game.code,game.matchId,game.voteSummary.round,game.voteSummary.phase].join(':')!==key||['vote','nomination','verdict','finished','lobby'].includes(game.phase)){votePreviewKey='';return;}
+  if(document.getElementById('eliminationEffect')||document.getElementById('victoryEffect')||document.querySelector('.game-sheet')){votePreviewTimer=setTimeout(show,600);return;}
+  votePreviewsSeen.add(key);votePreviewKey='';
+  openSheet('نتائج التصويت',voteSummaryCard(true));
+  const sheet=document.querySelector('.game-sheet');
+  clearTimeout(voteFoldTimer);voteFoldTimer=setTimeout(()=>{if(sheet?.isConnected)closeSheet();},6000);
+  sheet?.addEventListener('pointerdown',()=>clearTimeout(voteFoldTimer),{once:true});
+  sheet?.addEventListener('keydown',()=>clearTimeout(voteFoldTimer),{once:true});
+ };
+ votePreviewTimer=setTimeout(show,350);
 }
 function publicVotesCard() { return ''; }
 function renderWithNotices(content,controller=false) {
@@ -169,7 +227,7 @@ function renderWithNotices(content,controller=false) {
     if(!document.getElementById('publicVotesNotice'))$('#app').insertAdjacentHTML('beforeend',publicVotesCard());
     for(const element of app.querySelectorAll('.vote-count-details[data-disclosure-key]'))if(disclosures.has(element.dataset.disclosureKey))element.open=disclosures.get(element.dataset.disclosureKey);
     if(!document.getElementById('eliminationNotice'))$('#app').insertAdjacentHTML('afterbegin',eliminationNotice());
-    showEliminationEffect();
+    if(!showVictoryEffect())showEliminationEffect();
     if(game?.enabledRoles?.automatic_game&&game.me?.alive&&['day','trial'].includes(game.phase)){
       const canReady=game.phase==='day'||game.me.id===game.accusedPlayer;
       if(canReady)app.insertAdjacentHTML('beforeend',`<section class="card auto-ready"><h3>${discussionText('المباراة تلقائية','Automatic game')}</h3><p>${game.enabledRoles.action_deadline===false?discussionText('ننتظر اختيار الجميع بدون مهلة.','Waiting for everyone without a deadline.'):discussionText('ننتقل بعد اختيار الجميع أو انتهاء المهلة.','Advances when everyone is ready or the timer ends.')}</p><button class="btn gold wide" ${game.me.phaseReady?'disabled':''} onclick="readyAutomaticPhase()">${game.me.phaseReady?discussionText('تم التأكيد — بانتظار البقية','Confirmed — waiting for others'):discussionText(game.phase==='trial'?'انتهيت من الدفاع':'انتهيت من النقاش','I am ready')}</button></section>`);
@@ -229,14 +287,22 @@ function showMatchTools(){
 }
 function enhanceJourney(controller){
   if(!game)return;
+  document.body.classList.toggle('player-day-focus',!controller&&game.phase==='day'&&!!game.me?.alive);
   if(typeof pendingActionConfirmation!=='undefined'&&pendingActionConfirmation&&pendingActionConfirmation.context!==actionContext())cancelSensitiveAction();
   if(!document.querySelector('#app .phase-bar'))$('#app').insertAdjacentHTML('afterbegin',phaseBar());
+  const phaseBarElement=document.querySelector('#app .phase-bar');
+  if(phaseBarElement)$('#app').prepend(phaseBarElement);
+  const elimination=document.getElementById('eliminationNotice');
+  if(elimination&&phaseBarElement)phaseBarElement.insertAdjacentElement('afterend',elimination);
+  const voteSummary=document.getElementById('voteSummaryNotice');
+  if(voteSummary)$('#app').append(voteSummary);
   if(!controller&&!document.getElementById('playerStepStatus')){
     const statusHtml=playerStepStatus();
     if(statusHtml){const holder=document.createElement('div');holder.innerHTML=statusHtml;const status=holder.firstElementChild;status.id='playerStepStatus';document.querySelector('#app .phase-bar').insertAdjacentElement('afterend',status);}
   }
   document.querySelectorAll('.setup-tabs button').forEach((button,index)=>{if(index+1===setupStep)button.setAttribute('aria-current','step');});
   paintActionFeedback();updatePhaseTimer();
+  queueVoteResultPreview();
 }
 function syncMorningDetails(){
   const compact=window.matchMedia?.('(max-width:760px)').matches;

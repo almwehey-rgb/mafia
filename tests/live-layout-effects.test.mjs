@@ -5,6 +5,18 @@ import vm from 'node:vm';
 
 const journey=await readFile(new URL('../src/client/journey-ui.js',import.meta.url),'utf8');
 const css=await readFile(new URL('../dist/compact-live.css',import.meta.url),'utf8');
+test('Victory scenes reach players and spectators, last five seconds, skip and do not replay',()=>{
+ for(const winner of ['mafia','village'])for(const me of [null,{alive:true},{alive:false}]){
+  const nodes=new Map(),saved=new Map();let duration;
+  const context={game:{code:'1234',matchId:'final',phase:'finished',winner,me},document:{activeElement:null,visibilityState:'visible',querySelectorAll:()=>[],getElementById:id=>nodes.get(id),body:{appendChild:el=>nodes.set(el.id,el)},createElement:()=>({setAttribute(){},addEventListener(){},querySelector:()=>({focus(){}}),remove(){nodes.delete(this.id);}})},window:{matchMedia:()=>({matches:true})},navigator:{vibrate(){assert.fail('Reduced motion must not vibrate')}},localStorage:{getItem:key=>saved.get(key),setItem:(key,value)=>saved.set(key,value)},discussionText:ar=>ar,setTimeout:(_fn,ms)=>{duration=ms;return 1},clearTimeout(){}};
+  vm.createContext(context);vm.runInContext(journey,context);
+  assert.equal(vm.runInContext('showVictoryEffect()',context),true);assert.equal(duration,5000);
+  assert.match(nodes.get('victoryEffect').className,new RegExp('victory-'+winner));
+  assert.match(nodes.get('victoryEffect').innerHTML,/تجاوز وعرض النتائج/);
+  vm.runInContext('closeVictoryEffect();showVictoryEffect()',context);assert.equal(nodes.size,0);
+  context.game.winner='cancelled';assert.equal(vm.runInContext('showVictoryEffect()',context),false);
+ }
+});
 
 test('each elimination reason has a distinct visual cue',()=>{
   const context={};

@@ -185,8 +185,9 @@ function renderNight() {
 }
 
 function investigationPanel() {
+  if(game.me?.role!=='detective')return '';
   const results=(game.me?.investigationResults||[]).filter(r=>r.round===game.round);
-  return `<section class="card" data-no-translate><h2>${discussionText('نتائج التحقيق','Investigation results')}</h2>${results.map(r=>`<p><b>${escapeHtml(r.name)}</b>: ${discussionText(r.result,r.result==='مافيا'?'Mafia':'Innocent')}</p>`).join('')||`<p>${(game.round>detectiveQuestionCount(game.detectiveQuestions)?discussionText('انتهت فرص التحقيق المحددة.','Your investigation rounds are over.'):discussionText('لا توجد نتيجة هذه الليلة؛ قد تكون القدرة معطّلة أو لم يُسجّل اختيار.','No result tonight; your ability may have been blocked or no choice was recorded.'))}</p>`}</section>`;
+  return `<section class="card investigation-results" data-no-translate aria-label="نتائج التحقيق الخاصة"><header><h2>${discussionText('نتيجة تحقيقك','Your investigation')}</h2><span>${discussionText('خاص بك فقط','Only you can see this')} · ${discussionText('الجولة','Round')} ${game.round}</span></header>${results.map(r=>`<article class="investigation-result ${r.result==='مافيا'?'result-mafia':'result-innocent'}"><strong class="investigated-name">${escapeHtml(r.name)}</strong><b class="investigation-verdict">${r.result==='مافيا'?'✕':'✓'} ${discussionText(r.result,r.result==='مافيا'?'Mafia':'Innocent')}</b><small>${discussionText('نتيجة الفحص حسب قواعد الغرفة','Investigation result under room rules')}</small></article>`).join('')||`<p class="investigation-empty">${(game.round>detectiveQuestionCount(game.detectiveQuestions)?discussionText('انتهت فرص التحقيق المحددة.','Your investigation rounds are over.'):discussionText('لا توجد نتيجة هذه الليلة؛ قد تكون القدرة معطّلة أو لم يُسجّل اختيار.','No result tonight; your ability may have been blocked or no choice was recorded.'))}</p>`}</section>`;
 }
 function renderDay() {
   const me = game.me;
@@ -199,7 +200,8 @@ function renderDay() {
     $('#app').innerHTML = `<div class="card"><div class="role-title">${roleNames.lawyer}</div>${me.acted ? '<h2 class="ok">تم تسجيل الحماية ✅</h2>' : `<h2>من ستحمي من التصويت؟</h2>${choiceButtons(alivePlayers(), 'lawyerProtect', { icon: '⚖️' })}`}</div>`;
     return;
   }
-  $('#app').innerHTML = `<div class="card hero player-day-status">${eventCards()}<p>انتظر المضيف لبدء التصويت.</p></div>`;
+  const events=eventCards();
+  $('#app').innerHTML = `${events?`<div class="card hero player-day-status">${events}</div>`:''}${game.enabledRoles?.automatic_game?'':`<div class="card player-day-status"><p>${discussionText('انتظر المضيف لبدء التصويت.','Wait for the host to start voting.')}</p></div>`}`;
 }
 function renderVote() {
   const me = game.me;
