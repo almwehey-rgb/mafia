@@ -117,7 +117,7 @@ function setupRoleCards(roles, review = false) {
     ['escort','🚫','المعطّل',roles.escort],
     ['citizen','🏘️','المواطن',roles.citizens,true]];
   const visible = review ? cards.filter(card => card[3] > 0).sort((a,b) => b[3] - a[3]) : cards;
-  if(review)return '<div class="review-role-cards">' + visible.map(([role,,,count]) => interactiveRoleCard(role,{review:true,count})).join('') + '</div>';
+  if(review)return '<div class="compact-role-review">' + visible.map(([role,,label,count]) => `<button type="button" class="review-role-tile" onclick="previewHomeRole('${role}')" aria-label="${escapeHtml(label)}، العدد ${count}، عرض التفاصيل"><img src="${roleCardAsset(role,true,enabledRoles.kids_mode)}" alt="" width="64" height="96"><span>${escapeHtml(label)}</span><b>× ${count}</b></button>`).join('') + '</div>';
   return '<div class="role-preview">' + visible.map(card => roleCard(...card)).join('') + '</div>';
 }
 function setupPanel(roles){

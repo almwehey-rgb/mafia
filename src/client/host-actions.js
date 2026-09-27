@@ -18,9 +18,11 @@ async function leaveRoom() {
   } finally { lifecycleRequestPending = false; }
 }
 async function returnToLobby() {
-  if (lifecycleRequestPending || game?.phase !== 'finished') return;
+  if (lifecycleRequestPending || !game || game.phase === 'lobby') return;
+  if (!confirm('ترجع كل اللاعبين للوبي؟ سيتم إلغاء القيم الحالي ومسح الأدوار والاختيارات، مع بقاء اللاعبين في الغرفة.')) return;
   lifecycleRequestPending = true;
   try {
+    if(game.phase!=='finished')game=await api({action:'endGame',code:game.code,lifecycleVersion:game.lifecycleVersion,hostToken,id:playerId,playerToken});
     const next = await withBusy('جاري تجهيز ردهة الانتظار…', () => api({
       action:'returnToLobby', code:game.code, lifecycleVersion:game.lifecycleVersion,
       hostToken, id:playerId, playerToken
@@ -39,7 +41,10 @@ async function startGame() {
   lifecycleRequestPending = true;
   enabledRoles.phase_seconds=phaseDuration;
   try {
+    if(enabledRoles.automatic_game&&!await joinHostSeat())return;
     game = await withBusy('جاري توزيع الأدوار… / Dealing roles…', () => api({ action: 'start', code: game.code, lifecycleVersion:game.lifecycleVersion, hostToken, id:playerId, playerToken, mafiaCount, detectiveCount, detectiveQuestions, enabledRoles }));
+    // Start responses are host-oriented; fetch this player's private role before rendering.
+    if(game.enabledRoles?.automatic_game&&playerId)game=await api({action:'state',code:game.code,id:playerId,playerToken,hostToken});
     localHistory = []; localStorage.removeItem(`mafia-history-${game.code}`);
     signalPhase(); rememberEvent();
     renderHost();

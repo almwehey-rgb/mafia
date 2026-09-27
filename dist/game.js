@@ -168,7 +168,7 @@ function detailedRoleProperties(role, personal=false) {
  if(personal&&mafiaRoleClient(role))sections.push(['تكرار الاغتيال',game.enabledRoles?.mafia_no_repeat?'ممنوع اختيار هدف الاغتيال نفسه في ليلتين متتاليتين.':'تستطيع المافيا تكرار هدف الاغتيال في ليلتين متتاليتين.']);
  if(personal&&role==='doctor')sections.push(['تكرار الحماية',game.enabledRoles?.doctor_no_repeat?'ممنوع حماية نفس اللاعب في ليلتين متتاليتين.':'تستطيع حماية نفس اللاعب في ليلتين متتاليتين.']);
  if(personal&&role==='detective')sections.push(['إعداد غرفتك',`عدد جولات الفحص المحدد: ${detectiveQuestionCount(game.detectiveQuestions ?? game.detective_questions)}. فحص واحد في كل جولة مؤهلة.`]);
- return `<div class="role-rule-sections">${sections.map(([heading,text],index)=>personal?`<details class="role-rule-item" data-disclosure-key="private-rule-${index}" onclick="event.stopPropagation()"><summary>${escapeHtml(heading)}</summary><p>${escapeHtml(text)}</p></details>`:`<section><h3>${heading}</h3><p>${escapeHtml(text)}</p></section>`).join('')}</div>`;
+ return `${personal?`<header class="private-role-heading"><small>خصائص دورك</small><h2>${escapeHtml(title)}</h2></header>`:''}<div class="role-rule-sections">${sections.map(([heading,text])=>`<section class="role-rule-item"><h3>${escapeHtml(heading)}</h3><p>${escapeHtml(text)}</p></section>`).join('')}</div>`;
 }
 function roleLabel(role){
   if(!game?.enabledRoles?.kids_mode)return roleNames[role]||role;
@@ -332,6 +332,7 @@ function renderPublicEntry() {
  setRoomTag();$('#app').removeAttribute('data-login-shell');
  $('#app').innerHTML = `<section class="public-entry"><header><p class="resume-eyebrow">MAFIA NIGHT</p><h1>ليلتك تبدأ هنا</h1><p class="muted">ادخل برمز الاستضافة أو انضم إلى غرفة أصحابك</p></header><div class="card"><label for="hostPassCode">رمز الاستضافة</label><input class="input" id="hostPassCode" maxlength="24" dir="ltr" autocomplete="off" autocapitalize="characters" placeholder="XXXX-XXXX-XXXX-XXXX"><button class="btn gold wide" onclick="loginHostPass()">دخول برمز الاستضافة</button><div class="entry-divider">أو</div><button class="btn wide" onclick="joinForm()">دخول برقم الغرفة</button><p class="muted">عند مسح باركود الغرفة بكاميرا جوالك، تفتح صفحة الدخول مباشرة.</p><button class="btn wide" onclick="recoveryForm()">استرجاع حسابي</button></div>${homeCharacters()}</section>`;
  $('#hostPassCode').addEventListener('keydown',event=>{if(event.key==='Enter')loginHostPass();});
+ const joinButton=document.querySelector('.public-entry button[onclick="joinForm()"]');joinButton.outerHTML=`<div class="room-entry-actions">${joinButton.outerHTML}${cameraJoinButton()}</div>`;
 }
 function hostCodeError(error) {
  return ({ACCESS_CODE_EXHAUSTED:'انتهى رصيد المباريات. تواصل مع صاحب اللعبة لزيادته.',ACCESS_CODE_DISABLED:'تم إيقاف رمز الاستضافة. تواصل مع صاحب اللعبة.',ACCESS_CODE_BOUND:'هذا الرمز مرتبط بحساب آخر. استخدم نفس الجهاز أو استرجع حسابك أولًا.',INVALID_ACCESS_CODE:'رمز الاستضافة غير صحيح أو موقوف.',LOGIN_RATE_LIMITED:'محاولات كثيرة. انتظر 15 دقيقة.'})[error?.code];
@@ -455,6 +456,7 @@ function readSavedSession(code='') {
 function renderResumeCard(session,offline=false) {
   setRoomTag();
   $('#app').innerHTML=`<section class="card resume-card" data-no-translate aria-labelledby="resumeTitle"><div class="resume-emblem" aria-hidden="true">♠</div><span class="resume-eyebrow">${discussionText('مكانك محفوظ','YOUR SEAT IS SAVED')}</span><h1 id="resumeTitle">${discussionText('نكمل اللعب؟','Ready to return?')}</h1><p class="resume-description">${discussionText('ارجع للمباراة بنفس اسمك ودورك.','Return to the match with your same name and role.')}</p><div class="resume-room"><span>${discussionText('رقم الغرفة','ROOM CODE')}</span><strong dir="ltr">${escapeHtml(session.code)}</strong></div>${offline?`<p class="resume-offline" role="status">${discussionText('تعذر الاتصال. جلستك محفوظة؛ أعد المحاولة.','Connection failed. Your session is saved; try again.')}</p>`:''}<button class="btn resume-primary" onclick="resumeGame(${jsArg(session.code)})"><span>${discussionText('مواصلة المباراة','Resume game')}</span><span aria-hidden="true">←</span></button><div class="resume-secondary"><button class="btn" onclick="joinForm()">${discussionText('دخول غرفة أخرى','Join another room')}</button><button class="btn" onclick="renderHostLogin()">${discussionText('دخول المضيف','Host login')}</button></div><p class="resume-footnote">${discussionText('دورك سرّك. خلك مستعد.','Keep your role secret. Stay ready.')}</p></section>`;
+ const joinButton=document.querySelector('.resume-secondary button');joinButton.outerHTML=`<div class="room-entry-actions">${joinButton.outerHTML}${cameraJoinButton()}</div>`;
 }
 function home() {
   pollingEpoch++;
@@ -504,6 +506,7 @@ function showTrainingHelp() {
   $('#app').innerHTML = `<div class="card hero"><div class="role-title">🤖 التدريب واللعب الفردي</div><p>ابدأ مباراة فردية مع ثمانية مقاعد من البوتات، أو أنشئ غرفة عادية واختر عدد اللاعبين بنفسك.</p><button class="btn red" onclick="createSoloRoom()">العب وحدك مع البوتات</button><button class="btn" onclick="createRoom()">إنشاء غرفة عادية</button><button class="btn" onclick="home()">رجوع</button></div>`;
 }
 const reviewCardViews = new Map();
+const mafiaTeamViews = new Map();
 const kidsCardRoles = new Set(['mafia_boss','mafia','detective','doctor','citizen']);
 function roleCardAsset(role,thumbnail=false,kids=false){return `/assets/${kids&&kidsCardRoles.has(role)?'role-cards-kids':'role-cards-v3'}/${role}${thumbnail?'-thumb':''}.webp`;}
 function selectRoleView(card,open){
@@ -514,6 +517,14 @@ function selectRoleView(card,open){
  card.querySelector('.role-details-view').setAttribute('aria-hidden',String(!open));
  if(card.classList.contains('personal-role-card'))personalCardState.open=open;
  if(card.dataset.reviewRole)reviewCardViews.set(card.dataset.reviewRole,open);
+ if(open)requestAnimationFrame(()=>syncRoleScrollHint(card));
+}
+function syncRoleScrollHint(card){
+ const content=card.querySelector('.personal-card-properties');if(!content)return;
+ let hint=card.querySelector('.role-scroll-hint');
+ if(!hint){hint=document.createElement('span');hint.className='role-scroll-hint';hint.textContent='مرّر داخل الكرت لبقية الخصائص ↓';card.querySelector('.role-details-view').append(hint);}
+ const update=()=>{hint.hidden=content.scrollHeight<=content.clientHeight+3||content.scrollTop+content.clientHeight>=content.scrollHeight-4;};
+ content.onscroll=update;update();
 }
 function cardsUseKidsMode(){
  return game?.phase==='lobby' ? enabledRoles.kids_mode===true : game?.enabledRoles?.kids_mode===true;
@@ -526,7 +537,8 @@ function interactiveRoleCard(role, {personal=false, compact=false, image='', ope
  image = kids?art:(!image||image.includes('/role-cards-kids/')?art:image);
  const title=kids?({mafia_boss:'قائد الفريق الغامض',mafia:'الفريق الغامض',doctor:'الطبيب',detective:'المحقق',citizen:'المواطن'}[role]):role==='mafia_boss'?'زعيم المافيا':roleLabel(role).split(' / ')[0];
  const teammates=personal&&mafiaRoleClient(role)?(game.me.mafiaTeam||[]).filter(p=>p.id!==game.me.id):[];
- const team=personal&&mafiaRoleClient(role)?`<details class="role-allies" data-disclosure-key="mafia-team"><summary>زملاؤك في المافيا <small>خاص بفريقك</small></summary><div>${teammates.map(p=>`<span>${escapeHtml(p.name)}</span>`).join('')||'<p>أنت عضو المافيا الوحيد</p>'}</div></details>`:'';
+ const teamKey=escapeHtml(`mafia-team-${game?.code}-${game?.matchId}-${game?.me?.id}`);
+ const team=personal&&mafiaRoleClient(role)?`<details class="role-allies" data-disclosure-key="${teamKey}" ${mafiaTeamViews.get(teamKey)!==false?'open':''} ontoggle="mafiaTeamViews.set(this.dataset.disclosureKey,this.open)"><summary>زملاؤك في المافيا <small>خاص بفريقك · إظهار / إخفاء</small></summary><div>${teammates.map(p=>`<span>${escapeHtml(p.name)}</span>`).join('')||'<p>أنت عضو المافيا الوحيد</p>'}</div></details>`:'';
  const teamName=role==='serial_killer'||role==='jester'?'الفريق المستقل':detailedRoleRules[role]?.[0]||'';
  const teamCapsule=personal?`<span class="personal-team-capsule">${escapeHtml(teamName)}</span>`:'';
  const identity=`<header class="role-identity"><h2>${escapeHtml(title)}</h2><span>${escapeHtml(detailedRoleRules[role]?.[0]||'')}</span>${review?`<span class="review-role-count" data-no-translate aria-label="${discussionText('عدد اللاعبين','Player count')}">× ${count}</span>`:''}</header>`;
@@ -543,17 +555,49 @@ function mountHomeCharacters() {
  homeGalleryObserver=new IntersectionObserver(entries=>{if(entries.some(entry=>entry.isIntersecting)){homeGalleryObserver.disconnect();populate();}},{rootMargin:'0px'});
  homeGalleryObserver.observe(gallery);
 }
-let homeCardIndex=0, homeCardPointer=null;
+let homeCardIndex=0, homeCardPointer=null, homeCardWheelAt=0;
 const homeCardRoles=['mafia_boss','detective','mafia','citizen','jailer','lawyer','vigilante','revealer','witch','cupid','escort','serial_killer','jester','doctor'];
 function homeCharacters() {
- return `<section class="home-carousel" aria-label="شخصيات اللعبة" tabindex="0" onkeydown="if(event.key==='ArrowLeft'){event.preventDefault();moveHomeCard(1)}if(event.key==='ArrowRight'){event.preventDefault();moveHomeCard(-1)}"><div class="home-carousel-stage" onpointerdown="homeCardPointer=event.clientX" onpointerup="if(homeCardPointer!==null&&Math.abs(event.clientX-homeCardPointer)>35)moveHomeCard(event.clientX<homeCardPointer?1:-1);homeCardPointer=null" onpointercancel="homeCardPointer=null">${[-1,0,1].map(offset=>{const role=homeCardRoles[(homeCardIndex+offset+homeCardRoles.length)%homeCardRoles.length];return `<figure class="carousel-card carousel-card-${offset===0?'center':offset<0?'previous':'next'}"><img src="${roleCardAsset(role,true)}" alt="${escapeHtml(roleLabel(role))}" width="512" height="768" draggable="false"></figure>`;}).join('')}</div><div class="home-carousel-controls"><button type="button" aria-label="الشخصية السابقة" onclick="moveHomeCard(-1)">→</button><span aria-live="polite">${homeCardIndex+1} / ${homeCardRoles.length}</span><button type="button" aria-label="الشخصية التالية" onclick="moveHomeCard(1)">←</button></div></section>`;
+ return `<section class="home-carousel" aria-label="شخصيات اللعبة — اسحب للتنقل أو استخدم الأسهم" tabindex="0" onkeydown="if(event.key==='ArrowLeft'){event.preventDefault();moveHomeCard(1)}if(event.key==='ArrowRight'){event.preventDefault();moveHomeCard(-1)}"><div class="home-carousel-stage" onpointerdown="startHomeCardDrag(event)" onpointermove="dragHomeCard(event)" onpointerup="endHomeCardDrag(event)" onpointercancel="endHomeCardDrag(event,true)" onlostpointercapture="if(homeCardPointer)endHomeCardDrag(event,true)" onwheel="wheelHomeCard(event)">${homeCardRoles.map((role,i)=>`<figure class="carousel-card" style="${homeCardStyle(i,homeCardIndex)}" aria-hidden="${i!==homeCardIndex}"><img src="${roleCardAsset(role,true)}" alt="${escapeHtml(roleLabel(role))}" width="512" height="768" draggable="false"></figure>`).join('')}</div><span class="home-carousel-announcement" aria-live="polite">${escapeHtml(roleLabel(homeCardRoles[homeCardIndex]))}</span></section>`;
+}
+function homeCardStyle(index,position){
+ const count=homeCardRoles.length, offset=((index-position+count*1.5)%count+count)%count-count/2, distance=Math.abs(offset);
+ return `transform:translateX(${ -50+offset*73 }%) translateY(${Math.min(distance,2)*8}%) rotate(${offset*10}deg) scale(${Math.max(.7,1-distance*.12)});opacity:${Math.max(0,Math.min(1,2-distance))};z-index:${Math.round(100-distance*10)}`;
+}
+function paintHomeCards(position){
+ document.querySelectorAll('.home-carousel .carousel-card').forEach((card,i)=>{card.style.cssText=homeCardStyle(i,position);card.setAttribute('aria-hidden',String(i!==homeCardIndex));});
 }
 function moveHomeCard(step) {
- homeCardIndex=(homeCardIndex+step+homeCardRoles.length)%homeCardRoles.length;
- const root=document.querySelector('.home-carousel');if(!root)return;
- const focused=root.contains(document.activeElement),label=document.activeElement?.getAttribute('aria-label');
- root.outerHTML=homeCharacters();
- if(focused)([...document.querySelectorAll('.home-carousel button')].find(b=>b.getAttribute('aria-label')===label)||document.querySelector('.home-carousel'))?.focus({preventScroll:true});
+ homeCardIndex=((homeCardIndex+step)%homeCardRoles.length+homeCardRoles.length)%homeCardRoles.length;
+ paintHomeCards(homeCardIndex);
+ const announcement=document.querySelector('.home-carousel-announcement');if(announcement)announcement.textContent=roleLabel(homeCardRoles[homeCardIndex]);
+}
+function startHomeCardDrag(event){
+ if(!event.isPrimary||event.button!==0)return;
+ homeCardPointer={id:event.pointerId,x:event.clientX,y:event.clientY,delta:0,stage:event.currentTarget,active:false};
+ event.currentTarget.setPointerCapture(event.pointerId);
+}
+function dragHomeCard(event){
+ const drag=homeCardPointer;if(!drag||drag.id!==event.pointerId)return;
+ const dx=event.clientX-drag.x,dy=event.clientY-drag.y;
+ if(!drag.active&&Math.abs(dx)<Math.max(6,Math.abs(dy)))return;
+ drag.active=true;drag.stage.classList.add('is-dragging');
+ drag.delta=-dx/Math.max(65,drag.stage.clientWidth*.25);
+ paintHomeCards(homeCardIndex+drag.delta);
+}
+function endHomeCardDrag(event,cancel=false){
+ const drag=homeCardPointer;if(!drag||drag.id!==event.pointerId)return;
+ homeCardPointer=null;drag.stage.classList.remove('is-dragging');
+ if(drag.stage.hasPointerCapture(event.pointerId))drag.stage.releasePointerCapture(event.pointerId);
+ moveHomeCard(cancel?0:Math.round(drag.delta));
+}
+function wheelHomeCard(event){
+ if(event.ctrlKey||homeCardPointer)return;
+ const delta=Math.abs(event.deltaX)>Math.abs(event.deltaY)?event.deltaX:event.deltaY;
+ if(Math.abs(delta)<3)return;
+ event.preventDefault();
+ if(Date.now()-homeCardWheelAt<350)return;
+ homeCardWheelAt=Date.now();moveHomeCard(delta>0?1:-1);
 }
 function previewHomeRole(role){openSheet('شرح الشخصية',interactiveRoleCard(role,{open:true}));}
 function showGuide() {
@@ -600,11 +644,11 @@ async function createRoom() {
   } catch (error) { if (error.code === 'UNAUTHORIZED') { logoutHost(); alert('انتهت جلسة المضيف. سجّل الدخول من جديد.'); } else alert(hostCodeError(error)||'تعذر إنشاء الغرفة / Could not create room'); }
 }
 async function joinHostSeat() {
- if(playerId&&game.players.some(p=>p.id===playerId)){alert('أنت منضم كلاعب بالفعل');return;}
- const name=(prompt('اسمك داخل المباراة')||'').trim().slice(0,20);if(!name)return;
+ if(playerId&&game.players.some(p=>p.id===playerId))return true;
+ const name=(prompt('اسمك داخل المباراة — ستشارك كلاعب')||'').trim().slice(0,20);if(!name)return false;
  const id=crypto.randomUUID(),token=crypto.randomUUID();
- try{game=await api({action:'join',code:game.code,id,playerToken:token,profileToken,name,hostToken});playerId=id;playerToken=game.playerToken||token;saveSession(true);renderHost();}
- catch{alert('تعذر الانضمام. تأكد أن الاسم غير مستخدم وأن الغرفة ليست ممتلئة.');}
+ try{game=await api({action:'join',code:game.code,id,playerToken:token,profileToken,name,hostToken});playerId=id;playerToken=game.playerToken||token;saveSession(true);renderHost();return true;}
+ catch{alert('تعذر الانضمام. تأكد أن الاسم غير مستخدم وأن الغرفة ليست ممتلئة.');return false;}
 }
 async function createSoloRoom() {
   spectatorMode=false;delegatedHostMode=false;playerId='';playerToken='';
@@ -641,6 +685,7 @@ function joinForm(prefill = '') {
   setRoomTag(directJoin ? `غرفة ${code} / Room ${code}` : 'دخول لاعب / Player join');
   $('#app').innerHTML = `<div class="card hero join-card"><div class="role-badge">${directJoin ? 'مسحت الباركود بنجاح / QR scanned' : 'دخول لاعب / Player join'}</div><h2>${directJoin ? 'اكتب اسمك وادخل مباشرة / Enter your name to join' : 'دخول الغرفة / Join room'}</h2>${directJoin ? `<input type="hidden" id="roomCode" value="${escapeHtml(code)}">` : `<label for="roomCode">كود الغرفة / Room code</label><input class="input" id="roomCode" inputmode="numeric" maxlength="4" autocomplete="one-time-code" dir="ltr" enterkeyhint="next" aria-describedby="joinHint"><p id="joinHint" class="entry-hint">اطلب الكود المكوّن من 4 أرقام من المضيف / Ask the host for the 4-digit code</p>`}<label for="playerName">اسمك / Your name</label><input class="input" id="playerName" maxlength="20" autocomplete="name" enterkeyhint="go" placeholder="اكتب اسمك / Enter your name"><p id="joinFeedback" class="entry-feedback" role="alert" hidden></p><button class="btn red wide" onclick="joinRoom()">دخول اللعبة / Join game</button><button class="btn wide entry-back" onclick="home()">رجوع / Back</button></div>`;
   const nameInput = $('#playerName');
+  const codeField=$('#roomCode');if(codeField.type!=='hidden')codeField.outerHTML=`<div class="room-entry-actions">${codeField.outerHTML}${cameraJoinButton()}</div>`;
   nameInput.addEventListener('keydown', (event) => {
     if (event.key === 'Enter' && !event.isComposing) joinRoom();
   });
@@ -718,6 +763,55 @@ async function resumeGame(code='') {
     }else if(session)renderResumeCard(session,true);
   }
 }
+let roomScanner=null;
+function cameraJoinButton(){return '<button class="btn camera-join" type="button" onclick="openRoomScanner()" aria-label="مسح باركود الغرفة بالكاميرا" title="مسح باركود الغرفة بالكاميرا"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M3 7h4l2-3h6l2 3h4v13H3Z"/><circle cx="12" cy="13" r="4"/></svg></button>';}
+function scannedRoomCode(value){
+ const text=String(value||'').trim();if(/^\d{4}$/.test(text))return text;
+ try{const url=new URL(text);return url.origin===location.origin&&['/','/game','/game.html'].includes(url.pathname)&&/^\d{4}$/.test(url.searchParams.get('room')||'')?url.searchParams.get('room'):null;}catch{return null;}
+}
+function stopRoomScanner(){
+ const scanner=roomScanner;roomScanner=null;if(!scanner)return;
+ clearTimeout(scanner.timer);scanner.stream?.getTracks().forEach(track=>track.stop());
+ if(scanner.video)scanner.video.srcObject=null;
+}
+async function openRoomScanner(){
+ openSheet('مسح باركود الغرفة',`<div class="room-scanner"><video id="roomScanVideo" autoplay muted playsinline aria-label="معاينة الكاميرا"></video><p id="roomScanStatus" role="status">جاري فتح الكاميرا…</p><p class="muted">وجّه الكاميرا نحو باركود الغرفة. الصور تُقرأ على جهازك ولا تُرفع.</p><button class="btn wide" onclick="closeSheet();joinForm()">إدخال رقم الغرفة يدويًا</button></div>`);
+ const scanner={video:document.getElementById('roomScanVideo'),stream:null,timer:null};roomScanner=scanner;
+ const status=document.getElementById('roomScanStatus');
+ try{
+  if(!navigator.mediaDevices?.getUserMedia)throw Error('CAMERA_UNAVAILABLE');
+  const stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'}},audio:false});
+  if(roomScanner!==scanner){stream.getTracks().forEach(track=>track.stop());return;}
+  scanner.stream=stream;scanner.video.srcObject=stream;await scanner.video.play();
+  let detector=null;
+  if(window.BarcodeDetector){try{detector=new window.BarcodeDetector({formats:['qr_code']});}catch{}}
+  if(!detector){await loadFeatureScript('https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js');if(typeof window.jsQR!=='function')throw Error('DECODER_UNAVAILABLE');}
+  if(roomScanner!==scanner)return;
+  status.textContent='ضع الباركود داخل إطار الكاميرا';
+  const canvas=document.createElement('canvas'),context=canvas.getContext('2d',{willReadFrequently:true});
+  async function scan(){
+   if(roomScanner!==scanner)return;
+   try{
+    let value='';
+    if(scanner.video.readyState>=2){
+     if(detector)value=(await detector.detect(scanner.video))[0]?.rawValue||'';
+     else{const scale=Math.min(1,640/scanner.video.videoWidth);canvas.width=Math.round(scanner.video.videoWidth*scale);canvas.height=Math.round(scanner.video.videoHeight*scale);context.drawImage(scanner.video,0,0,canvas.width,canvas.height);const pixels=context.getImageData(0,0,canvas.width,canvas.height);value=window.jsQR(pixels.data,canvas.width,canvas.height)?.data||'';}
+    }
+    if(roomScanner!==scanner)return;
+    const code=scannedRoomCode(value);
+    if(code){closeSheet();joinForm(code);return;}
+    if(value)status.textContent='هذا ليس باركود غرفة من موقع اللعبة';
+   }catch{if(roomScanner===scanner)status.textContent='تعذرت قراءة الباركود، قرّب الكاميرا وحاول مجددًا';}
+   if(roomScanner===scanner)scanner.timer=setTimeout(scan,180);
+  }
+  scan();
+ }catch(error){
+  if(roomScanner!==scanner)return;stopRoomScanner();
+  status.textContent=error.name==='NotAllowedError'?'اسمح باستخدام الكاميرا من إعدادات المتصفح، أو أدخل رقم الغرفة يدويًا.':'تعذر تشغيل الماسح. تأكد من الكاميرا والاتصال أو أدخل رقم الغرفة يدويًا.';
+ }
+}
+window.addEventListener('pagehide',stopRoomScanner);
+document.addEventListener('visibilitychange',()=>{if(document.hidden&&roomScanner)closeSheet();});
 function renderStateKey(state) {
   if (!state) return '';
   const { serverTime, discussion, ...view } = state;
@@ -882,7 +976,7 @@ function setupRoleCards(roles, review = false) {
     ['escort','🚫','المعطّل',roles.escort],
     ['citizen','🏘️','المواطن',roles.citizens,true]];
   const visible = review ? cards.filter(card => card[3] > 0).sort((a,b) => b[3] - a[3]) : cards;
-  if(review)return '<div class="review-role-cards">' + visible.map(([role,,,count]) => interactiveRoleCard(role,{review:true,count})).join('') + '</div>';
+  if(review)return '<div class="compact-role-review">' + visible.map(([role,,label,count]) => `<button type="button" class="review-role-tile" onclick="previewHomeRole('${role}')" aria-label="${escapeHtml(label)}، العدد ${count}، عرض التفاصيل"><img src="${roleCardAsset(role,true,enabledRoles.kids_mode)}" alt="" width="64" height="96"><span>${escapeHtml(label)}</span><b>× ${count}</b></button>`).join('') + '</div>';
   return '<div class="role-preview">' + visible.map(card => roleCard(...card)).join('') + '</div>';
 }
 function setupPanel(roles){
@@ -1017,9 +1111,11 @@ async function leaveRoom() {
   } finally { lifecycleRequestPending = false; }
 }
 async function returnToLobby() {
-  if (lifecycleRequestPending || game?.phase !== 'finished') return;
+  if (lifecycleRequestPending || !game || game.phase === 'lobby') return;
+  if (!confirm('ترجع كل اللاعبين للوبي؟ سيتم إلغاء القيم الحالي ومسح الأدوار والاختيارات، مع بقاء اللاعبين في الغرفة.')) return;
   lifecycleRequestPending = true;
   try {
+    if(game.phase!=='finished')game=await api({action:'endGame',code:game.code,lifecycleVersion:game.lifecycleVersion,hostToken,id:playerId,playerToken});
     const next = await withBusy('جاري تجهيز ردهة الانتظار…', () => api({
       action:'returnToLobby', code:game.code, lifecycleVersion:game.lifecycleVersion,
       hostToken, id:playerId, playerToken
@@ -1038,7 +1134,10 @@ async function startGame() {
   lifecycleRequestPending = true;
   enabledRoles.phase_seconds=phaseDuration;
   try {
+    if(enabledRoles.automatic_game&&!await joinHostSeat())return;
     game = await withBusy('جاري توزيع الأدوار… / Dealing roles…', () => api({ action: 'start', code: game.code, lifecycleVersion:game.lifecycleVersion, hostToken, id:playerId, playerToken, mafiaCount, detectiveCount, detectiveQuestions, enabledRoles }));
+    // Start responses are host-oriented; fetch this player's private role before rendering.
+    if(game.enabledRoles?.automatic_game&&playerId)game=await api({action:'state',code:game.code,id:playerId,playerToken,hostToken});
     localHistory = []; localStorage.removeItem(`mafia-history-${game.code}`);
     signalPhase(); rememberEvent();
     renderHost();
@@ -1138,7 +1237,7 @@ function mountPlayerTools(){
 }
 function toggleDelegatedHost(){delegatedHostMode=!delegatedHostMode;document.querySelector('.player-tools')?.remove();delegatedHostMode?renderHost():renderPlayer()}
 let sheetReturnFocus=null;
-function closeSheet(){stopChatPolling();const sheet=document.querySelector('.game-sheet');if(!sheet)return;sheet.remove();document.querySelector('.shell')?.removeAttribute('inert');document.querySelector('.utility-bar')?.removeAttribute('inert');if(sheetReturnFocus?.isConnected)sheetReturnFocus.focus();sheetReturnFocus=null;}
+function closeSheet(){stopRoomScanner();stopChatPolling();const sheet=document.querySelector('.game-sheet');if(!sheet)return;sheet.remove();document.querySelector('.shell')?.removeAttribute('inert');document.querySelector('.utility-bar')?.removeAttribute('inert');if(sheetReturnFocus?.isConnected)sheetReturnFocus.focus();sheetReturnFocus=null;}
 function openSheet(title,body){closeSheet();sheetReturnFocus=document.activeElement;const sheet=document.createElement('div');sheet.className='game-sheet';sheet.innerHTML=`<div class="sheet-card" role="dialog" aria-modal="true" aria-labelledby="sheetTitle"><div class="toolbar"><h2 id="sheetTitle">${title}</h2><button aria-label="إغلاق / Close" class="close-sheet" onclick="closeSheet()">×</button></div>${body}</div>`;document.body.appendChild(sheet);document.querySelector('.shell')?.setAttribute('inert','');document.querySelector('.utility-bar')?.setAttribute('inert','');sheet.querySelector('.close-sheet').focus();
  sheet.addEventListener('focusin',event=>requestAnimationFrame(()=>event.target?.scrollIntoView?.({block:'nearest'})));
  sheet.addEventListener('keydown',event=>{
@@ -1615,7 +1714,15 @@ function renderWithNotices(content,controller=false) {
 }
 async function readyAutomaticPhase(){try{game=await api({action:'readyPhase',code:game.code,id:playerId,playerToken,hostToken});renderPlayer();}catch{alert('تعذر تأكيد الجاهزية، حاول مجددًا.');}}
 function automaticGameSettings(){return `<section class="voting-setting"><h3>إدارة المباراة</h3><div class="voting-mode-options"><button class="btn" aria-pressed="${!enabledRoles.automatic_game}" onclick="setAutomaticGame(false)">يدوي بالمضيف</button><button class="btn" aria-pressed="${!!enabledRoles.automatic_game}" onclick="setAutomaticGame(true)">تلقائي بدون مضيف</button></div>${enabledRoles.automatic_game?`<p>بعد آخر اختيار تنتقل المرحلة تلقائيًا. بالنهار يؤكد الجميع انتهاء النقاش.</p><div class="voting-mode-options"><button class="btn" aria-pressed="${enabledRoles.action_deadline!==false}" onclick="setActionDeadline(true)">بمهلة</button><button class="btn" aria-pressed="${enabledRoles.action_deadline===false}" onclick="setActionDeadline(false)">انتظار الجميع</button></div>`:''}</section>`;}
-function setAutomaticGame(value){enabledRoles.automatic_game=value;schedulePreferenceSave();renderHost();}
+let automaticSetupPending=false;
+async function setAutomaticGame(value){
+ if(automaticSetupPending)return;
+ automaticSetupPending=true;
+ try{
+  if(value&&game?.phase==='lobby'&&!await joinHostSeat())return;
+  enabledRoles.automatic_game=value;schedulePreferenceSave();renderHost();
+ }finally{automaticSetupPending=false;}
+}
 function setActionDeadline(value){enabledRoles.action_deadline=value;schedulePreferenceSave();renderHost();}
 function renderPlayer(){
   // Keep the private role reveal independent of post-reveal Mafia controls.

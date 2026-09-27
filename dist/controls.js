@@ -93,18 +93,33 @@ function syncRoomUtilityActions(){
  if(active&&!spectator&&!leave){leave=document.createElement('button');leave.type='button';leave.className='room-action leave-room-option';leave.onclick=()=>{document.querySelector('.utility-menu')?.removeAttribute('open');leaveRoom()};options.append(leave)}
  else if((!active||spectator)&&leave)leave.remove();
  const leaveLabel=english?'↪ Leave room':'↪ مغادرة الغرفة';
- if(leave&&leave.dataset.label!==leaveLabel){leave.dataset.label=leaveLabel;leave.textContent=leaveLabel}
+ if(leave&&leave.dataset.label!==leaveLabel){leave.dataset.label=leaveLabel;leave.textContent='↪';leave.title=leaveLabel;leave.setAttribute('aria-label',leaveLabel)}
  let handoff=options.querySelector('.resign-mafia-leader-option');
  if(boss&&!handoff){handoff=document.createElement('button');handoff.type='button';handoff.className='room-action resign-mafia-leader-option';handoff.onclick=()=>{document.querySelector('.utility-menu')?.removeAttribute('open');resignMafiaLeader()};options.append(handoff)}
  else if(!boss&&handoff)handoff.remove();
  const handoffLabel=english?'👑 Choose mafia successor':'👑 تسليم قيادة المافيا للاعب';
  // The icon decorator replaces the crown text with SVG. Comparing textContent
  // would rewrite it on every mutation and freeze the Mafia boss tab.
- if(handoff&&handoff.dataset.label!==handoffLabel){handoff.dataset.label=handoffLabel;handoff.textContent=handoffLabel}
+ if(handoff&&handoff.dataset.label!==handoffLabel){handoff.dataset.label=handoffLabel;handoff.textContent='👑';handoff.title=handoffLabel;handoff.setAttribute('aria-label',handoffLabel)}
+ const sources=[...document.querySelectorAll('.phase-bar button:not(.lobby-exit)')];
+ const keys=new Set();
+ if(active&&(typeof hostToken!=='undefined'&&hostToken||game.me?.isHost)&&game.phase!=='lobby')sources.push({getAttribute:key=>key==='onclick'?'returnToLobby()':key==='aria-label'?(english?'Return everyone to lobby':'إرجاع الجميع للوبي'):null,textContent:'',disabled:false,click:()=>returnToLobby()});
+ for(const source of sources){
+  const key=source.getAttribute('onclick');if(!key||keys.has(key))continue;keys.add(key);
+  let button=[...options.querySelectorAll('[data-phase-action]')].find(item=>item.dataset.phaseAction===key);
+  if(!button){button=document.createElement('button');button.type='button';button.dataset.phaseAction=key;options.append(button);}
+  const label=source.getAttribute('aria-label')||source.textContent.trim();
+  const symbol=key.includes('returnToLobby')?'⌂':key.includes('restartGame')?'↻':key.includes('togglePause')?(game.phase==='paused'?'▶':'Ⅱ'):key.includes('showAdminQR')?'▦':key.includes('showMatchTools')?'⚙':key.includes('backFromLobby')?'⌂':'♙';
+  if(button.dataset.label!==label){button.dataset.label=label;button.textContent=symbol;button.title=label;button.setAttribute('aria-label',label);}
+  button.disabled=source.disabled;
+  button.onclick=()=>{document.querySelector('.utility-menu')?.removeAttribute('open');source.click();};
+ }
+ for(const button of options.querySelectorAll('[data-phase-action]'))if(!keys.has(button.dataset.phaseAction))button.remove();
+ for(const button of options.querySelectorAll('button')){const label=button.getAttribute('aria-label');if(label&&button.title!==label)button.title=label;}
 }
 document.addEventListener('DOMContentLoaded',()=>{syncRoomUtilityActions();new MutationObserver(syncRoomUtilityActions).observe(document.body,{childList:true,subtree:true})});
 document.addEventListener('DOMContentLoaded',()=>{const style=document.createElement('style');style.textContent='.phase-bar .lobby-exit{display:none!important}';document.head.append(style)},{once:true});
-document.addEventListener('DOMContentLoaded',()=>{const menu=document.querySelector('.utility-menu');if(!menu)return;const breakpoint=window.matchMedia('(max-width:1000px)');const apply=()=>{menu.open=!breakpoint.matches};apply();breakpoint.addEventListener('change',apply)},{once:true});
+document.addEventListener('DOMContentLoaded',()=>{const menu=document.querySelector('.utility-menu');if(!menu)return;menu.open=false;document.addEventListener('pointerdown',event=>{if(!menu.contains(event.target))menu.open=false});document.addEventListener('keydown',event=>{if(event.key==='Escape'){menu.open=false;menu.querySelector('summary')?.focus()}})},{once:true});
 document.addEventListener('DOMContentLoaded',fitCompactHeaderControls,{once:true});
 if('serviceWorker'in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('/sw.js').catch(()=>{}));
 })();

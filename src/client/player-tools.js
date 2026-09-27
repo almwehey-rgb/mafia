@@ -17,7 +17,7 @@ function mountPlayerTools(){
 }
 function toggleDelegatedHost(){delegatedHostMode=!delegatedHostMode;document.querySelector('.player-tools')?.remove();delegatedHostMode?renderHost():renderPlayer()}
 let sheetReturnFocus=null;
-function closeSheet(){stopChatPolling();const sheet=document.querySelector('.game-sheet');if(!sheet)return;sheet.remove();document.querySelector('.shell')?.removeAttribute('inert');document.querySelector('.utility-bar')?.removeAttribute('inert');if(sheetReturnFocus?.isConnected)sheetReturnFocus.focus();sheetReturnFocus=null;}
+function closeSheet(){stopRoomScanner();stopChatPolling();const sheet=document.querySelector('.game-sheet');if(!sheet)return;sheet.remove();document.querySelector('.shell')?.removeAttribute('inert');document.querySelector('.utility-bar')?.removeAttribute('inert');if(sheetReturnFocus?.isConnected)sheetReturnFocus.focus();sheetReturnFocus=null;}
 function openSheet(title,body){closeSheet();sheetReturnFocus=document.activeElement;const sheet=document.createElement('div');sheet.className='game-sheet';sheet.innerHTML=`<div class="sheet-card" role="dialog" aria-modal="true" aria-labelledby="sheetTitle"><div class="toolbar"><h2 id="sheetTitle">${title}</h2><button aria-label="إغلاق / Close" class="close-sheet" onclick="closeSheet()">×</button></div>${body}</div>`;document.body.appendChild(sheet);document.querySelector('.shell')?.setAttribute('inert','');document.querySelector('.utility-bar')?.setAttribute('inert','');sheet.querySelector('.close-sheet').focus();
  sheet.addEventListener('focusin',event=>requestAnimationFrame(()=>event.target?.scrollIntoView?.({block:'nearest'})));
  sheet.addEventListener('keydown',event=>{

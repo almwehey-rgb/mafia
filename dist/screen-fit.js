@@ -11,8 +11,7 @@
     const active = Boolean(lobby);
     const header = document.querySelector('.header');
     const bar = document.querySelector('.utility-bar');
-    if (active && header && bar && bar.parentElement !== header) header.appendChild(bar);
-    if (!active && bar && bar.parentElement !== document.body) document.body.prepend(bar);
+    if (header && bar && bar.parentElement !== header) header.appendChild(bar);
     document.body.classList.toggle('screen-lobby', active);
     document.body.classList.remove('screen-fitted');
     document.documentElement.classList.remove('screen-fitted');

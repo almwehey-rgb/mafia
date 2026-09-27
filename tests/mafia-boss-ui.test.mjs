@@ -62,19 +62,23 @@ test('New Mafia boss gets a private role card before any leadership controls ren
  assert.match(app.innerHTML,/زعيم المافيا/);
  assert.match(app.innerHTML,/فهمت دوري/);
  assert.match(app.innerHTML,/زميل/);
+ assert.match(app.innerHTML,/<details class="role-allies"[^>]*\sopen\s/);
+ vm.runInContext("mafiaTeamViews.set('mafia-team-1234-new-match-boss',false);renderPlayer()",context);
+ assert.doesNotMatch(app.innerHTML,/<details class="role-allies"[^>]*\sopen\s/);
  assert.doesNotMatch(app.innerHTML,/تنازل عن الزعامة|محقق مزيف/);
- assert.equal(enhanced,1);
+ assert.equal(enhanced,2);
 });
 
 test('Boss utility menu does not loop when its crown becomes an icon',()=>{
  let writes=0;
  const children=[];
- const options={querySelector:selector=>children.find(child=>child.className.includes(selector.slice(1)))||null,append:child=>children.push(child)};
+ const options={querySelector:selector=>children.find(child=>child.className.includes(selector.slice(1)))||null,querySelectorAll:selector=>selector==='button'?children:[],append:child=>children.push(child)};
  const document={
   addEventListener:()=>{},
+  querySelectorAll:()=>[],
   querySelector:selector=>selector==='.utility-options'?options:selector==='.utility-menu>summary'?{setAttribute:()=>{}}:null,
   createElement:()=>{
-   const button={dataset:{},className:'',remove(){children.splice(children.indexOf(this),1)}};
+   const button={dataset:{},className:'',attributes:{},setAttribute(key,value){this.attributes[key]=value},getAttribute(key){return this.attributes[key]},remove(){children.splice(children.indexOf(this),1)}};
    Object.defineProperty(button,'textContent',{get(){return this.visibleText||''},set(value){writes++;this.visibleText=value.replace('👑','')}});
    return button;
   },

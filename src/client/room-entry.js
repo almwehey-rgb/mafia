@@ -10,11 +10,11 @@ async function createRoom() {
   } catch (error) { if (error.code === 'UNAUTHORIZED') { logoutHost(); alert('انتهت جلسة المضيف. سجّل الدخول من جديد.'); } else alert(hostCodeError(error)||'تعذر إنشاء الغرفة / Could not create room'); }
 }
 async function joinHostSeat() {
- if(playerId&&game.players.some(p=>p.id===playerId)){alert('أنت منضم كلاعب بالفعل');return;}
- const name=(prompt('اسمك داخل المباراة')||'').trim().slice(0,20);if(!name)return;
+ if(playerId&&game.players.some(p=>p.id===playerId))return true;
+ const name=(prompt('اسمك داخل المباراة — ستشارك كلاعب')||'').trim().slice(0,20);if(!name)return false;
  const id=crypto.randomUUID(),token=crypto.randomUUID();
- try{game=await api({action:'join',code:game.code,id,playerToken:token,profileToken,name,hostToken});playerId=id;playerToken=game.playerToken||token;saveSession(true);renderHost();}
- catch{alert('تعذر الانضمام. تأكد أن الاسم غير مستخدم وأن الغرفة ليست ممتلئة.');}
+ try{game=await api({action:'join',code:game.code,id,playerToken:token,profileToken,name,hostToken});playerId=id;playerToken=game.playerToken||token;saveSession(true);renderHost();return true;}
+ catch{alert('تعذر الانضمام. تأكد أن الاسم غير مستخدم وأن الغرفة ليست ممتلئة.');return false;}
 }
 async function createSoloRoom() {
   spectatorMode=false;delegatedHostMode=false;playerId='';playerToken='';
@@ -51,6 +51,7 @@ function joinForm(prefill = '') {
   setRoomTag(directJoin ? `غرفة ${code} / Room ${code}` : 'دخول لاعب / Player join');
   $('#app').innerHTML = `<div class="card hero join-card"><div class="role-badge">${directJoin ? 'مسحت الباركود بنجاح / QR scanned' : 'دخول لاعب / Player join'}</div><h2>${directJoin ? 'اكتب اسمك وادخل مباشرة / Enter your name to join' : 'دخول الغرفة / Join room'}</h2>${directJoin ? `<input type="hidden" id="roomCode" value="${escapeHtml(code)}">` : `<label for="roomCode">كود الغرفة / Room code</label><input class="input" id="roomCode" inputmode="numeric" maxlength="4" autocomplete="one-time-code" dir="ltr" enterkeyhint="next" aria-describedby="joinHint"><p id="joinHint" class="entry-hint">اطلب الكود المكوّن من 4 أرقام من المضيف / Ask the host for the 4-digit code</p>`}<label for="playerName">اسمك / Your name</label><input class="input" id="playerName" maxlength="20" autocomplete="name" enterkeyhint="go" placeholder="اكتب اسمك / Enter your name"><p id="joinFeedback" class="entry-feedback" role="alert" hidden></p><button class="btn red wide" onclick="joinRoom()">دخول اللعبة / Join game</button><button class="btn wide entry-back" onclick="home()">رجوع / Back</button></div>`;
   const nameInput = $('#playerName');
+  const codeField=$('#roomCode');if(codeField.type!=='hidden')codeField.outerHTML=`<div class="room-entry-actions">${codeField.outerHTML}${cameraJoinButton()}</div>`;
   nameInput.addEventListener('keydown', (event) => {
     if (event.key === 'Enter' && !event.isComposing) joinRoom();
   });

@@ -56,7 +56,7 @@ function detailedRoleProperties(role, personal=false) {
  if(personal&&mafiaRoleClient(role))sections.push(['تكرار الاغتيال',game.enabledRoles?.mafia_no_repeat?'ممنوع اختيار هدف الاغتيال نفسه في ليلتين متتاليتين.':'تستطيع المافيا تكرار هدف الاغتيال في ليلتين متتاليتين.']);
  if(personal&&role==='doctor')sections.push(['تكرار الحماية',game.enabledRoles?.doctor_no_repeat?'ممنوع حماية نفس اللاعب في ليلتين متتاليتين.':'تستطيع حماية نفس اللاعب في ليلتين متتاليتين.']);
  if(personal&&role==='detective')sections.push(['إعداد غرفتك',`عدد جولات الفحص المحدد: ${detectiveQuestionCount(game.detectiveQuestions ?? game.detective_questions)}. فحص واحد في كل جولة مؤهلة.`]);
- return `<div class="role-rule-sections">${sections.map(([heading,text],index)=>personal?`<details class="role-rule-item" data-disclosure-key="private-rule-${index}" onclick="event.stopPropagation()"><summary>${escapeHtml(heading)}</summary><p>${escapeHtml(text)}</p></details>`:`<section><h3>${heading}</h3><p>${escapeHtml(text)}</p></section>`).join('')}</div>`;
+ return `${personal?`<header class="private-role-heading"><small>خصائص دورك</small><h2>${escapeHtml(title)}</h2></header>`:''}<div class="role-rule-sections">${sections.map(([heading,text])=>`<section class="role-rule-item"><h3>${escapeHtml(heading)}</h3><p>${escapeHtml(text)}</p></section>`).join('')}</div>`;
 }
 function roleLabel(role){
   if(!game?.enabledRoles?.kids_mode)return roleNames[role]||role;

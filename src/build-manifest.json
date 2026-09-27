@@ -17,6 +17,7 @@
     "src/client/role-cards.js",
     "src/client/spectator-ui.js",
     "src/client/room-entry.js",
+    "src/client/qr-scanner.js",
     "src/client/polling.js",
     "src/client/host-view.js",
     "src/client/host-actions.js",

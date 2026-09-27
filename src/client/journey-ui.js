@@ -185,7 +185,15 @@ function renderWithNotices(content,controller=false) {
 }
 async function readyAutomaticPhase(){try{game=await api({action:'readyPhase',code:game.code,id:playerId,playerToken,hostToken});renderPlayer();}catch{alert('تعذر تأكيد الجاهزية، حاول مجددًا.');}}
 function automaticGameSettings(){return `<section class="voting-setting"><h3>إدارة المباراة</h3><div class="voting-mode-options"><button class="btn" aria-pressed="${!enabledRoles.automatic_game}" onclick="setAutomaticGame(false)">يدوي بالمضيف</button><button class="btn" aria-pressed="${!!enabledRoles.automatic_game}" onclick="setAutomaticGame(true)">تلقائي بدون مضيف</button></div>${enabledRoles.automatic_game?`<p>بعد آخر اختيار تنتقل المرحلة تلقائيًا. بالنهار يؤكد الجميع انتهاء النقاش.</p><div class="voting-mode-options"><button class="btn" aria-pressed="${enabledRoles.action_deadline!==false}" onclick="setActionDeadline(true)">بمهلة</button><button class="btn" aria-pressed="${enabledRoles.action_deadline===false}" onclick="setActionDeadline(false)">انتظار الجميع</button></div>`:''}</section>`;}
-function setAutomaticGame(value){enabledRoles.automatic_game=value;schedulePreferenceSave();renderHost();}
+let automaticSetupPending=false;
+async function setAutomaticGame(value){
+ if(automaticSetupPending)return;
+ automaticSetupPending=true;
+ try{
+  if(value&&game?.phase==='lobby'&&!await joinHostSeat())return;
+  enabledRoles.automatic_game=value;schedulePreferenceSave();renderHost();
+ }finally{automaticSetupPending=false;}
+}
 function setActionDeadline(value){enabledRoles.action_deadline=value;schedulePreferenceSave();renderHost();}
 function renderPlayer(){
   // Keep the private role reveal independent of post-reveal Mafia controls.
