@@ -12,6 +12,7 @@ function home() {
   document.querySelector('.player-tools')?.remove();
   closeSheet();
   game = null;
+  if(new URLSearchParams(location.search).get('admin')==='1'&&!hostAccessToken){renderHostLogin();return;}
   const roomCode = new URLSearchParams(location.search).get('room');
   const session=readSavedSession(/^\d{4}$/.test(roomCode||'')?roomCode:'');
   if(session){renderResumeCard(session);return;}

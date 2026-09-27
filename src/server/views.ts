@@ -17,6 +17,7 @@ function publicView(room: any, players: any[], meId?: string, host = false) {
   const locked = isMafiaLocked(room, players);
   const settings = enabledRoles(room.enabled_roles);
   const now = Date.now();
+  const votingActive = ["vote", "nomination", "verdict"].includes(room.phase === "paused" ? settings.paused_phase : room.phase);
   const escortTarget = room.round === 1 ? null : players.find((x) => x.alive && x.role === "escort" && x.id !== room.jailed_player)?.action_target;
   const nightRoles = players.filter((x) => {
     if (room.round === 1) return x.alive && x.role === "detective";
@@ -41,11 +42,7 @@ function publicView(room: any, players: any[], meId?: string, host = false) {
     detectiveQuestions: detectiveQuestionCount(room.detective_questions), jailerExecutions: room.jailer_executions,
     enabledRoles: { ...settings, mafia_kill_enabled: mafiaKillEnabledForRound(room) },
     lastEvent: room.last_event, lastDeaths: room.last_deaths || [],
-    voteSummary: room.enabled_roles?.vote_summary ? { ...room.enabled_roles.vote_summary, counts: (room.enabled_roles.vote_summary.counts || []).map((item: any) => ({ id: item.id, name: item.name, count: item.count, ...(settings.public_voting && Array.isArray(item.voters) ? { voters: item.voters.map((v: any) => ({ id: v.id, name: v.name })) } : {}) })) } : null,
-    voteTallies: ["vote", "nomination", "verdict"].includes(room.phase === "paused" ? settings.paused_phase : room.phase)
-      ? Object.entries(players.filter(x => x.alive && x.vote_target).reduce((counts: Record<string, number>, x) => { counts[x.vote_target] = (counts[x.vote_target] || 0) + 1; return counts; }, {})).map(([target, count]) => ({ target, count })) : undefined,
-    publicVotes: settings.public_voting && ["vote", "nomination", "verdict"].includes(room.phase === "paused" ? settings.paused_phase : room.phase)
-      ? players.filter(x => x.alive && x.vote_target).map(x => ({ voterId: x.id, target: x.vote_target })) : undefined,
+    voteSummary: !votingActive && room.enabled_roles?.vote_summary ? { ...room.enabled_roles.vote_summary, counts: (room.enabled_roles.vote_summary.counts || []).map((item: any) => ({ id: item.id, name: item.name, count: item.count, ...(settings.public_voting && Array.isArray(item.voters) ? { voters: item.voters.map((v: any) => ({ id: v.id, name: v.name })) } : {}) })) } : null,
     eliminations: (room.last_deaths || []).map((id: string) => { const p = players.find((x) => x.id === id); const elimination = roleState(p || {}).elimination; return { id, name: p?.name || "", reason: elimination?.reason || "eliminated", round: elimination?.round ?? null, at: elimination?.at ?? null, detail: elimination?.reason === "host_expelled" ? elimination.detail : undefined }; }),
     pendingShot: room.phase !== "finished" && room.enabled_roles?.pending_shot ? { id: room.enabled_roles.pending_shot.id, playerId: room.enabled_roles.pending_shot.playerId, resolving: room.enabled_roles.pending_shot.resolving === true, target: (host || me?.id === room.enabled_roles.pending_shot.playerId) ? room.enabled_roles.pending_shot.target : undefined } : null,
     lastEliminated: room.last_eliminated, lastSaved: room.last_saved, winner: room.winner,
@@ -90,6 +87,7 @@ function publicView(room: any, players: any[], meId?: string, host = false) {
       leaderDeadline: mafiaRole(me.role) ? room.enabled_roles?.leader_election?.deadline : undefined,
       acted: me.role === "detective" ? selected(me).length >= limit : me.role === "cupid" ? selected(me).length >= 2 : Boolean(me.action_target),
       voted: Boolean(me.vote_target),
+      phaseReady: roleState(me).phaseReady === `${room.round}:${room.phase}`,
       voteTarget: me.vote_target || null,
       acknowledged: roleState(me).ack === true,
       willText: me.will_text || "",

@@ -2,3 +2,4 @@
 // Host-code operations are authenticated independently of room controllers.
 const REQUEST_ACTIONS=["acknowledgeRole","act","addBot","adminState","advanceVerdict","beginNight","claimSeat","controlDiscussion","create","createAdminInvite","createReplacement","electMafiaLeader","endGame","expelPlayer","finishDiscussion","health","hostLogin","hostLogout","hostPreferences","id","jail","join","joinSpectator","kick","lastShot","lawyerProtect","leaderboard","leave","listSnapshots","messages","moderationLog","mute","ok","operationsStatus","passDiscussion","profile","recoverProfile","redeemAdminInvite","report","resolveNight","resolveVote","restart","restoreSnapshot","returnToLobby","revokeAdminAccess","saveWill","sendMessage","setDiscussionClaim","spectatorState","start","startDiscussion","startVote","state","systemStatus","togglePause","transferHost","vote","warnPlayer","operationsStatus"];
 REQUEST_ACTIONS.push('hostCodes');
+REQUEST_ACTIONS.push('readyPhase');

@@ -3,7 +3,7 @@ import {createHash} from 'node:crypto';
 await import('./build-sources.mjs');
 let html=await readFile('scripts/game-template.html','utf8');
 const game=await readFile('dist/game.js','utf8');
-const login=game.slice(game.indexOf('function renderHostLogin()')).match(/\$\('#app'\)\.innerHTML = `([\s\S]*?)`;/)[1].replace('${homeCharacters()}','').replaceAll('<button ','<button disabled ');
+const login=game.slice(game.indexOf('function renderPublicEntry()')).match(/\$\('#app'\)\.innerHTML = `([\s\S]*?)`;/)[1].replace('${homeCharacters()}','').replaceAll('<button ','<button disabled ');
 let css='';
 const matches=[...html.matchAll(/<link rel="stylesheet" href="([^\"]+)">|<style>([\s\S]*?)<\/style>/g)];
 for(const match of matches)css+=(match[1]?await readFile('dist'+match[1].split('?')[0],'utf8'):match[2])+'\n';

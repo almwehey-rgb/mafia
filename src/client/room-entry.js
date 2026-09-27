@@ -9,6 +9,13 @@ async function createRoom() {
     startPolling(true);
   } catch (error) { if (error.code === 'UNAUTHORIZED') { logoutHost(); alert('انتهت جلسة المضيف. سجّل الدخول من جديد.'); } else alert(hostCodeError(error)||'تعذر إنشاء الغرفة / Could not create room'); }
 }
+async function joinHostSeat() {
+ if(playerId&&game.players.some(p=>p.id===playerId)){alert('أنت منضم كلاعب بالفعل');return;}
+ const name=(prompt('اسمك داخل المباراة')||'').trim().slice(0,20);if(!name)return;
+ const id=crypto.randomUUID(),token=crypto.randomUUID();
+ try{game=await api({action:'join',code:game.code,id,playerToken:token,profileToken,name,hostToken});playerId=id;playerToken=game.playerToken||token;saveSession(true);renderHost();}
+ catch{alert('تعذر الانضمام. تأكد أن الاسم غير مستخدم وأن الغرفة ليست ممتلئة.');}
+}
 async function createSoloRoom() {
   spectatorMode=false;delegatedHostMode=false;playerId='';playerToken='';
   const soloName = (window.prompt('اكتب اسمك في اللعبة / Enter your name', 'أنت') || '').trim().slice(0,20);

@@ -38,9 +38,17 @@ function mountHomeCharacters() {
  homeGalleryObserver=new IntersectionObserver(entries=>{if(entries.some(entry=>entry.isIntersecting)){homeGalleryObserver.disconnect();populate();}},{rootMargin:'0px'});
  homeGalleryObserver.observe(gallery);
 }
+let homeCardIndex=0, homeCardPointer=null;
+const homeCardRoles=['mafia_boss','detective','mafia','citizen','jailer','lawyer','vigilante','revealer','witch','cupid','escort','serial_killer','jester','doctor'];
 function homeCharacters() {
- const roles=['mafia_boss','mafia','detective','doctor','citizen','jailer','lawyer','vigilante','revealer','witch','cupid','escort','serial_killer','jester'];
- return `<section class="cinema-cards home-card-collection" aria-label="${discussionText('شخصيات اللعبة','Game characters')}">${roles.map(role=>`<figure class="home-character-art"><img src="${roleCardAsset(role,true)}" alt="${escapeHtml(roleLabel(role))}" width="512" height="768" loading="lazy" decoding="async"></figure>`).join('')}</section>`;
+ return `<section class="home-carousel" aria-label="شخصيات اللعبة" tabindex="0" onkeydown="if(event.key==='ArrowLeft'){event.preventDefault();moveHomeCard(1)}if(event.key==='ArrowRight'){event.preventDefault();moveHomeCard(-1)}"><div class="home-carousel-stage" onpointerdown="homeCardPointer=event.clientX" onpointerup="if(homeCardPointer!==null&&Math.abs(event.clientX-homeCardPointer)>35)moveHomeCard(event.clientX<homeCardPointer?1:-1);homeCardPointer=null" onpointercancel="homeCardPointer=null">${[-1,0,1].map(offset=>{const role=homeCardRoles[(homeCardIndex+offset+homeCardRoles.length)%homeCardRoles.length];return `<figure class="carousel-card carousel-card-${offset===0?'center':offset<0?'previous':'next'}"><img src="${roleCardAsset(role,true)}" alt="${escapeHtml(roleLabel(role))}" width="512" height="768" draggable="false"></figure>`;}).join('')}</div><div class="home-carousel-controls"><button type="button" aria-label="الشخصية السابقة" onclick="moveHomeCard(-1)">→</button><span aria-live="polite">${homeCardIndex+1} / ${homeCardRoles.length}</span><button type="button" aria-label="الشخصية التالية" onclick="moveHomeCard(1)">←</button></div></section>`;
+}
+function moveHomeCard(step) {
+ homeCardIndex=(homeCardIndex+step+homeCardRoles.length)%homeCardRoles.length;
+ const root=document.querySelector('.home-carousel');if(!root)return;
+ const focused=root.contains(document.activeElement),label=document.activeElement?.getAttribute('aria-label');
+ root.outerHTML=homeCharacters();
+ if(focused)([...document.querySelectorAll('.home-carousel button')].find(b=>b.getAttribute('aria-label')===label)||document.querySelector('.home-carousel'))?.focus({preventScroll:true});
 }
 function previewHomeRole(role){openSheet('شرح الشخصية',interactiveRoleCard(role,{open:true}));}
 function showGuide() {

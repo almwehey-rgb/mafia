@@ -83,6 +83,7 @@ type RoomRouteContext = RouteContext & {code:string;room:any;players:any[];me:an
 // Host-code operations are authenticated independently of room controllers.
 const REQUEST_ACTIONS=["acknowledgeRole","act","addBot","adminState","advanceVerdict","beginNight","claimSeat","controlDiscussion","create","createAdminInvite","createReplacement","electMafiaLeader","endGame","expelPlayer","finishDiscussion","health","hostLogin","hostLogout","hostPreferences","id","jail","join","joinSpectator","kick","lastShot","lawyerProtect","leaderboard","leave","listSnapshots","messages","moderationLog","mute","ok","operationsStatus","passDiscussion","profile","recoverProfile","redeemAdminInvite","report","resolveNight","resolveVote","restart","restoreSnapshot","returnToLobby","revokeAdminAccess","saveWill","sendMessage","setDiscussionClaim","spectatorState","start","startDiscussion","startVote","state","systemStatus","togglePause","transferHost","vote","warnPlayer","operationsStatus"];
 REQUEST_ACTIONS.push('hostCodes');
+REQUEST_ACTIONS.push('readyPhase');
 // Allowlisted operational fields only. Never record headers, request bodies,
 // credentials, player names, role assignments or action targets.
 const requestTotals={requests:0,failed:0,slow:0};
@@ -140,6 +141,8 @@ const enabledRoles = (value: any) => {
   reveal_dead_roles: value?.reveal_dead_roles === true,
   allow_no_vote: value?.allow_no_vote !== false,
   public_voting: value?.public_voting === true,
+  automatic_game: value?.automatic_game === true,
+  action_deadline: value?.action_deadline !== false,
   full_trial: value?.full_trial !== false,
   kids_mode: value?.kids_mode === true,
   phase_seconds: [30,60,90].includes(+value?.phase_seconds) ? +value.phase_seconds : 60,
@@ -176,10 +179,11 @@ async function patchRoleState(code: string, player: any, patch: Record<string, a
 const validPlayerId = (id: unknown) => typeof id === "string" && /^[A-Za-z0-9_-]{1,80}$/.test(id);
 const phaseSeconds = (room: any) => [30,60,90].includes(+room.enabled_roles?.phase_seconds) ? +room.enabled_roles.phase_seconds : 60;
 const phaseDeadline = (room: any) => new Date(room.phase_started_at).getTime() + phaseSeconds(room) * 1000;
-const phaseExpired = (room: any) => room.phase !== "paused" && !room.enabled_roles?.pending_shot && Number.isFinite(phaseDeadline(room)) && Date.now() >= phaseDeadline(room);
+const phaseExpired = (room: any) => !(room.enabled_roles?.automatic_game && room.enabled_roles?.action_deadline === false) && room.phase !== "paused" && !room.enabled_roles?.pending_shot && Number.isFinite(phaseDeadline(room)) && Date.now() >= phaseDeadline(room);
 
 function discussionView(room: any, now = Date.now()) {
   const settings = enabledRoles(room.enabled_roles);
+  if(settings.automatic_game)return {status:'off',complete:true};
   const saved = room.enabled_roles?.discussion_state;
   if (settings.discussion_mode === "off") return { status: "off", complete: true };
   if (!saved || saved.round !== room.round) return { status: "waiting", complete: false, mode: settings.discussion_mode };
@@ -365,6 +369,7 @@ function publicView(room: any, players: any[], meId?: string, host = false) {
   const locked = isMafiaLocked(room, players);
   const settings = enabledRoles(room.enabled_roles);
   const now = Date.now();
+  const votingActive = ["vote", "nomination", "verdict"].includes(room.phase === "paused" ? settings.paused_phase : room.phase);
   const escortTarget = room.round === 1 ? null : players.find((x) => x.alive && x.role === "escort" && x.id !== room.jailed_player)?.action_target;
   const nightRoles = players.filter((x) => {
     if (room.round === 1) return x.alive && x.role === "detective";
@@ -389,11 +394,7 @@ function publicView(room: any, players: any[], meId?: string, host = false) {
     detectiveQuestions: detectiveQuestionCount(room.detective_questions), jailerExecutions: room.jailer_executions,
     enabledRoles: { ...settings, mafia_kill_enabled: mafiaKillEnabledForRound(room) },
     lastEvent: room.last_event, lastDeaths: room.last_deaths || [],
-    voteSummary: room.enabled_roles?.vote_summary ? { ...room.enabled_roles.vote_summary, counts: (room.enabled_roles.vote_summary.counts || []).map((item: any) => ({ id: item.id, name: item.name, count: item.count, ...(settings.public_voting && Array.isArray(item.voters) ? { voters: item.voters.map((v: any) => ({ id: v.id, name: v.name })) } : {}) })) } : null,
-    voteTallies: ["vote", "nomination", "verdict"].includes(room.phase === "paused" ? settings.paused_phase : room.phase)
-      ? Object.entries(players.filter(x => x.alive && x.vote_target).reduce((counts: Record<string, number>, x) => { counts[x.vote_target] = (counts[x.vote_target] || 0) + 1; return counts; }, {})).map(([target, count]) => ({ target, count })) : undefined,
-    publicVotes: settings.public_voting && ["vote", "nomination", "verdict"].includes(room.phase === "paused" ? settings.paused_phase : room.phase)
-      ? players.filter(x => x.alive && x.vote_target).map(x => ({ voterId: x.id, target: x.vote_target })) : undefined,
+    voteSummary: !votingActive && room.enabled_roles?.vote_summary ? { ...room.enabled_roles.vote_summary, counts: (room.enabled_roles.vote_summary.counts || []).map((item: any) => ({ id: item.id, name: item.name, count: item.count, ...(settings.public_voting && Array.isArray(item.voters) ? { voters: item.voters.map((v: any) => ({ id: v.id, name: v.name })) } : {}) })) } : null,
     eliminations: (room.last_deaths || []).map((id: string) => { const p = players.find((x) => x.id === id); const elimination = roleState(p || {}).elimination; return { id, name: p?.name || "", reason: elimination?.reason || "eliminated", round: elimination?.round ?? null, at: elimination?.at ?? null, detail: elimination?.reason === "host_expelled" ? elimination.detail : undefined }; }),
     pendingShot: room.phase !== "finished" && room.enabled_roles?.pending_shot ? { id: room.enabled_roles.pending_shot.id, playerId: room.enabled_roles.pending_shot.playerId, resolving: room.enabled_roles.pending_shot.resolving === true, target: (host || me?.id === room.enabled_roles.pending_shot.playerId) ? room.enabled_roles.pending_shot.target : undefined } : null,
     lastEliminated: room.last_eliminated, lastSaved: room.last_saved, winner: room.winner,
@@ -438,6 +439,7 @@ function publicView(room: any, players: any[], meId?: string, host = false) {
       leaderDeadline: mafiaRole(me.role) ? room.enabled_roles?.leader_election?.deadline : undefined,
       acted: me.role === "detective" ? selected(me).length >= limit : me.role === "cupid" ? selected(me).length >= 2 : Boolean(me.action_target),
       voted: Boolean(me.vote_target),
+      phaseReady: roleState(me).phaseReady === `${room.round}:${room.phase}`,
       voteTarget: me.vote_target || null,
       acknowledged: roleState(me).ack === true,
       willText: me.will_text || "",
@@ -510,6 +512,7 @@ function actorRateLimited(key:string,now:number) {
   return false;
 }
 async function autoAdvanceSolo(code:string, room:any, players:any[]) {
+  if(room.enabled_roles?.automatic_game)return await autoAdvanceMatch(code,room,players);
   if (!room.enabled_roles?.solo_mode || ['lobby','finished','paused'].includes(room.phase)) return {room,players};
   const base:any={body:{hostToken:room.host_token,code},action:'auto',ip:'solo-manager',now:Date.now(),started:Date.now(),code,room,players,me:null,host:true,authenticatedSpectator:null};
   if (room.phase === 'reveal') {
@@ -540,6 +543,31 @@ async function autoAdvanceSolo(code:string, room:any, players:any[]) {
     if (players.filter(needs).every((p:any)=>p.action_target) || !players.some(needs)) await routeResolveNight({...base,action:'resolveNight',room,players});
   }
   return {room,players};
+}
+async function autoAdvanceMatch(code:string,room:any,players:any[]) {
+  if(['lobby','finished','paused'].includes(room.phase)||room.enabled_roles?.pending_shot)return {room,players};
+  const alive=players.filter(p=>p.alive),expired=phaseExpired(room),key=`${room.round}:${room.phase}`;
+  let action='';
+  if(room.phase==='reveal'&&players.length&&players.every(p=>roleState(p).ack===true))action='beginNight';
+  if(room.phase==='night'&&(publicView(room,players,undefined,true).nightReady||expired))action='resolveNight';
+  if(['vote','nomination','verdict'].includes(room.phase)){
+    const required=alive.filter(p=>room.phase!=='verdict'||p.id!==room.accused_player);
+    if(required.every(p=>p.vote_target)||expired)action='resolveVote';
+  }
+  if(room.phase==='trial'&&(roleState(players.find(p=>p.id===room.accused_player)).phaseReady===key||players.find(p=>p.id===room.accused_player)?.is_bot||expired))action='advanceVerdict';
+  if(room.phase==='day'){
+    const ready=alive.every(p=>p.is_bot||roleState(p).phaseReady===key);
+    const abilities=alive.every(p=>p.role==='lawyer'?Boolean(p.action_target)||p.is_bot:p.role==='jailer'?Boolean(room.jailed_player)||p.is_bot:true);
+    if((ready&&abilities)||expired)action='startVote';
+  }
+  if(!action)return {room,players};
+  if(!requestDatabase.getStore()!.plan)requestDatabase.getStore()!.plan=new TransitionPlan(room,players);
+  if(action==='startVote'){await botDayActions(room,players);({room,players}=await load(code));}
+  const context:any={body:{code},action,ip:'automatic-game',now:Date.now(),started:Date.now(),code,room,players,me:null,host:true,authenticatedSpectator:null};
+  const handlers:any={beginNight:routeBeginNight,resolveNight:routeResolveNight,startVote:routeStartVote,resolveVote:routeResolveVote,advanceVerdict:routeAdvanceVerdict};
+  const response=await handlers[action](context);
+  if(!response.ok)throw Error('STALE_ACTION');
+  return await load(code);
 }
 async function readCurrentState(code:string,body:any,now:number) {
   const {data,error}=await db.rpc('mafia_presence',{p_code:code,p_host_token:body.hostToken||null,p_player_id:body.id||null,p_player_token:body.playerToken||null});
@@ -1954,6 +1982,11 @@ async function handleRequest(request:Request) {
 
     if (action === "electMafiaLeader") return await routeElectMafiaLeader({body, action, ip, now, started, code, room, players, me, host, authenticatedSpectator});
     if (action === "acknowledgeRole") return await routeAcknowledgeRole({body, action, ip, now, started, code, room, players, me, host, authenticatedSpectator});
+    if(action==='readyPhase'){
+      if(!room.enabled_roles?.automatic_game||!me?.alive||!['day','trial'].includes(room.phase)||(room.phase==='trial'&&me.id!==room.accused_player))return out({error:'INVALID_ACTION'},409);
+      await patchRoleState(code,me,{phaseReady:`${room.round}:${room.phase}`});
+      ({room,players}=await load(code));return out(publicView(room,players,me.id,host));
+    }
 
     if (action === "beginNight") return await routeBeginNight({body, action, ip, now, started, code, room, players, me, host, authenticatedSpectator});
 

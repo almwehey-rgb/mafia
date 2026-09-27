@@ -140,17 +140,13 @@ function voteCountRow(name,count,voters,key) {
   return `<details class="vote-count-details" data-disclosure-key="${escapeHtml(key)}"><summary>${heading}<span class="vote-expand-mark" aria-hidden="true">⌄</span></summary><ul class="vote-voter-list">${voters.map(v=>`<li>${escapeHtml(v.name)}</li>`).join('')}</ul></details>`;
 }
 function voteSummaryCard() {
+  if(['vote','nomination','verdict'].includes(game?.phase==='paused'?game.enabledRoles?.paused_phase:game?.phase))return '';
   const summary=game?.voteSummary;
   if(!summary)return '';
   const label=name=>summary.phase==='verdict'?(name==='GUILTY'?discussionText('مذنب','Guilty'):discussionText('بريء','Innocent')):name;
   return `<section id="voteSummaryNotice" class="card" data-no-translate><h3>${discussionText('نتائج التصويت — الجولة','Voting results — round')} ${escapeHtml(summary.round)}</h3>${summary.counts.map(item=>voteCountRow(label(item.name),item.count,item.voters,`result-${game.matchId}-${summary.round}-${summary.phase}-${item.id||item.name}`)).join('')}${voteCountRow(discussionText('امتناع / لم يصوّت','Abstained / did not vote'),summary.abstained,null,'')}</section>`;
 }
-function publicVotesCard() {
-  if(!['vote','nomination','verdict'].includes(game?.phase==='paused'?game.enabledRoles?.paused_phase:game?.phase))return '';
-  const targetLabel=id=>({SKIP:discussionText('امتناع','Abstain'),GUILTY:discussionText('إدانة','Guilty'),INNOCENT:discussionText('براءة','Innocent')})[id]||nameOf(id);
-  const counts=game.voteTallies||Object.entries((game.publicVotes||[]).reduce((acc,v)=>{acc[v.target]=(acc[v.target]||0)+1;return acc;},{})).map(([target,count])=>({target,count}));
-  return `<section id="publicVotesNotice" class="card public-votes" data-no-translate><h3>${discussionText('الأصوات الحالية','Current votes')}</h3><p class="muted">${game.enabledRoles?.public_voting?discussionText('اضغط على اللاعب لمعرفة من صوّت له','Select a player to see their voters'):discussionText('تصويت سري — أسماء المصوّتين مخفية','Secret ballot — voter names are hidden')}</p>${[...counts].sort((a,b)=>b.count-a.count).map(item=>voteCountRow(targetLabel(item.target),item.count,game.enabledRoles?.public_voting?(game.publicVotes||[]).filter(v=>v.target===item.target).map(v=>({name:nameOf(v.voterId)})):null,`live-${game.matchId}-${game.round}-${game.phase}-${item.target}`)).join('')||`<p>${discussionText('بانتظار أول صوت','Waiting for the first vote')}</p>`}</section>`;
-}
+function publicVotesCard() { return ''; }
 function renderWithNotices(content,controller=false) {
   const app=$('#app'), focused=document.activeElement;
   const focusPhase=[game?.matchId,game?.phase,game?.round].join('|');
@@ -174,6 +170,10 @@ function renderWithNotices(content,controller=false) {
     for(const element of app.querySelectorAll('.vote-count-details[data-disclosure-key]'))if(disclosures.has(element.dataset.disclosureKey))element.open=disclosures.get(element.dataset.disclosureKey);
     if(!document.getElementById('eliminationNotice'))$('#app').insertAdjacentHTML('afterbegin',eliminationNotice());
     showEliminationEffect();
+    if(game?.enabledRoles?.automatic_game&&game.me?.alive&&['day','trial'].includes(game.phase)){
+      const canReady=game.phase==='day'||game.me.id===game.accusedPlayer;
+      if(canReady)app.insertAdjacentHTML('beforeend',`<section class="card auto-ready"><h3>${discussionText('المباراة تلقائية','Automatic game')}</h3><p>${game.enabledRoles.action_deadline===false?discussionText('ننتظر اختيار الجميع بدون مهلة.','Waiting for everyone without a deadline.'):discussionText('ننتقل بعد اختيار الجميع أو انتهاء المهلة.','Advances when everyone is ready or the timer ends.')}</p><button class="btn gold wide" ${game.me.phaseReady?'disabled':''} onclick="readyAutomaticPhase()">${game.me.phaseReady?discussionText('تم التأكيد — بانتظار البقية','Confirmed — waiting for others'):discussionText(game.phase==='trial'?'انتهيت من الدفاع':'انتهيت من النقاش','I am ready')}</button></section>`);
+    }
     if(game?.me?.alive && game.me.warnings?.length && !controller && !document.getElementById('hostWarningNotice')){const warning=game.me.warnings.at(-1);$('#app').insertAdjacentHTML('afterbegin',`<section id="hostWarningNotice" class="status wait" role="alert" data-no-translate><b>${discussionText('⚠️ إنذار من المضيف','⚠️ Warning from the host')}</b><p>${escapeHtml(warning.reason)}</p></section>`);}
     if(keepFocus&&!focused.isConnected&&document.activeElement===document.body){
       const replacement=[...app.querySelectorAll('button,[role="button"]')].filter(sameControl)[focusIndex];
@@ -183,6 +183,10 @@ function renderWithNotices(content,controller=false) {
     if(changedPhase && !controller && typeof window!=='undefined')window.scrollTo?.({top:0,left:0,behavior:'instant'});
   }
 }
+async function readyAutomaticPhase(){try{game=await api({action:'readyPhase',code:game.code,id:playerId,playerToken,hostToken});renderPlayer();}catch{alert('تعذر تأكيد الجاهزية، حاول مجددًا.');}}
+function automaticGameSettings(){return `<section class="voting-setting"><h3>إدارة المباراة</h3><div class="voting-mode-options"><button class="btn" aria-pressed="${!enabledRoles.automatic_game}" onclick="setAutomaticGame(false)">يدوي بالمضيف</button><button class="btn" aria-pressed="${!!enabledRoles.automatic_game}" onclick="setAutomaticGame(true)">تلقائي بدون مضيف</button></div>${enabledRoles.automatic_game?`<p>بعد آخر اختيار تنتقل المرحلة تلقائيًا. بالنهار يؤكد الجميع انتهاء النقاش.</p><div class="voting-mode-options"><button class="btn" aria-pressed="${enabledRoles.action_deadline!==false}" onclick="setActionDeadline(true)">بمهلة</button><button class="btn" aria-pressed="${enabledRoles.action_deadline===false}" onclick="setActionDeadline(false)">انتظار الجميع</button></div>`:''}</section>`;}
+function setAutomaticGame(value){enabledRoles.automatic_game=value;schedulePreferenceSave();renderHost();}
+function setActionDeadline(value){enabledRoles.action_deadline=value;schedulePreferenceSave();renderHost();}
 function renderPlayer(){
   // Keep the private role reveal independent of post-reveal Mafia controls.
   // Those controls must never prevent a newly assigned boss from seeing the card.
@@ -233,7 +237,7 @@ function syncMorningDetails(){
     else detail.setAttribute('open','');
   });
 }
-function renderHost(){renderWithNotices(renderHostContent,true);enhanceJourney(true);mountHostProgress();syncMorningDetails();}
+function renderHost(){if(game?.enabledRoles?.automatic_game&&game.me&&!['lobby','finished'].includes(game.phase)){renderPlayer();return;}renderWithNotices(renderHostContent,true);enhanceJourney(true);mountHostProgress();syncMorningDetails();}
 function renderSpectator(){renderWithNotices(renderSpectatorContent);}
 
 function disciplineButtons(player) {

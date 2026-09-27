@@ -104,6 +104,11 @@ async function handleRequest(request:Request) {
 
     if (action === "electMafiaLeader") return await routeElectMafiaLeader({body, action, ip, now, started, code, room, players, me, host, authenticatedSpectator});
     if (action === "acknowledgeRole") return await routeAcknowledgeRole({body, action, ip, now, started, code, room, players, me, host, authenticatedSpectator});
+    if(action==='readyPhase'){
+      if(!room.enabled_roles?.automatic_game||!me?.alive||!['day','trial'].includes(room.phase)||(room.phase==='trial'&&me.id!==room.accused_player))return out({error:'INVALID_ACTION'},409);
+      await patchRoleState(code,me,{phaseReady:`${room.round}:${room.phase}`});
+      ({room,players}=await load(code));return out(publicView(room,players,me.id,host));
+    }
 
     if (action === "beginNight") return await routeBeginNight({body, action, ip, now, started, code, room, players, me, host, authenticatedSpectator});
 

@@ -19,6 +19,16 @@ async function snapshot(db){
  const result={};for(const table of ['mafia_rooms','mafia_players','mafia_profiles','mafia_season_stats','mafia_snapshots'])result[table]=(await db.query('select * from '+table)).rows;
  return result;
 }
+test('Automatic state polling commits at most one vote transition and never grants host access',async()=>{
+ const {db,handler}=await edgeFixture();try{
+  await seed(db,'vote');
+  await db.exec(`update mafia_rooms set enabled_roles=enabled_roles || '{"automatic_game":true,"action_deadline":false}'::jsonb where code='8754'`);
+  const poll=()=>handler(new Request('https://isolated.test/',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({action:'state',code:'8754',id:'a',playerToken:'token-a'})}));
+  const responses=await Promise.all([poll(),poll()]);assert.ok(responses.some(r=>r.ok));
+  for(const r of responses){const body=await r.json();if(r.ok)assert.equal(body.canControl,false);else assert.equal(body.error,'STALE_GAME');}
+  const room=(await db.query("select lifecycle_version from mafia_rooms where code='8754'")).rows[0];assert.equal(room.lifecycle_version,1);
+ }finally{await db.close();}
+});
 
 test('Night resolution rolls back investigations, snapshots and phase on a database failure',async()=>{
  const {db,handler}=await edgeFixture();try{

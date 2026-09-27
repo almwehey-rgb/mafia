@@ -195,20 +195,40 @@ test('An off-screen host clears old match history after missing a rematch but ke
  c.game.matchId='third-match';c.rememberEvent();assert.equal(c.localHistory.length,1);
 });
 
-test('Voting visibility defaults to secret and only explicit public mode exposes current ballots',async()=>{
+test('Neither public nor secret voting exposes ballots or totals before resolution',async()=>{
  const f=fixture();const room=f.rooms[0];room.phase='vote';f.players[0].vote_target='b';
  for(const auth of [f.host,{id:'b',playerToken:'token-b'}]){
   const secret=await f.call('state',auth);assert.equal(secret.status,200);assert.equal(secret.body.publicVotes,undefined);
  }
  room.enabled_roles.public_voting=true;
  let view=(await f.call('state',{id:'b',playerToken:'token-b'})).body;
- assert.deepEqual(view.publicVotes,[{voterId:'a',target:'b'}]);
+ assert.equal(view.publicVotes,undefined);assert.equal(view.voteTallies,undefined);assert.equal(view.voteSummary,null);
  room.phase='verdict';f.players[0].vote_target='GUILTY';
- view=(await f.call('state',f.host)).body;assert.equal(view.publicVotes[0].target,'GUILTY');
+ view=(await f.call('state',f.host)).body;assert.equal(view.publicVotes,undefined);assert.equal(view.voteSummary,null);
  room.phase='night';assert.equal((await f.call('state',f.host)).body.publicVotes,undefined);
  room.phase='vote';room.enabled_roles.public_voting='true';assert.equal((await f.call('state',f.host)).body.publicVotes,undefined);
 });
 
+test('Automatic voting waits indefinitely or uses deadline, and keeps player permissions',async()=>{
+ for(const deadline of [false,true]){
+  const f=fixture();const room=f.rooms[0];room.phase='vote';room.enabled_roles={...room.enabled_roles,automatic_game:true,action_deadline:deadline,full_trial:false};f.players[2].role='mafia_boss';
+  f.advance(120000);
+  let r=await f.call('state',{id:'a',playerToken:'token-a'});assert.equal(r.status,200);
+  assert.equal(r.body.canControl,false);
+  if(deadline){assert.notEqual(r.body.phase,'vote');continue;}
+  assert.equal(r.body.phase,'vote');
+  for(const p of f.players)p.vote_target='SKIP';
+  r=await f.call('state',{id:'a',playerToken:'token-a'});assert.equal(r.status,200);assert.equal(r.body.phase,'night');
+ }
+});
+test('Automatic night waits for real abilities; automatic day waits for everyone to finish discussion',async()=>{
+ const f=fixture();const room=f.rooms[0];room.phase='night';room.round=1;room.enabled_roles={...room.enabled_roles,automatic_game:true,action_deadline:false};f.players[0].role='detective';f.players[2].role='mafia_boss';
+ f.advance(120000);let r=await f.call('state',{id:'a',playerToken:'token-a'});assert.equal(r.body.phase,'night');
+ f.players[0].action_target='b';r=await f.call('state',{id:'a',playerToken:'token-a'});assert.equal(r.status,200);assert.equal(r.body.phase,'day');
+ r=await f.call('state',{id:'a',playerToken:'token-a'});assert.equal(r.body.phase,'day');
+ for(const p of f.players.filter(p=>!p.is_bot)){r=await f.call('readyPhase',{id:p.id,playerToken:'token-'+p.id});assert.equal(r.status,200);}
+ r=await f.call('state',{id:'a',playerToken:'token-a'});assert.equal(r.status,200);assert.equal(r.body.phase,'nomination');
+});
 test('Start endpoint rejects old generations and only commits one duplicate start',async()=>{
  const f=fixture();f.rooms[0].phase='lobby';
  const args={...f.host,lifecycleVersion:0,mafiaCount:1,detectiveCount:0,enabledRoles:{doctor:false,detective:false,lawyer:false,jailer:false}};

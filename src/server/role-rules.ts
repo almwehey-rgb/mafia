@@ -28,6 +28,8 @@ const enabledRoles = (value: any) => {
   reveal_dead_roles: value?.reveal_dead_roles === true,
   allow_no_vote: value?.allow_no_vote !== false,
   public_voting: value?.public_voting === true,
+  automatic_game: value?.automatic_game === true,
+  action_deadline: value?.action_deadline !== false,
   full_trial: value?.full_trial !== false,
   kids_mode: value?.kids_mode === true,
   phase_seconds: [30,60,90].includes(+value?.phase_seconds) ? +value.phase_seconds : 60,
@@ -64,10 +66,11 @@ async function patchRoleState(code: string, player: any, patch: Record<string, a
 const validPlayerId = (id: unknown) => typeof id === "string" && /^[A-Za-z0-9_-]{1,80}$/.test(id);
 const phaseSeconds = (room: any) => [30,60,90].includes(+room.enabled_roles?.phase_seconds) ? +room.enabled_roles.phase_seconds : 60;
 const phaseDeadline = (room: any) => new Date(room.phase_started_at).getTime() + phaseSeconds(room) * 1000;
-const phaseExpired = (room: any) => room.phase !== "paused" && !room.enabled_roles?.pending_shot && Number.isFinite(phaseDeadline(room)) && Date.now() >= phaseDeadline(room);
+const phaseExpired = (room: any) => !(room.enabled_roles?.automatic_game && room.enabled_roles?.action_deadline === false) && room.phase !== "paused" && !room.enabled_roles?.pending_shot && Number.isFinite(phaseDeadline(room)) && Date.now() >= phaseDeadline(room);
 
 function discussionView(room: any, now = Date.now()) {
   const settings = enabledRoles(room.enabled_roles);
+  if(settings.automatic_game)return {status:'off',complete:true};
   const saved = room.enabled_roles?.discussion_state;
   if (settings.discussion_mode === "off") return { status: "off", complete: true };
   if (!saved || saved.round !== room.round) return { status: "waiting", complete: false, mode: settings.discussion_mode };

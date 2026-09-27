@@ -6,6 +6,7 @@ function actorRateLimited(key:string,now:number) {
   return false;
 }
 async function autoAdvanceSolo(code:string, room:any, players:any[]) {
+  if(room.enabled_roles?.automatic_game)return await autoAdvanceMatch(code,room,players);
   if (!room.enabled_roles?.solo_mode || ['lobby','finished','paused'].includes(room.phase)) return {room,players};
   const base:any={body:{hostToken:room.host_token,code},action:'auto',ip:'solo-manager',now:Date.now(),started:Date.now(),code,room,players,me:null,host:true,authenticatedSpectator:null};
   if (room.phase === 'reveal') {
@@ -36,6 +37,31 @@ async function autoAdvanceSolo(code:string, room:any, players:any[]) {
     if (players.filter(needs).every((p:any)=>p.action_target) || !players.some(needs)) await routeResolveNight({...base,action:'resolveNight',room,players});
   }
   return {room,players};
+}
+async function autoAdvanceMatch(code:string,room:any,players:any[]) {
+  if(['lobby','finished','paused'].includes(room.phase)||room.enabled_roles?.pending_shot)return {room,players};
+  const alive=players.filter(p=>p.alive),expired=phaseExpired(room),key=`${room.round}:${room.phase}`;
+  let action='';
+  if(room.phase==='reveal'&&players.length&&players.every(p=>roleState(p).ack===true))action='beginNight';
+  if(room.phase==='night'&&(publicView(room,players,undefined,true).nightReady||expired))action='resolveNight';
+  if(['vote','nomination','verdict'].includes(room.phase)){
+    const required=alive.filter(p=>room.phase!=='verdict'||p.id!==room.accused_player);
+    if(required.every(p=>p.vote_target)||expired)action='resolveVote';
+  }
+  if(room.phase==='trial'&&(roleState(players.find(p=>p.id===room.accused_player)).phaseReady===key||players.find(p=>p.id===room.accused_player)?.is_bot||expired))action='advanceVerdict';
+  if(room.phase==='day'){
+    const ready=alive.every(p=>p.is_bot||roleState(p).phaseReady===key);
+    const abilities=alive.every(p=>p.role==='lawyer'?Boolean(p.action_target)||p.is_bot:p.role==='jailer'?Boolean(room.jailed_player)||p.is_bot:true);
+    if((ready&&abilities)||expired)action='startVote';
+  }
+  if(!action)return {room,players};
+  if(!requestDatabase.getStore()!.plan)requestDatabase.getStore()!.plan=new TransitionPlan(room,players);
+  if(action==='startVote'){await botDayActions(room,players);({room,players}=await load(code));}
+  const context:any={body:{code},action,ip:'automatic-game',now:Date.now(),started:Date.now(),code,room,players,me:null,host:true,authenticatedSpectator:null};
+  const handlers:any={beginNight:routeBeginNight,resolveNight:routeResolveNight,startVote:routeStartVote,resolveVote:routeResolveVote,advanceVerdict:routeAdvanceVerdict};
+  const response=await handlers[action](context);
+  if(!response.ok)throw Error('STALE_ACTION');
+  return await load(code);
 }
 async function readCurrentState(code:string,body:any,now:number) {
   const {data,error}=await db.rpc('mafia_presence',{p_code:code,p_host_token:body.hostToken||null,p_player_id:body.id||null,p_player_token:body.playerToken||null});
