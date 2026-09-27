@@ -22,6 +22,7 @@ function normalizeEnabledRoles(value = {}) {
     doctor_no_repeat: value.doctor_no_repeat !== false,
     reveal_dead_roles: value.reveal_dead_roles === true,
     allow_no_vote: value.allow_no_vote !== false,
+    public_voting: value.public_voting === true,
     full_trial: value.full_trial !== false,
     kids_mode: value.kids_mode === true,
     phase_seconds: [30,60,90].includes(+value.phase_seconds) ? +value.phase_seconds : 60,

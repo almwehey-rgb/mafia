@@ -42,6 +42,8 @@ function publicView(room: any, players: any[], meId?: string, host = false) {
     enabledRoles: { ...settings, mafia_kill_enabled: mafiaKillEnabledForRound(room) },
     lastEvent: room.last_event, lastDeaths: room.last_deaths || [],
     voteSummary: room.enabled_roles?.vote_summary || null,
+    publicVotes: settings.public_voting && ["vote", "nomination", "verdict"].includes(room.phase === "paused" ? settings.paused_phase : room.phase)
+      ? players.filter(x => x.alive && x.vote_target).map(x => ({ voterId: x.id, target: x.vote_target })) : undefined,
     eliminations: (room.last_deaths || []).map((id: string) => { const p = players.find((x) => x.id === id); const elimination = roleState(p || {}).elimination; return { id, name: p?.name || "", reason: elimination?.reason || "eliminated", round: elimination?.round ?? null, at: elimination?.at ?? null, detail: elimination?.reason === "host_expelled" ? elimination.detail : undefined }; }),
     pendingShot: room.phase !== "finished" && room.enabled_roles?.pending_shot ? { id: room.enabled_roles.pending_shot.id, playerId: room.enabled_roles.pending_shot.playerId, resolving: room.enabled_roles.pending_shot.resolving === true, target: (host || me?.id === room.enabled_roles.pending_shot.playerId) ? room.enabled_roles.pending_shot.target : undefined } : null,
     lastEliminated: room.last_eliminated, lastSaved: room.last_saved, winner: room.winner,

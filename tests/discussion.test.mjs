@@ -195,6 +195,20 @@ test('An off-screen host clears old match history after missing a rematch but ke
  c.game.matchId='third-match';c.rememberEvent();assert.equal(c.localHistory.length,1);
 });
 
+test('Voting visibility defaults to secret and only explicit public mode exposes current ballots',async()=>{
+ const f=fixture();const room=f.rooms[0];room.phase='vote';f.players[0].vote_target='b';
+ for(const auth of [f.host,{id:'b',playerToken:'token-b'}]){
+  const secret=await f.call('state',auth);assert.equal(secret.status,200);assert.equal(secret.body.publicVotes,undefined);
+ }
+ room.enabled_roles.public_voting=true;
+ let view=(await f.call('state',{id:'b',playerToken:'token-b'})).body;
+ assert.deepEqual(view.publicVotes,[{voterId:'a',target:'b'}]);
+ room.phase='verdict';f.players[0].vote_target='GUILTY';
+ view=(await f.call('state',f.host)).body;assert.equal(view.publicVotes[0].target,'GUILTY');
+ room.phase='night';assert.equal((await f.call('state',f.host)).body.publicVotes,undefined);
+ room.phase='vote';room.enabled_roles.public_voting='true';assert.equal((await f.call('state',f.host)).body.publicVotes,undefined);
+});
+
 test('Start endpoint rejects old generations and only commits one duplicate start',async()=>{
  const f=fixture();f.rooms[0].phase='lobby';
  const args={...f.host,lifecycleVersion:0,mafiaCount:1,detectiveCount:0,enabledRoles:{doctor:false,detective:false,lawyer:false,jailer:false}};

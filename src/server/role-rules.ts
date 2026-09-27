@@ -2,7 +2,7 @@ const shuffle = <T>(items: T[]) => { for (let i = items.length - 1; i > 0; i--) 
 const mafiaRole = (role: string | null) => role === "mafia" || role === "mafia_boss";
 const selected = (player: any) => String(player.action_target || "").split(",").filter(Boolean);
 const results = (player: any) => { try { return JSON.parse(player.investigation_result || "[]"); } catch { return []; } };
-const defaultEnabledRoles = { doctor: true, detective: true, lawyer: true, jailer: true, vigilante: false, witch: false, serial_killer: false, jester: false, cupid: false, escort: false, godfather_innocent: true, mafia_kill_start_round: 2, mafia_kill_mode: "always", mafia_kill_enabled: true, mafia_no_repeat: false, doctor_no_repeat: true, reveal_dead_roles: false, allow_no_vote: true, full_trial: true, kids_mode: false, paused_phase: null };
+const defaultEnabledRoles = { doctor: true, detective: true, lawyer: true, jailer: true, vigilante: false, witch: false, serial_killer: false, jester: false, cupid: false, escort: false, godfather_innocent: true, mafia_kill_start_round: 2, mafia_kill_mode: "always", mafia_kill_enabled: true, mafia_no_repeat: false, doctor_no_repeat: true, reveal_dead_roles: false, allow_no_vote: true, public_voting: false, full_trial: true, kids_mode: false, paused_phase: null };
 const enabledRoles = (value: any) => {
   const legacyRound = value?.mafia_kill_mode === "disabled" || value?.mafia_kill_enabled === false ? 0 : value?.mafia_kill_mode === "after_first" ? 2 : 1;
   let mafiaKillStartRound = Number.isFinite(+value?.mafia_kill_start_round) ? Math.max(0, Math.min(10, Math.round(+value.mafia_kill_start_round))) : legacyRound;
@@ -27,6 +27,7 @@ const enabledRoles = (value: any) => {
   doctor_no_repeat: value?.doctor_no_repeat !== false,
   reveal_dead_roles: value?.reveal_dead_roles === true,
   allow_no_vote: value?.allow_no_vote !== false,
+  public_voting: value?.public_voting === true,
   full_trial: value?.full_trial !== false,
   kids_mode: value?.kids_mode === true,
   phase_seconds: [30,60,90].includes(+value?.phase_seconds) ? +value.phase_seconds : 60,

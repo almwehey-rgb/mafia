@@ -32,6 +32,20 @@ function rememberEliminationEffect(key) {
     localStorage.setItem(eliminationEffectStorageKey,JSON.stringify([...keys.filter(item=>item!==key),key].slice(-60)));
   } catch {}
 }
+function eliminationEmblem(kind) {
+  const paths={
+    mafia:'<path d="M62 13 48 58 37 70l-8-8 12-11Z"/><path d="m30 49 25 25M35 68 21 83m-5-5 10 10"/>',
+    vote:'<path d="M50 18v64M28 84h44M22 32h56M50 18l-6 10h12Z"/><path d="m25 32-12 27h24ZM75 32 63 59h24Z"/><path d="M13 62q12 16 24 0m26 0q12 16 24 0"/>',
+    serial:'<path d="M34 15 18 78l21-20M57 11 40 87l20-26M80 18 65 83l19-22"/>',
+    poison:'<path d="M39 13h22m-18 0v24L23 72q-7 15 10 15h34q17 0 10-15L57 37V13M32 62h36"/><circle cx="46" cy="70" r="2"/><circle cx="58" cy="77" r="2"/><path d="m48 31 4-7m11 26 4-8"/>',
+    execution:'<path d="M22 85V39a28 28 0 0 1 56 0v46ZM22 39h56M36 16v69M50 11v74M64 16v69M22 66h56"/>',
+    shot:'<circle cx="50" cy="50" r="29"/><circle cx="50" cy="50" r="8"/><path d="M50 8v24m0 36v24M8 50h24m36 0h24"/>',
+    lovers:'<path d="M45 27C17 5 2 40 22 59l24 25M56 26C80 7 99 38 78 59L56 83M52 23l-8 20 14 12-11 22"/>',
+    expelled:'<path d="M54 19H22v64h32M53 50h35L74 36m14 14L74 64M34 25v52"/>',
+    other:'<path d="m50 12 36 38-36 38L14 50ZM50 31v24m0 12v2"/>'
+  };
+  return `<svg viewBox="0 0 100 100" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths[kind]||paths.other}</svg>`;
+}
 function showEliminationEffect() {
   if(game?.me?.alive!==false)return;
   const eliminations=visibleEliminations();
@@ -40,7 +54,6 @@ function showEliminationEffect() {
   const key=[game.code,game.matchId,eliminated.id,eliminated.at||'legacy'].join(':');
   if(hasSeenEliminationEffect(key))return;
   const kind=eliminationKind(eliminated.reason);
-  const icons={mafia:'🗡️',vote:'⚖️',serial:'🩸',poison:'☠️',execution:'🔒',shot:'🎯',lovers:'💔',expelled:'⛔',mixed:'✦',other:'✦'};
   const titles={mafia:['اغتيال في الظلام','Mafia assassination'],vote:['حسم التصويت','Vote decided'],serial:['ضربة القاتل المتسلسل','Serial killer strike'],poison:['سم الساحرة','Witch poison'],execution:['حكم السجّان','Jailer execution'],shot:['الطلقة الأخيرة','Final shot'],lovers:['مصير الحبيبين','Linked fate'],expelled:['استبعاد من المضيف','Host expulsion'],mixed:['أحداث الليلة','Night events'],other:['خرج لاعب من المباراة','A player left the game']};
   const names=escapeHtml(eliminated.name);
   closeEliminationEffect();
@@ -50,7 +63,7 @@ function showEliminationEffect() {
   effect.setAttribute('role','dialog');
   effect.setAttribute('aria-modal','true');
   effect.setAttribute('aria-label',discussionText(...titles[kind]));
-  effect.innerHTML=`<span class="elimination-effect-flash" aria-hidden="true"></span><span class="elimination-effect-ring" aria-hidden="true"></span><div class="elimination-effect-scene"><span class="elimination-effect-icon" aria-hidden="true">${icons[kind]}</span><p class="elimination-effect-kicker">${discussionText('حدث في المباراة','Game event')}</p><h2>${discussionText(...titles[kind])}</h2><p class="elimination-effect-names">${names}</p><span class="elimination-effect-progress" aria-hidden="true"></span><button type="button" class="btn elimination-effect-skip" onclick="closeEliminationEffect()">${discussionText('تجاوز','Skip')}</button></div>`;
+  effect.innerHTML=`<div class="exit-atmosphere" aria-hidden="true"><span class="exit-beam"></span><span class="exit-orbit"></span>${Array.from({length:18},(_,i)=>`<i style="--i:${i};--x:${(i*37)%100}%;--drift:${(i%2?1:-1)*(20+i*3)}px;--delay:${(i%6)*.12}s"></i>`).join('')}</div><span class="exit-shutter exit-shutter-top" aria-hidden="true"></span><span class="exit-shutter exit-shutter-bottom" aria-hidden="true"></span><span class="elimination-effect-flash" aria-hidden="true"></span><span class="elimination-effect-ring" aria-hidden="true"></span><div class="exit-cinema-brand" aria-hidden="true">M A F I A <span>◆</span> N I G H T</div><div class="elimination-effect-scene"><p class="elimination-effect-kicker">${discussionText('انتهى دورك في هذه المباراة','YOUR PART IN THIS MATCH HAS ENDED')}</p><div class="exit-sigil"><span class="elimination-effect-icon">${eliminationEmblem(kind)}</span><span class="exit-sigil-mark" aria-hidden="true">◆</span></div><h2>${discussionText(...titles[kind])}</h2><p class="elimination-effect-names">${names}</p><div class="exit-cause-line" aria-hidden="true"><span></span>◆<span></span></div><p class="exit-afterword">${discussionText('تبقى الأسرار… وتستمر اللعبة','The secrets remain. The game continues.')}</p></div><footer class="exit-cinema-footer"><button type="button" class="btn elimination-effect-skip" onclick="closeEliminationEffect()">${discussionText('تجاوز المشهد','Skip scene')} <span aria-hidden="true">←</span></button><span class="elimination-effect-progress" aria-hidden="true"></span></footer>`;
   effect.addEventListener('keydown',event=>{if(event.key==='Escape')closeEliminationEffect();});
   document.body.appendChild(effect);
   rememberEliminationEffect(key);
@@ -127,6 +140,11 @@ function voteSummaryCard() {
   const label=name=>summary.phase==='verdict'?(name==='GUILTY'?discussionText('مذنب','Guilty'):discussionText('بريء','Innocent')):name;
   return `<section id="voteSummaryNotice" class="card" data-no-translate><h3>${discussionText('نتائج التصويت — الجولة','Voting results — round')} ${escapeHtml(summary.round)}</h3>${summary.counts.map(item=>`<div style="display:flex;justify-content:space-between;gap:16px;padding:6px 0"><b>${escapeHtml(label(item.name))}</b><strong>${escapeHtml(item.count)}</strong></div>`).join('')}<div style="display:flex;justify-content:space-between;gap:16px;padding:6px 0"><b>${discussionText('ما صوّت','Did not vote')}</b><strong>${escapeHtml(summary.abstained)}</strong></div></section>`;
 }
+function publicVotesCard() {
+  if(!game?.enabledRoles?.public_voting || !['vote','nomination','verdict'].includes(game.phase==='paused'?game.enabledRoles.paused_phase:game.phase))return '';
+  const targetLabel=id=>({SKIP:discussionText('امتناع','Abstain'),GUILTY:discussionText('إدانة','Guilty'),INNOCENT:discussionText('براءة','Innocent')})[id]||nameOf(id);
+  return `<section id="publicVotesNotice" class="card public-votes" data-no-translate><h3>${discussionText('التصويت العلني','Public voting')}</h3><p class="muted">${discussionText('اختيارات اللاعبين ظاهرة للجميع','Everyone can see each player’s choice')}</p>${(game.publicVotes||[]).map(v=>`<div class="public-vote-row"><b>${escapeHtml(nameOf(v.voterId))}</b><span aria-hidden="true">←</span><strong>${escapeHtml(targetLabel(v.target))}</strong></div>`).join('')||`<p>${discussionText('بانتظار أول صوت','Waiting for the first vote')}</p>`}</section>`;
+}
 function renderWithNotices(content,controller=false) {
   const app=$('#app'), focused=document.activeElement;
   const focusPhase=[game?.matchId,game?.phase,game?.round].join('|');
@@ -146,6 +164,7 @@ function renderWithNotices(content,controller=false) {
     if(!document.getElementById('leaderElectionCard'))$('#app').insertAdjacentHTML('afterbegin',leaderElectionCard());
     if(game?.me?.alive&&game.me.mafiaCountResult&&!document.getElementById('revealerResult')){const result=game.me.mafiaCountResult;$('#app').insertAdjacentHTML('afterbegin',`<section id="revealerResult" class="card" data-no-translate><h3>${discussionText('📡 نتيجة كشف الجولة','📡 Reveal result, round')} ${escapeHtml(result.round)}</h3><p>${discussionText('عدد المافيا الباقين عند إعلان الصباح','Mafia alive at dawn')}: <strong>${escapeHtml(result.count)}</strong></p></section>`);}
     if(!document.getElementById('voteSummaryNotice'))$('#app').insertAdjacentHTML('afterbegin',voteSummaryCard());
+    if(!document.getElementById('publicVotesNotice'))$('#app').insertAdjacentHTML('beforeend',publicVotesCard());
     if(!document.getElementById('eliminationNotice'))$('#app').insertAdjacentHTML('afterbegin',eliminationNotice());
     showEliminationEffect();
     if(game?.me?.alive && game.me.warnings?.length && !controller && !document.getElementById('hostWarningNotice')){const warning=game.me.warnings.at(-1);$('#app').insertAdjacentHTML('afterbegin',`<section id="hostWarningNotice" class="status wait" role="alert" data-no-translate><b>${discussionText('⚠️ إنذار من المضيف','⚠️ Warning from the host')}</b><p>${escapeHtml(warning.reason)}</p></section>`);}
@@ -271,7 +290,7 @@ function updateHostProgress() {
   if (game.phase === 'lobby') {
     title = discussionText(['','١ من ٣ · إعداد المباراة','٢ من ٣ · اختيار الأدوار','٣ من ٣ · جاهزية المباراة'][setupStep],['','1 of 3 · Game setup','2 of 3 · Select roles','3 of 3 · Ready to play'][setupStep]);
     const roles = roleDistribution();
-    status = !roles.valid ? discussionText('الأدوار أكثر من اللاعبين؛ قلّل الأدوار.','Too many roles; reduce the selection.') : game.players.length < 2 ? discussionText('يلزم لاعبان على الأقل لبدء المباراة.','At least two players are needed to start.') : discussionText(game.players.length + ' لاعبين · عدد الأدوار مناسب',game.players.length + ' players · Role counts fit');
+    status = game.players.length < 2 ? discussionText('بانتظار لاعبين — ' + game.players.length + ' من ٢', 'Waiting for players — ' + game.players.length + ' of 2') : !roles.valid ? discussionText('الأدوار أكثر من اللاعبين؛ قلّل الأدوار.','Too many roles; reduce the selection.') : discussionText(game.players.length + ' لاعبين · جاهزين لإعداد المباراة',game.players.length + ' players · Ready for setup');
   } else if (game.phase === 'reveal') {
     status = discussionText('أكد دوره ' + (game.roleReadyCount || 0) + ' من ' + game.players.length,(game.roleReadyCount || 0) + ' of ' + game.players.length + ' roles confirmed');
   } else if (game.phase === 'paused') {

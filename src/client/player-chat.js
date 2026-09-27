@@ -205,7 +205,7 @@ function renderVote() {
   const me = game.me;
   const targets = alivePlayers().filter((player) => player.id !== playerId);
   const nomination=game.phase==='nomination';
-  $('#app').innerHTML = `${phaseBar()}<div class="card"><div class="role-title">${nomination?'☝️ ترشيح متهم':'🗳️ التصويت السري'}</div>${me.voted?`<div class="status">✅ تم تسجيل صوتك ويمكنك تغييره حتى كشف النتيجة.</div>`:`<h2>${nomination?'من تريد محاكمته؟':'اختر لاعبًا للاستبعاد'}</h2>`}${choiceButtons(targets,'castVote')}${game.enabledRoles?.allow_no_vote?'<button class="pick skip" onclick="castVote(\'SKIP\')">✋ لا أريد اختيار أحد</button>':''}</div>`;
+  $('#app').innerHTML = `${phaseBar()}<div class="card"><div class="role-title">${nomination?'☝️ ترشيح متهم':game.enabledRoles?.public_voting?'🗳️ التصويت العلني':'🗳️ التصويت السري'}</div>${me.voted?`<div class="status">✅ تم تسجيل صوتك ويمكنك تغييره حتى كشف النتيجة.</div>`:`<h2>${nomination?'من تريد محاكمته؟':'اختر لاعبًا للاستبعاد'}</h2>`}${choiceButtons(targets,'castVote')}${game.enabledRoles?.allow_no_vote?'<button class="pick skip" onclick="castVote(\'SKIP\')">✋ لا أريد اختيار أحد</button>':''}</div>`;
 }
 
 let actionFeedback = null;
