@@ -7,7 +7,7 @@ async function createRoom() {
     saveSession(true);
     renderHost();
     startPolling(true);
-  } catch (error) { if (error.code === 'UNAUTHORIZED') { logoutHost(); alert('انتهت جلسة المضيف. سجّل الدخول من جديد.'); } else alert('تعذر إنشاء الغرفة / Could not create room'); }
+  } catch (error) { if (error.code === 'UNAUTHORIZED') { logoutHost(); alert('انتهت جلسة المضيف. سجّل الدخول من جديد.'); } else alert(hostCodeError(error)||'تعذر إنشاء الغرفة / Could not create room'); }
 }
 async function createSoloRoom() {
   spectatorMode=false;delegatedHostMode=false;playerId='';playerToken='';

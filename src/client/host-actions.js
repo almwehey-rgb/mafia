@@ -43,7 +43,7 @@ async function startGame() {
     localHistory = []; localStorage.removeItem(`mafia-history-${game.code}`);
     signalPhase(); rememberEvent();
     renderHost();
-  } catch (error) { alert(error.code === 'STALE_GAME' ? 'تغيّرت حالة الغرفة. انتظر تحديث الشاشة ثم حاول مجددًا.' : 'تأكد من وجود لاعبين كافين / Check player count'); }
+  } catch (error) { alert(hostCodeError(error)||(error.code === 'STALE_GAME' ? 'تغيّرت حالة الغرفة. انتظر تحديث الشاشة ثم حاول مجددًا.' : 'تأكد من وجود لاعبين كافين / Check player count')); }
   finally { lifecycleRequestPending = false; }
 }
 async function restartGame() {
@@ -60,7 +60,7 @@ async function restartGame() {
     localHistory = []; localStorage.removeItem(`mafia-history-${game.code}`);
     closeSheet(); signalPhase(); rememberEvent(); renderHost();
   } catch (error) {
-    alert(error.code === 'STALE_GAME' ? 'تغيّرت حالة الغرفة. انتظر تحديث الشاشة ثم حاول مجددًا.' : 'تعذرت إعادة القيم، حاول مجددًا.');
+    alert(hostCodeError(error)||(error.code === 'STALE_GAME' ? 'تغيّرت حالة الغرفة. انتظر تحديث الشاشة ثم حاول مجددًا.' : 'تعذرت إعادة القيم، حاول مجددًا.'));
   } finally { lifecycleRequestPending = false; }
 }
 async function hostAction(action) {

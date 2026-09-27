@@ -43,7 +43,11 @@ async function routeStart(context:RoomRouteContext) {
         p_assignments: assignments, p_settings: selectedRoles,
         p_mafia: mafiaCount, p_detectives: detectiveCount, p_questions: detectiveQuestions,
       });
-      if (error) throw error;
+      if (error) {
+        const accessError=['ACCESS_CODE_DISABLED','ACCESS_CODE_EXHAUSTED'].find(key=>String(error.message).includes(key));
+        if(accessError)return out({error:accessError},403);
+        throw error;
+      }
       if (transition?.error) return out({ error: transition.error }, transition.error === "UNAUTHORIZED" ? 403 : 409);
       if (transition?.ok !== true) throw new Error("START_FAILED");
       ({ room, players } = await load(code));

@@ -21,6 +21,7 @@ export async function edgeFixture({fresh=false,sourcePath,log=console,environmen
    await db.exec(readFileSync(new URL('../../supabase/migrations/202609120002_atomic_transitions.sql',import.meta.url),'utf8'));
    await db.exec(readFileSync(new URL('../../supabase/migrations/20260913121414_atomic_join_seat.sql',import.meta.url),'utf8'));
   }
+  await db.exec(readFileSync(new URL('../../supabase/host-access-codes.sql',import.meta.url),'utf8'));
   await db.query('insert into mafia_host_auth(pin_hash) values($1)',[createHash('sha256').update('12345678').digest('hex')]);
   function reload(nextSource){
   let handler;

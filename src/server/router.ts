@@ -20,6 +20,7 @@ async function handleRequest(request:Request) {
     const started = Date.now();
     if (action === "health") return out({ status: "ok", version: 20, time: new Date().toISOString() });
     if (action === "hostLogin") return await routeHostLogin({body, action, ip, now, started});
+    if (action === "hostCodes") return await routeHostCodes({body, action, ip, now, started});
     if (action === "hostPreferences") return await routeHostPreferences({body, action, ip, now, started});
     if (action === "hostLogout") return await routeHostLogout({body, action, ip, now, started});
     if (action === "recoverProfile") return await routeRecoverProfile({body, action, ip, now, started});

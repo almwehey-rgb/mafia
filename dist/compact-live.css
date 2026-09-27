@@ -295,3 +295,16 @@ body:has(#eliminationNotice)::before { display: none !important; }
   .elimination-effect-flash, .elimination-effect-ring { display: none; }
   .elimination-effect-progress { display: none; }
 }
+/* Host pass management remains usable at phone widths. */
+.host-code-manager { max-width: 760px; margin-inline: auto; }
+.host-code-manager .toolbar { flex-wrap: wrap; }
+.host-code-manager h1 { font-size: 25px; margin: 0; }
+.host-code-manager form { display: grid; gap: 6px; margin-block: 20px; }
+.host-code-manager .input { margin: 0 0 8px; min-width: 0; }
+.host-code-list { display: grid; gap: 12px; }
+.host-code-item { padding: 14px; border: 1px solid var(--line); border-radius: 14px; overflow-wrap: anywhere; }
+.host-code-item code { display: block; font-size: 20px; letter-spacing: 1px; margin-block: 10px; }
+.host-code-item .actions { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 6px; }
+.host-code-item .btn { padding: 9px 4px; font-size: 14px; min-height: 44px; }
+.host-pass-login { margin-top: 18px; text-align: start; }
+.host-pass-login summary { padding: 12px 0; cursor: pointer; font-weight: 800; }
