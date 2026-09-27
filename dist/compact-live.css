@@ -660,3 +660,38 @@ body #app .lobby-join .actions .btn[onclick="showModeration()"] { grid-column:1/
 .public-entry .input,.public-entry .btn { min-height:48px; border-radius:12px; margin-bottom:12px; }
 .public-entry .muted { font-size:14px; line-height:1.8; }
 .entry-divider { margin:4px 0 16px; color:var(--muted); }
+
+/* Opening draw is a short stage, not a second speaking-order dashboard. */
+body #app .compact-opening-draw { margin:0; padding:12px; text-align:center; border-radius:16px; }
+body #app .compact-opening-draw h2 { font-size:20px; margin:0; }
+body #app .compact-opening-draw .fair-draw-wheel { width:min(200px,28dvh); margin:16px auto; }
+body #app .compact-opening-draw .fair-draw-sector { font-size:18px; font-weight:800; }
+body #app .compact-opening-draw p { margin:6px 0; font-size:18px; font-weight:700; }
+body #app .draw-participants { text-align:start; }
+body #app .draw-participants summary { padding:10px 4px; min-height:44px; font-size:14px; cursor:pointer; }
+body #app .draw-participants ol { max-height:140px; overflow:auto; margin:0; padding-inline-start:28px; }
+body #app .draw-participants li { padding:5px; overflow-wrap:anywhere; }
+body #app .discussion-panel { margin:0; }
+body #app .discussion-speaker { font-size:clamp(24px,5vw,34px); line-height:1.3; overflow-wrap:anywhere; }
+body #app .discussion-clock { font-size:clamp(38px,7dvh,56px); line-height:1.15; margin:8px 0; }
+body #app .discussion-order { margin:0; font-size:13px; }
+body #app .speaker-queue { margin:8px 0; }
+body #app .speakers-upcoming > summary { padding:10px 4px; min-height:44px; }
+body #app .discussion-panel .actions { gap:8px; margin-top:8px; }
+body #app .discussion-panel .actions:empty { display:none; }
+body:has(#app > .player-tools) #app:has(> .discussion-panel) > .player-tools { position:static!important; flex-shrink:0; }
+body #app:has(.draw-in-progress) > .auto-ready { display:none; }
+body #app .draw-in-progress { padding:8px!important; }
+body #app .compact-opening-draw .fair-draw-wheel { width:min(180px,24dvh); }
+body #app .draw-wait-note { font-size:13px!important; margin:8px 0 0!important; }
+body:has(#app > .player-tools) #app > .discussion-panel { gap:4px!important; padding:10px!important; }
+body:has(#app > .player-tools) #app .discussion-speaker { margin:0!important; }
+body:has(#app > .player-tools) #app .discussion-clock { margin:4px 0!important; font-size:44px!important; line-height:1.1!important; }
+body:has(#app > .player-tools) #app .discussion-order { margin:0!important; }
+body:has(#app > .player-tools) #app .speaker-queue { margin:0!important; }
+body #app:has(> .discussion-panel) .auto-ready { padding:10px!important; }
+body #app:has(> .discussion-panel) .auto-ready h3 { display:none; }
+body #app:has(> .discussion-panel) .auto-ready p { margin:0 0 6px; font-size:13px; line-height:1.4; }
+@media (max-height:700px) {
+  body:has(#app > .player-tools) #app:has(> .discussion-panel) { gap:4px!important; }
+}

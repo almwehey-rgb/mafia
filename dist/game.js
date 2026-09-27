@@ -934,7 +934,7 @@ function lobbyPaneTabs() {
 }
 function eventCards() {
   const detailedCauses=new Set(visibleEliminations().map(player=>player.reason));
-  const events = String(game.lastEvent || '').split(',').filter(event=>event&&!detailedCauses.has(event));
+  const events = String(game.lastEvent || '').split(',').filter(event=>event&&event!=='detective_only_night'&&!detailedCauses.has(event));
   const kids={mafia_kill:'🌙 اختار الفريق الغامض لاعبًا للخروج.',mafia_skipped:'🌙 لم يختر الفريق الغامض أحدًا.',mafia_disabled:'🌙 هذه اللعبة بدون اختيار ليلي للفريق الغامض.',mafia_delayed:'🌙 تبدأ اختيارات الفريق الغامض من الليلة الثانية.',doctor_saved:'🛡️ حمى الحارس اللاعب.',vote_eliminated:'🗳️ خرج اللاعب باختيار المجموعة.'};
   return events.map((event) => { const delayed = event === 'mafia_delayed' ? `🌙 لا يوجد اغتيال مافيا هذه الليلة. يبدأ من الليلة ${game.enabledRoles?.mafia_kill_start_round || 1}.` : null; return `<div class="event announcement-event ${event.endsWith('saved')?'announcement-saved':''}" role="status">${delayed || (game.enabledRoles?.kids_mode&&(kids[event])?kids[event]:(eventText[event] || escapeHtml(event)))}</div>`; }).join('');
 }

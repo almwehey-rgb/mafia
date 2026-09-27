@@ -18,6 +18,8 @@ for(const name of (await readdir('dist')).filter(n=>/\.(js|css)$/.test(n)&&n!=='
 for(const name of (await readdir('dist/assets/role-cards-v3')).filter(n=>n.endsWith('.webp')).sort())versions['/assets/role-cards-v3/'+name]=hash(await readFile('dist/assets/role-cards-v3/'+name));
 for(const name of (await readdir('dist/assets/role-cards-kids')).filter(n=>n.endsWith('.webp')).sort())versions['/assets/role-cards-kids/'+name]=hash(await readFile('dist/assets/role-cards-kids/'+name));
 versions['/assets/mafia-gold-icon.webp']=hash(await readFile('dist/assets/mafia-gold-icon.webp'));
+for(const name of ['apple-touch-icon-v2.png','app-icon-192-v2.png','app-icon-512-v2.png','app-icon-maskable-512-v2.png'])versions['/assets/'+name]=hash(await readFile('dist/assets/'+name));
+versions['/manifest.webmanifest']=hash(await readFile('dist/manifest.webmanifest'));
 html=html.replace(/(src|href)="(\/[^"?]+\.(?:js|css))(?:\?[^\"]*)?"/g,(_,attr,url)=>`${attr}="${url}?v=${versions[url]}"`);
 const release=hash(JSON.stringify(versions));
 html=html.replace('</head>',`<script>window.MAFIA_RELEASE=${JSON.stringify(release)};window.MAFIA_ASSETS=${JSON.stringify(Object.fromEntries(['/admin.js','/qrcode.js','/admin-qr.js'].map(p=>[p,p+'?v='+versions[p]])))};</script>\n</head>`);

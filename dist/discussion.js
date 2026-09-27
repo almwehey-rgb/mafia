@@ -47,22 +47,20 @@ function openingDrawGeometry(candidates, winner) {
   };
 }
 function discussionRoulette(view) {
-  if(!view.roulette || view.mode!=='turns' || view.complete)return '';
+  if(!openingDrawActive(view))return '';
   const candidates = view.roulette.candidates || [];
   const winner = view.roulette.winner;
   if (!candidates.length || !candidates.includes(winner)) return '';
   const elapsed = openingDrawElapsed(view);
-  const order = view.order.filter(id=>candidates.includes(id));
   const duration = openingDrawDuration(view);
-  const settled = elapsed >= duration;
   const geometry = openingDrawGeometry(candidates, winner);
   const colors = ['#66acb3','#d4a856','#9472b2','#77994f','#bc778b','#5488b6','#bb794b','#638f80','#8c83bc'].map((color,i)=>`var(--draw-color-${i+1},${color})`);
   const sectors = candidates.map((id,i) => `${colors[i % colors.length]} ${i*geometry.size}deg ${(i+1)*geometry.size}deg`).join(',');
   const labels = candidates.map((id,i) => {
     const angle = (i+.5)*geometry.size*Math.PI/180;
-    return `<span class="fair-draw-sector" style="left:${50+Math.sin(angle)*32}%;top:${50-Math.cos(angle)*32}%"><bdi>${escapeHtml(nameOf(id))}</bdi></span>`;
+    return `<span class="fair-draw-sector" style="left:${50+Math.sin(angle)*32}%;top:${50-Math.cos(angle)*32}%"><bdi>${i+1}</bdi></span>`;
   }).join('');
-  return `<details class="opening-roulette clear-draw animated-draw fair-draw ${settled?'draw-settled':''}" style="--draw-duration:${duration}ms;--draw-delay:-${Math.min(elapsed,duration)}ms;--draw-play:${view.pausedAt?'paused':'running'};--draw-rotation:${geometry.rotation}deg" ${view.index===0&&!settled?'open':''} data-no-translate><summary><span>${discussionText('قرعة بداية النقاش','Opening draw')}</span><bdi class="draw-after">${escapeHtml(nameOf(winner))}</bdi><span class="draw-chevron" aria-hidden="true">⌄</span></summary><div class="draw-content"><div class="draw-heading"><span class="draw-emblem" aria-hidden="true">✦</span><div><h3>${discussionText('من يبدأ النقاش؟','Who speaks first?')}</h3><p>${discussionText('القرعة تحدد من يبدأ','The draw chooses who starts')}</p></div></div><div class="fair-draw-wheel" aria-hidden="true"><span class="fair-draw-pointer"></span><div class="fair-draw-disc" style="background:conic-gradient(${sectors})">${labels}</div><span class="fair-draw-hub">✦</span></div><div class="draw-contenders">${candidates.map((id,i)=>`<span style="--contender-color:${colors[i%colors.length]}"><i aria-hidden="true">${i+1}</i><bdi>${escapeHtml(nameOf(id))}</bdi></span>`).join('')}</div><div class="draw-selected"><span class="draw-label">${discussionText('المتحدث الأول','FIRST SPEAKER')}</span><strong class="draw-name-stage"><span class="draw-before">${discussionText('القرعة تدور…','Drawing…')}</span><bdi class="draw-after draw-final">${escapeHtml(nameOf(winner))}</bdi></strong><span class="draw-selected-note draw-after">${discussionText('اختارته القرعة لافتتاح النقاش','Selected by the draw to open the discussion')}</span></div><div class="draw-order-heading draw-after">${discussionText('ترتيب المشاركين في القرعة','Draw participants in speaking order')}<span>${order.length}</span></div><ol class="draw-order draw-after">${order.map((id,i)=>`<li class="${id===winner?'draw-first':''}"><span class="draw-position">${i+1}</span><bdi>${escapeHtml(nameOf(id))}</bdi><small>${i===0?discussionText('الأول','First'):i===1?discussionText('الثاني','Second'):discussionText('بالترتيب','In order')}</small></li>`).join('')}</ol></div></details>`;
+  return `<div class="opening-roulette fair-draw compact-opening-draw" style="--draw-duration:${duration}ms;--draw-delay:-${Math.min(elapsed,duration)}ms;--draw-play:${view.pausedAt?'paused':'running'};--draw-rotation:${geometry.rotation}deg" data-no-translate><h2>${discussionText('من يبدأ النقاش؟','Who speaks first?')}</h2><div class="fair-draw-wheel" aria-hidden="true"><span class="fair-draw-pointer"></span><div class="fair-draw-disc" style="background:conic-gradient(${sectors})">${labels}</div><span class="fair-draw-hub">✦</span></div><p role="status">${discussionText(view.pausedAt?'القرعة متوقفة مؤقتًا':'القرعة تدور…',view.pausedAt?'Draw paused':'Drawing…')}</p><details class="draw-participants"><summary>${discussionText('المشاركون في القرعة','Draw participants')} (${candidates.length})</summary><ol>${candidates.map(id=>`<li><bdi>${escapeHtml(nameOf(id))}</bdi></li>`).join('')}</ol></details></div>`;
 }
 function discussionQueue(view) {
   if(view.mode!=='turns'||!view.order?.length)return '';
@@ -73,7 +71,7 @@ function discussionQueue(view) {
     return `<li class="speaker-row ${state}" ${state==='current'?'aria-current="step"':''}><span class="speaker-position">${i+1}</span><bdi class="speaker-name">${escapeHtml(nameOf(id))}</bdi><span class="speaker-state">${label}</span></li>`;
   };
   const remaining=view.order.slice(cursor);
-  return `<div class="speaker-queue"><h3>${discussionText('ترتيب المتحدثين','Speaking order')}</h3><ol class="speaker-list">${remaining.slice(0,1).map((id,i)=>row(id,i+cursor)).join('')}</ol>${remaining.length>1?`<details class="speakers-upcoming" data-disclosure-key="upcoming-speakers"><summary>${discussionText('عرض بقية الترتيب','Show remaining order')} (${remaining.length-1})</summary><ol class="speaker-list">${remaining.slice(1).map((id,i)=>row(id,i+cursor+1)).join('')}</ol></details>`:''}${cursor>0?`<details class="speakers-finished"><summary>${discussionText('أنهوا دورهم','Completed turns')} (${cursor})</summary><ol class="speaker-list">${view.order.slice(0,cursor).map(row).join('')}</ol></details>`:''}</div>`;
+  return `<div class="speaker-queue">${remaining.length>1?`<details class="speakers-upcoming" data-disclosure-key="upcoming-speakers"><summary>${discussionText('عرض بقية الترتيب','Show remaining order')} (${remaining.length-1})</summary><ol class="speaker-list">${remaining.slice(1).map((id,i)=>row(id,i+cursor+1)).join('')}</ol></details>`:''}${cursor>0?`<details class="speakers-finished"><summary>${discussionText('أنهوا دورهم','Completed turns')} (${cursor})</summary><ol class="speaker-list">${view.order.slice(0,cursor).map(row).join('')}</ol></details>`:''}</div>`;
 }
 function discussionPanel(controller) {
   const view = clientDiscussion();
