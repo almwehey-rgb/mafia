@@ -665,7 +665,8 @@ body #app .lobby-join .actions .btn[onclick="showModeration()"] { grid-column:1/
 body #app .compact-opening-draw { margin:0; padding:12px; text-align:center; border-radius:16px; }
 body #app .compact-opening-draw h2 { font-size:20px; margin:0; }
 body #app .compact-opening-draw .fair-draw-wheel { width:min(200px,28dvh); margin:16px auto; }
-body #app .compact-opening-draw .fair-draw-sector { font-size:18px; font-weight:800; }
+body #app .compact-opening-draw .fair-draw-sector { width:32%; font-weight:800; }
+body #app .compact-opening-draw .fair-draw-sector bdi { max-width:100%; font-size:clamp(10px,2.8vw,13px); line-height:1.25; overflow-wrap:anywhere; }
 body #app .compact-opening-draw p { margin:6px 0; font-size:18px; font-weight:700; }
 body #app .draw-participants { text-align:start; }
 body #app .draw-participants summary { padding:10px 4px; min-height:44px; font-size:14px; cursor:pointer; }

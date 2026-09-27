@@ -58,7 +58,7 @@ function discussionRoulette(view) {
   const sectors = candidates.map((id,i) => `${colors[i % colors.length]} ${i*geometry.size}deg ${(i+1)*geometry.size}deg`).join(',');
   const labels = candidates.map((id,i) => {
     const angle = (i+.5)*geometry.size*Math.PI/180;
-    return `<span class="fair-draw-sector" style="left:${50+Math.sin(angle)*32}%;top:${50-Math.cos(angle)*32}%"><bdi>${i+1}</bdi></span>`;
+    return `<span class="fair-draw-sector" style="left:${50+Math.sin(angle)*32}%;top:${50-Math.cos(angle)*32}%"><bdi>${escapeHtml(nameOf(id))}</bdi></span>`;
   }).join('');
   return `<div class="opening-roulette fair-draw compact-opening-draw" style="--draw-duration:${duration}ms;--draw-delay:-${Math.min(elapsed,duration)}ms;--draw-play:${view.pausedAt?'paused':'running'};--draw-rotation:${geometry.rotation}deg" data-no-translate><h2>${discussionText('من يبدأ النقاش؟','Who speaks first?')}</h2><div class="fair-draw-wheel" aria-hidden="true"><span class="fair-draw-pointer"></span><div class="fair-draw-disc" style="background:conic-gradient(${sectors})">${labels}</div><span class="fair-draw-hub">✦</span></div><p role="status">${discussionText(view.pausedAt?'القرعة متوقفة مؤقتًا':'القرعة تدور…',view.pausedAt?'Draw paused':'Drawing…')}</p><details class="draw-participants"><summary>${discussionText('المشاركون في القرعة','Draw participants')} (${candidates.length})</summary><ol>${candidates.map(id=>`<li><bdi>${escapeHtml(nameOf(id))}</bdi></li>`).join('')}</ol></details></div>`;
 }

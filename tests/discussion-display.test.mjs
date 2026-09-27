@@ -11,6 +11,8 @@ test('Draw shows saved winner and queue follows server order without revealing r
  assert.match(html,/compact-opening-draw/);assert.match(html,/fair-draw-disc/);assert.match(html,/&lt;b&gt;/);
  assert.doesNotMatch(html,/draw-selected|draw-order|draw-contenders/);
  assert.equal((html.match(/class="fair-draw-sector"/g)||[]).length,2);
+ const wheelLabels=[...html.matchAll(/class="fair-draw-sector"[^>]*><bdi>(.*?)<\/bdi>/g)].map(match=>match[1]);
+ assert.deepEqual(wheelLabels,['بدر','أحمد &lt;b&gt;']);
  assert.match(html,/بدر/);assert.match(html,/أحمد &lt;b&gt;/);
  assert.match(html,/0deg 180deg/);assert.match(html,/180deg 360deg/);
  assert.doesNotMatch(html,/حقيقي|مزيف|mafia|detective/);
