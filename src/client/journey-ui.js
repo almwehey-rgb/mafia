@@ -134,16 +134,22 @@ function leaderElectionCard(){
  const ended=Date.now()+discussionClockOffset>=game.me.leaderDeadline;
  return `<section id="leaderElectionCard" class="card"><h2>اختيار زعيم المافيا الجديد</h2><p>تصويت سري بعد التنازل. الأكثر أصواتًا يصبح الزعيم، والتعادل بقرعة. تنتهي المهلة خلال 30 ثانية، وتبقى القيادة الحالية حتى حسم البديل.</p>${ended?'<button class="btn gold" onclick="electMafiaLeader(&quot;FINALIZE&quot;)">حسم التصويت وتحديث الكروت</button>':game.me.leaderVote?'<p>تم تسجيل صوتك. بانتظار بقية الفريق.</p>':choiceButtons((game.me.mafiaTeam||[]).filter(p=>p.id!==game.me.leaderFormer&&p.alive!==false),'electMafiaLeader',{icon:'👑'})}</section>`;
 }
+function voteCountRow(name,count,voters,key) {
+  const heading=`<span class="vote-target-name">${escapeHtml(name)}</span><strong class="vote-count-badge">${escapeHtml(count)} ${discussionText('أصوات','votes')}</strong>`;
+  if(!game?.enabledRoles?.public_voting || !Array.isArray(voters))return `<div class="vote-count-row">${heading}</div>`;
+  return `<details class="vote-count-details" data-disclosure-key="${escapeHtml(key)}"><summary>${heading}<span class="vote-expand-mark" aria-hidden="true">⌄</span></summary><ul class="vote-voter-list">${voters.map(v=>`<li>${escapeHtml(v.name)}</li>`).join('')}</ul></details>`;
+}
 function voteSummaryCard() {
   const summary=game?.voteSummary;
   if(!summary)return '';
   const label=name=>summary.phase==='verdict'?(name==='GUILTY'?discussionText('مذنب','Guilty'):discussionText('بريء','Innocent')):name;
-  return `<section id="voteSummaryNotice" class="card" data-no-translate><h3>${discussionText('نتائج التصويت — الجولة','Voting results — round')} ${escapeHtml(summary.round)}</h3>${summary.counts.map(item=>`<div style="display:flex;justify-content:space-between;gap:16px;padding:6px 0"><b>${escapeHtml(label(item.name))}</b><strong>${escapeHtml(item.count)}</strong></div>`).join('')}<div style="display:flex;justify-content:space-between;gap:16px;padding:6px 0"><b>${discussionText('ما صوّت','Did not vote')}</b><strong>${escapeHtml(summary.abstained)}</strong></div></section>`;
+  return `<section id="voteSummaryNotice" class="card" data-no-translate><h3>${discussionText('نتائج التصويت — الجولة','Voting results — round')} ${escapeHtml(summary.round)}</h3>${summary.counts.map(item=>voteCountRow(label(item.name),item.count,item.voters,`result-${game.matchId}-${summary.round}-${summary.phase}-${item.id||item.name}`)).join('')}${voteCountRow(discussionText('امتناع / لم يصوّت','Abstained / did not vote'),summary.abstained,null,'')}</section>`;
 }
 function publicVotesCard() {
-  if(!game?.enabledRoles?.public_voting || !['vote','nomination','verdict'].includes(game.phase==='paused'?game.enabledRoles.paused_phase:game.phase))return '';
+  if(!['vote','nomination','verdict'].includes(game?.phase==='paused'?game.enabledRoles?.paused_phase:game?.phase))return '';
   const targetLabel=id=>({SKIP:discussionText('امتناع','Abstain'),GUILTY:discussionText('إدانة','Guilty'),INNOCENT:discussionText('براءة','Innocent')})[id]||nameOf(id);
-  return `<section id="publicVotesNotice" class="card public-votes" data-no-translate><h3>${discussionText('التصويت العلني','Public voting')}</h3><p class="muted">${discussionText('اختيارات اللاعبين ظاهرة للجميع','Everyone can see each player’s choice')}</p>${(game.publicVotes||[]).map(v=>`<div class="public-vote-row"><b>${escapeHtml(nameOf(v.voterId))}</b><span aria-hidden="true">←</span><strong>${escapeHtml(targetLabel(v.target))}</strong></div>`).join('')||`<p>${discussionText('بانتظار أول صوت','Waiting for the first vote')}</p>`}</section>`;
+  const counts=game.voteTallies||Object.entries((game.publicVotes||[]).reduce((acc,v)=>{acc[v.target]=(acc[v.target]||0)+1;return acc;},{})).map(([target,count])=>({target,count}));
+  return `<section id="publicVotesNotice" class="card public-votes" data-no-translate><h3>${discussionText('الأصوات الحالية','Current votes')}</h3><p class="muted">${game.enabledRoles?.public_voting?discussionText('اضغط على اللاعب لمعرفة من صوّت له','Select a player to see their voters'):discussionText('تصويت سري — أسماء المصوّتين مخفية','Secret ballot — voter names are hidden')}</p>${[...counts].sort((a,b)=>b.count-a.count).map(item=>voteCountRow(targetLabel(item.target),item.count,game.enabledRoles?.public_voting?(game.publicVotes||[]).filter(v=>v.target===item.target).map(v=>({name:nameOf(v.voterId)})):null,`live-${game.matchId}-${game.round}-${game.phase}-${item.target}`)).join('')||`<p>${discussionText('بانتظار أول صوت','Waiting for the first vote')}</p>`}</section>`;
 }
 function renderWithNotices(content,controller=false) {
   const app=$('#app'), focused=document.activeElement;
@@ -165,6 +171,7 @@ function renderWithNotices(content,controller=false) {
     if(game?.me?.alive&&game.me.mafiaCountResult&&!document.getElementById('revealerResult')){const result=game.me.mafiaCountResult;$('#app').insertAdjacentHTML('afterbegin',`<section id="revealerResult" class="card" data-no-translate><h3>${discussionText('📡 نتيجة كشف الجولة','📡 Reveal result, round')} ${escapeHtml(result.round)}</h3><p>${discussionText('عدد المافيا الباقين عند إعلان الصباح','Mafia alive at dawn')}: <strong>${escapeHtml(result.count)}</strong></p></section>`);}
     if(!document.getElementById('voteSummaryNotice'))$('#app').insertAdjacentHTML('afterbegin',voteSummaryCard());
     if(!document.getElementById('publicVotesNotice'))$('#app').insertAdjacentHTML('beforeend',publicVotesCard());
+    for(const element of app.querySelectorAll('.vote-count-details[data-disclosure-key]'))if(disclosures.has(element.dataset.disclosureKey))element.open=disclosures.get(element.dataset.disclosureKey);
     if(!document.getElementById('eliminationNotice'))$('#app').insertAdjacentHTML('afterbegin',eliminationNotice());
     showEliminationEffect();
     if(game?.me?.alive && game.me.warnings?.length && !controller && !document.getElementById('hostWarningNotice')){const warning=game.me.warnings.at(-1);$('#app').insertAdjacentHTML('afterbegin',`<section id="hostWarningNotice" class="status wait" role="alert" data-no-translate><b>${discussionText('⚠️ إنذار من المضيف','⚠️ Warning from the host')}</b><p>${escapeHtml(warning.reason)}</p></section>`);}

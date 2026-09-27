@@ -39,7 +39,8 @@ function mountHomeCharacters() {
  homeGalleryObserver.observe(gallery);
 }
 function homeCharacters() {
- return `<section class="cinema-cards" aria-label="الشخصيات الرئيسية">${[['detective','المحقق'],['mafia_boss','زعيم المافيا'],['doctor','الطبيب']].map(([role,title])=>`<button class="cinema-character" onclick="previewHomeRole('${role}')" aria-label="شرح دور ${title}"><img src="/assets/role-cards-v3/${role}-thumb.webp" alt="${title}" width="1024" height="1536" loading="lazy" decoding="async"></button>`).join('')}<p>اكتشف دورك… والعبها بذكاء</p></section>`;
+ const roles=['mafia_boss','mafia','detective','doctor','citizen','jailer','lawyer','vigilante','revealer','witch','cupid','escort','serial_killer','jester'];
+ return `<section class="cinema-cards home-card-collection" aria-label="${discussionText('شخصيات اللعبة','Game characters')}">${roles.map(role=>`<figure class="home-character-art"><img src="${roleCardAsset(role,true)}" alt="${escapeHtml(roleLabel(role))}" width="512" height="768" loading="lazy" decoding="async"></figure>`).join('')}</section>`;
 }
 function previewHomeRole(role){openSheet('شرح الشخصية',interactiveRoleCard(role,{open:true}));}
 function showGuide() {

@@ -264,11 +264,25 @@ test('Public vote totals persist after resolution without exposing voter identit
   f.advance(61000);const r=await f.call('resolveVote',f.host);assert.equal(r.status,200);
   const summary=r.body.voteSummary;assert.equal(summary.round,1);assert.equal(summary.abstained,1);
   assert.equal(summary.counts.reduce((n,p)=>n+p.count,0),phase==='verdict'?2:3);
-  assert.deepEqual(Object.keys(summary.counts[0]).sort(),['count','name']);
+  assert.deepEqual(Object.keys(summary.counts[0]).sort(),['count','id','name']);
   const playerView=await f.call('state',{id:'a',playerToken:'token-a'});assert.deepEqual(playerView.body.voteSummary,summary);
   assert.equal(playerView.body.players.some(p=>p.voteTarget||p.vote_target),false);
  }
 });
+test('Public vote result stores exact voter names and secret mode strips the breakdown',async()=>{
+ for(const phase of ['vote','nomination','verdict']){
+  const f=fixture();const room=f.rooms[0];room.phase=phase;room.accused_player='b';room.enabled_roles.public_voting=true;f.players[2].role='mafia_boss';
+  const target=phase==='verdict'?'GUILTY':'b';
+  for(const p of f.players)p.vote_target=target;
+  const result=await f.call('resolveVote',f.host);assert.equal(result.status,200);
+  const entry=result.body.voteSummary.counts[0];assert.equal(entry.count,phase==='verdict'?3:4);
+  assert.equal(entry.voters.length,entry.count);assert.ok(entry.voters.every(v=>typeof v.id==='string'&&typeof v.name==='string'));
+  if(phase==='verdict')assert.ok(!entry.voters.some(v=>v.id==='b'));
+  room.enabled_roles.public_voting=false;
+  const secret=await f.call('state',f.host);assert.ok(secret.body.voteSummary.counts.every(item=>!('voters' in item)));
+ }
+});
+
 test('Revealer learns only surviving Mafia count after night two and respects blocks',async()=>{
  for(const blocked of [false,true]){
   const f=fixture();f.rooms[0].phase='night';f.players[0].role='revealer';f.players[0].action_target=null;f.players[1].role='mafia_boss';f.players[1].action_target='SKIP';f.players[2].role='escort';f.players[2].action_target=blocked?'a':'bot';

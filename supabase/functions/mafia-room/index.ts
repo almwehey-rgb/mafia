@@ -389,7 +389,9 @@ function publicView(room: any, players: any[], meId?: string, host = false) {
     detectiveQuestions: detectiveQuestionCount(room.detective_questions), jailerExecutions: room.jailer_executions,
     enabledRoles: { ...settings, mafia_kill_enabled: mafiaKillEnabledForRound(room) },
     lastEvent: room.last_event, lastDeaths: room.last_deaths || [],
-    voteSummary: room.enabled_roles?.vote_summary || null,
+    voteSummary: room.enabled_roles?.vote_summary ? { ...room.enabled_roles.vote_summary, counts: (room.enabled_roles.vote_summary.counts || []).map((item: any) => ({ id: item.id, name: item.name, count: item.count, ...(settings.public_voting && Array.isArray(item.voters) ? { voters: item.voters.map((v: any) => ({ id: v.id, name: v.name })) } : {}) })) } : null,
+    voteTallies: ["vote", "nomination", "verdict"].includes(room.phase === "paused" ? settings.paused_phase : room.phase)
+      ? Object.entries(players.filter(x => x.alive && x.vote_target).reduce((counts: Record<string, number>, x) => { counts[x.vote_target] = (counts[x.vote_target] || 0) + 1; return counts; }, {})).map(([target, count]) => ({ target, count })) : undefined,
     publicVotes: settings.public_voting && ["vote", "nomination", "verdict"].includes(room.phase === "paused" ? settings.paused_phase : room.phase)
       ? players.filter(x => x.alive && x.vote_target).map(x => ({ voterId: x.id, target: x.vote_target })) : undefined,
     eliminations: (room.last_deaths || []).map((id: string) => { const p = players.find((x) => x.id === id); const elimination = roleState(p || {}).elimination; return { id, name: p?.name || "", reason: elimination?.reason || "eliminated", round: elimination?.round ?? null, at: elimination?.at ?? null, detail: elimination?.reason === "host_expelled" ? elimination.detail : undefined }; }),
@@ -1760,7 +1762,9 @@ async function routeResolveVote(context:RoomRouteContext) {
         else totals[voter.vote_target] = (totals[voter.vote_target] || 0) + 1;
       }
       const voteSummary = { round: room.round, phase: room.phase, abstained,
-        counts: Object.entries(totals).map(([id, count]) => ({ name: room.phase === "verdict" ? id : players.find(p => p.id === id)?.name || "", count })).sort((a,b) => b.count-a.count) };
+        counts: Object.entries(totals).map(([id, count]) => ({ id, name: room.phase === "verdict" ? id : players.find(p => p.id === id)?.name || "", count,
+          ...(enabledRoles(room.enabled_roles).public_voting ? { voters: requiredVoters.filter(p => p.vote_target === id).map(p => ({ id: p.id, name: p.name })) } : {})
+        })).sort((a,b) => b.count-a.count) };
       room.enabled_roles = { ...room.enabled_roles, vote_summary: voteSummary };
       const { error: summaryError } = await db.from("mafia_rooms").update({ enabled_roles: room.enabled_roles }).eq("code",code);
       if (summaryError) throw summaryError;

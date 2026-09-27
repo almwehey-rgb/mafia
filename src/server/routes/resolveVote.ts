@@ -16,7 +16,9 @@ async function routeResolveVote(context:RoomRouteContext) {
         else totals[voter.vote_target] = (totals[voter.vote_target] || 0) + 1;
       }
       const voteSummary = { round: room.round, phase: room.phase, abstained,
-        counts: Object.entries(totals).map(([id, count]) => ({ name: room.phase === "verdict" ? id : players.find(p => p.id === id)?.name || "", count })).sort((a,b) => b.count-a.count) };
+        counts: Object.entries(totals).map(([id, count]) => ({ id, name: room.phase === "verdict" ? id : players.find(p => p.id === id)?.name || "", count,
+          ...(enabledRoles(room.enabled_roles).public_voting ? { voters: requiredVoters.filter(p => p.vote_target === id).map(p => ({ id: p.id, name: p.name })) } : {})
+        })).sort((a,b) => b.count-a.count) };
       room.enabled_roles = { ...room.enabled_roles, vote_summary: voteSummary };
       const { error: summaryError } = await db.from("mafia_rooms").update({ enabled_roles: room.enabled_roles }).eq("code",code);
       if (summaryError) throw summaryError;

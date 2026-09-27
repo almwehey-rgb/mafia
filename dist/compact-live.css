@@ -457,3 +457,37 @@ body #app .announcement-saved { color:#146147!important; background:#dff3e8!impo
 body #app .voting-mode-options [aria-pressed="true"] { background:#b88e48!important; color:#15180f!important; border-color:#b88e48!important; }
 #app .elimination-row { display:block; }
 #app .elimination-mark { display:inline-grid; vertical-align:middle; margin-inline-end:8px; }
+
+/* Home tools: readable touch targets and an intentional owner-action row. */
+body #app .cinema-home .cinema-tools { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; width:100%; max-width:560px; margin:24px auto 0; padding:20px 0 0; border-top:1px solid #a88b5038; box-sizing:border-box; }
+body #app .cinema-home .cinema-tools button { display:flex; flex-direction:row; align-items:center; justify-content:flex-start; gap:12px; min-width:0; min-height:72px; padding:14px; border:1px solid #a88b5045!important; border-radius:14px; background:#1c211b!important; color:#f8efd9!important; font-size:15px; font-weight:750; line-height:1.5; text-align:start; box-shadow:none!important; }
+body.light #app .cinema-home .cinema-tools button { background:#fffdf8!important; color:#292b24!important; border-color:#d9ccaf!important; }
+body #app .cinema-home .cinema-tools button > span:first-child { display:grid; place-items:center; flex:0 0 36px; width:36px; height:36px; margin:0; border-radius:11px; background:#b7924c18; color:#af8845; font-size:23px; }
+body #app .cinema-home .cinema-tools button[onclick="showHostCodes()"] { grid-column:1/-1; min-height:64px; background:linear-gradient(110deg,#bd9550,#e2c583)!important; color:#1c2118!important; border-color:#d3b375!important; }
+body #app .cinema-home .cinema-tools button[onclick="showHostCodes()"] > span:first-child { color:inherit; background:#ffffff30; }
+body #app .cinema-home .cinema-more { max-width:560px; width:100%; margin:16px auto 0; text-align:start; border:1px solid #a88b5038; border-radius:14px; overflow:hidden; }
+body #app .cinema-home .cinema-more summary { min-height:48px; padding:14px 16px; box-sizing:border-box; font-size:15px; font-weight:700; cursor:pointer; background:transparent!important; color:inherit!important; }
+body #app .cinema-home .cinema-more > div { display:grid; grid-template-columns:1fr; gap:8px; padding:0 12px 12px; }
+body #app .cinema-home .cinema-more .btn { width:100%; min-height:48px; margin:0; font-size:14px; border-radius:10px; }
+body #app .cinema-home .cinema-tools button:focus-visible,body #app .cinema-home .cinema-more summary:focus-visible { outline:3px solid #b99350; outline-offset:3px; }
+@media(min-width:700px) { body #app .cinema-home .cinema-tools { grid-template-columns:repeat(4,minmax(0,1fr)); max-width:720px; } body #app .cinema-home .cinema-tools button { flex-direction:column; justify-content:center; text-align:center; min-height:100px; } body #app .cinema-home .cinema-tools button[onclick="showHostCodes()"] { flex-direction:row; min-height:64px; } body #app .cinema-home .cinema-more { max-width:720px; } }
+@media(max-width:360px) { body #app .cinema-home .cinema-tools { gap:8px; } body #app .cinema-home .cinema-tools button { padding:10px; gap:8px; font-size:14px; } }
+/* Complete, non-interactive home collection: no flipped cards or descriptions. */
+body #app .cinema-cards.home-card-collection { display:flex!important; flex-wrap:wrap; justify-content:center; align-items:flex-start; gap:clamp(8px,1.3vw,16px); width:100%; max-width:1080px; height:auto; margin:24px auto; padding:0; perspective:none; }
+body #app .home-card-collection .home-character-art { flex:0 0 calc((100% - 12 * 8px)/7); min-width:0; margin:0; padding:0; position:static; transform:none; }
+body #app .home-card-collection img { display:block; width:100%; height:auto; aspect-ratio:2/3; object-fit:contain; border-radius:10px; box-shadow:0 6px 16px #0002; }
+@media(min-width:1100px) { body #app .home-card-collection .home-character-art { flex-basis:calc((100% - 96px)/7); } }
+@media(max-width:899px) { body #app .home-card-collection .home-character-art { flex-basis:calc((100% - 64px)/5); } }
+@media(max-width:599px) { body #app .cinema-cards.home-card-collection { gap:10px; margin:20px auto; } body #app .home-card-collection .home-character-art { flex-basis:calc((100% - 20px)/3); } body #app .home-card-collection img { border-radius:7px; } }
+/* Expandable vote totals; secret ballots are deliberately non-interactive. */
+#app .vote-count-row, #app .vote-count-details > summary { display:flex; align-items:center; gap:12px; min-height:54px; padding:12px 14px; box-sizing:border-box; font-size:16px; line-height:1.5; }
+#app .vote-count-details, #app .vote-count-row { border:1px solid #aa875044; border-radius:12px; margin:8px 0; background:#aa875008; }
+#app .vote-count-details > summary { cursor:pointer; list-style:none; }
+#app .vote-count-details > summary::-webkit-details-marker { display:none; }
+#app .vote-target-name { flex:1; min-width:0; overflow-wrap:anywhere; font-weight:750; }
+#app .vote-count-badge { flex-shrink:0; border-radius:20px; padding:4px 12px; background:#b98e4820; font-variant-numeric:tabular-nums; font-size:14px; }
+#app .vote-expand-mark { transition:transform .18s; }
+#app .vote-count-details[open] .vote-expand-mark { transform:rotate(180deg); }
+#app .vote-voter-list { display:flex; flex-wrap:wrap; gap:8px; list-style:none; margin:0 14px 14px; padding:12px 0 0; border-top:1px solid #aa875033; }
+#app .vote-voter-list li { padding:6px 12px; border-radius:8px; background:#aa875015; overflow-wrap:anywhere; max-width:100%; font-size:15px; }
+#app .vote-count-details summary:focus-visible { outline:3px solid #b99350; outline-offset:2px; border-radius:12px; }
