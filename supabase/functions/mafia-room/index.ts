@@ -84,6 +84,7 @@ type RoomRouteContext = RouteContext & {code:string;room:any;players:any[];me:an
 const REQUEST_ACTIONS=["acknowledgeRole","act","addBot","adminState","advanceVerdict","beginNight","claimSeat","controlDiscussion","create","createAdminInvite","createReplacement","electMafiaLeader","endGame","expelPlayer","finishDiscussion","health","hostLogin","hostLogout","hostPreferences","id","jail","join","joinSpectator","kick","lastShot","lawyerProtect","leaderboard","leave","listSnapshots","messages","moderationLog","mute","ok","operationsStatus","passDiscussion","requestDiscussionReply","profile","recoverProfile","redeemAdminInvite","report","resolveNight","resolveVote","restart","restoreSnapshot","returnToLobby","revokeAdminAccess","saveWill","sendMessage","setDiscussionClaim","spectatorState","start","startDiscussion","startVote","state","systemStatus","togglePause","transferHost","vote","warnPlayer","operationsStatus"];
 REQUEST_ACTIONS.push('hostCodes');
 REQUEST_ACTIONS.push('readyPhase');
+REQUEST_ACTIONS.push('offerRecruitment','answerRecruitment');
 // Allowlisted operational fields only. Never record headers, request bodies,
 // credentials, player names, role assignments or action targets.
 const requestTotals={requests:0,failed:0,slow:0};
@@ -115,7 +116,7 @@ const shuffle = <T>(items: T[]) => { for (let i = items.length - 1; i > 0; i--) 
 const mafiaRole = (role: string | null) => role === "mafia" || role === "mafia_boss";
 const selected = (player: any) => String(player.action_target || "").split(",").filter(Boolean);
 const results = (player: any) => { try { return JSON.parse(player.investigation_result || "[]"); } catch { return []; } };
-const defaultEnabledRoles = { doctor: true, detective: true, lawyer: true, jailer: true, vigilante: false, witch: false, serial_killer: false, jester: false, cupid: false, escort: false, godfather_innocent: true, mafia_kill_start_round: 2, mafia_kill_mode: "always", mafia_kill_enabled: true, mafia_no_repeat: false, doctor_no_repeat: true, reveal_dead_roles: false, allow_no_vote: true, public_voting: false, full_trial: true, kids_mode: false, paused_phase: null };
+const defaultEnabledRoles = { doctor: true, detective: true, lawyer: true, jailer: true, vigilante: false, witch: false, serial_killer: false, jester: false, cupid: false, escort: false, godfather_innocent: true, mafia_kill_start_round: 2, mafia_kill_mode: "always", mafia_kill_enabled: true, mafia_no_repeat: false, mafia_recruitment: false, doctor_no_repeat: true, reveal_dead_roles: false, allow_no_vote: true, public_voting: false, full_trial: true, kids_mode: false, paused_phase: null };
 const enabledRoles = (value: any) => {
   const legacyRound = value?.mafia_kill_mode === "disabled" || value?.mafia_kill_enabled === false ? 0 : value?.mafia_kill_mode === "after_first" ? 2 : 1;
   let mafiaKillStartRound = Number.isFinite(+value?.mafia_kill_start_round) ? Math.max(0, Math.min(10, Math.round(+value.mafia_kill_start_round))) : legacyRound;
@@ -137,6 +138,7 @@ const enabledRoles = (value: any) => {
   mafia_kill_mode: mafiaKillStartRound === 0 ? "disabled" : mafiaKillStartRound === 1 ? "always" : mafiaKillStartRound === 2 ? "after_first" : "scheduled",
   mafia_kill_enabled: mafiaKillStartRound > 0,
   mafia_no_repeat: value?.mafia_no_repeat === true,
+  mafia_recruitment: value?.mafia_recruitment === true && value?.kids_mode !== true,
   doctor_no_repeat: value?.doctor_no_repeat !== false,
   reveal_dead_roles: value?.reveal_dead_roles === true,
   allow_no_vote: value?.allow_no_vote !== false,
@@ -161,6 +163,25 @@ const mafiaKillEnabledForRound = (room: any) => {
 };
 const roleState = (player: any) => player?.role_state && typeof player.role_state === "object" ? player.role_state : {};
 const mafiaLastTarget = (players: any[]) => players.find((player) => mafiaRole(player.role) && roleState(player).lastMafiaTarget)?.role_state.lastMafiaTarget || null;
+const currentRecruitment = (room:any) => room.enabled_roles?.recruitment_state?.round === room.round ? room.enabled_roles.recruitment_state : null;
+function recruitmentWaiting(room:any) {
+  const attempt=currentRecruitment(room);
+  const at=room.phase==='paused'?new Date(room.phase_paused_at).getTime():Date.now();
+  // Use the same response window for every target, even an ineligible role or
+  // an early refusal. Readiness must not become an oracle for secret roles.
+  return Boolean(attempt&&!attempt.resolved&&at<attempt.deadline);
+}
+function canOfferRecruitment(room:any,players:any[],player:any) {
+  return Boolean(enabledRoles(room.enabled_roles).mafia_recruitment&&room.phase==='night'&&mafiaKillEnabledForRound(room)&&!phaseExpired(room)
+    &&player?.alive&&player.role==='mafia_boss'&&!player.action_target&&!room.enabled_roles?.recruitment_state&&!isMafiaLocked(room,players)
+    &&player.id!==room.jailed_player&&!players.some(p=>p.alive&&p.role==='escort'&&p.id!==room.jailed_player&&p.action_target===player.id));
+}
+function recruitmentView(room:any,players:any[],player:any) {
+  const attempt=room.enabled_roles?.recruitment_state;
+  return {used:Boolean(attempt),canOffer:canOfferRecruitment(room,players,player),active:Boolean(currentRecruitment(room)&&!attempt.resolved),
+    targetName:attempt?players.find(p=>p.id===attempt.targetId)?.name||'':null,
+    outcome:attempt?.resolved?(attempt.joined?'joined':'failed'):null};
+}
 // Merge a small state change without erasing a concurrent vote, charge or claim.
 async function patchRoleState(code: string, player: any, patch: Record<string, any>) {
   let state = roleState(player);
@@ -384,7 +405,7 @@ function publicView(room: any, players: any[], meId?: string, host = false) {
   const nightRoles = players.filter((x) => {
     if (room.round === 1) return x.alive && x.role === "detective";
     if (!x.alive || x.id === room.jailed_player || x.id === escortTarget) return false;
-    if (mafiaRole(x.role)) return mafiaKillEnabledForRound(room) && !locked;
+    if (mafiaRole(x.role)) return !currentRecruitment(room) && mafiaKillEnabledForRound(room) && !locked;
     if (x.role === "jailer") return players.some((p) => p.alive && p.id === room.jailed_player) && room.jailer_executions > 0;
     if (x.role === "vigilante") return false;
     if (x.role === "revealer") return !roleState(x).mafiaCountResult;
@@ -393,7 +414,7 @@ function publicView(room: any, players: any[], meId?: string, host = false) {
     if (x.role === "cupid") return room.round === 2 && selected(x).length < 2;
     return ["doctor", "detective", "serial_killer", "escort", "revealer"].includes(x.role);
   });
-  const nightReady = nightRoles.every((x) => x.role === "detective" ? selected(x).length >= limit : x.role === "cupid" ? selected(x).length >= 2 : Boolean(x.action_target));
+  const nightReady = !recruitmentWaiting(room) && nightRoles.every((x) => x.role === "detective" ? selected(x).length >= limit : x.role === "cupid" ? selected(x).length >= 2 : Boolean(x.action_target));
   return {
     code: room.code, phase: room.phase, round: room.round, lifecycleVersion: room.lifecycle_version || 0, matchId: room.match_id || null,
     canControl: host, hostPlayerId: room.host_player_id || null,
@@ -404,6 +425,7 @@ function publicView(room: any, players: any[], meId?: string, host = false) {
     detectiveQuestions: detectiveQuestionCount(room.detective_questions), jailerExecutions: room.jailer_executions,
     enabledRoles: { ...settings, mafia_kill_enabled: mafiaKillEnabledForRound(room) },
     lastEvent: room.last_event, lastDeaths: room.last_deaths || [],
+    recruitmentReveal: room.phase==='finished'&&room.enabled_roles?.recruitment_state ? (()=>{const r=room.enabled_roles.recruitment_state;return {round:r.round,bossName:players.find(p=>p.id===r.bossId)?.name||'',targetName:players.find(p=>p.id===r.targetId)?.name||'',outcome:r.resolved?r.outcome:'unfinished'};})() : undefined,
     voteSummary: !votingActive && room.enabled_roles?.vote_summary ? { ...room.enabled_roles.vote_summary, counts: (room.enabled_roles.vote_summary.counts || []).map((item: any) => ({ id: item.id, name: item.name, count: item.count, ...(settings.public_voting && Array.isArray(item.voters) ? { voters: item.voters.map((v: any) => ({ id: v.id, name: v.name })) } : {}) })) } : null,
     eliminations: (room.last_deaths || []).map((id: string) => { const p = players.find((x) => x.id === id); const elimination = roleState(p || {}).elimination; const privateCause=host||me?.id===id; return { id, name: p?.name || "", reason: privateCause ? elimination?.reason || "eliminated" : "eliminated", round: elimination?.round ?? null, at: elimination?.at ?? null, detail: privateCause&&elimination?.reason === "host_expelled" ? elimination.detail : undefined }; }),
     pendingShot: room.phase !== "finished" && room.enabled_roles?.pending_shot ? { id: room.enabled_roles.pending_shot.id, playerId: room.enabled_roles.pending_shot.playerId, resolving: room.enabled_roles.pending_shot.resolving === true, target: (host || me?.id === room.enabled_roles.pending_shot.playerId) ? room.enabled_roles.pending_shot.target : undefined } : null,
@@ -425,6 +447,10 @@ function publicView(room: any, players: any[], meId?: string, host = false) {
       warnings: roleState(me).warnings || [],
       discussionRepliesLeft: Math.max(0, 2 - (room.enabled_roles?.discussion_reply_usage?.[me.id] || 0)),
       promotedBoss: me.role === "mafia_boss" && roleState(me).promotedBoss === true,
+      recruitment: mafiaRole(me.role)&&settings.mafia_recruitment ? recruitmentView(room,players,me) : undefined,
+      recruitmentOffer: me.role==='citizen'&&currentRecruitment(room)?.targetId===me.id&&!currentRecruitment(room).resolved&&['night','paused'].includes(room.phase)&&currentRecruitment(room).response!=='unavailable' ? {deadline:currentRecruitment(room).deadline,response:currentRecruitment(room).response,open:room.phase==='night'&&recruitmentWaiting(room)} : undefined,
+      recruited: roleState(me).recruited===true,
+      recruitmentResult: currentRecruitment(room)?.targetId===me.id&&currentRecruitment(room).resolved&&currentRecruitment(room).response==='accept' ? {joined:currentRecruitment(room).joined===true} : undefined,
       discussionClaim: me.role === "mafia_boss" && roleState(me).discussionClaim === true,
       discussionChoiceMade: me.role === "mafia_boss" && typeof roleState(me).discussionClaim === "boolean",
       discussionChoiceLocked: typeof roleState(me).discussionClaim === "boolean" || room.round > 1 || Boolean(room.enabled_roles?.discussion_state),
@@ -457,6 +483,7 @@ function publicView(room: any, players: any[], meId?: string, host = false) {
       muted: roleState(me).muted === true,
     } : undefined,
     nightReady: host ? nightReady : undefined,
+    nightResolutionBlocked: host ? recruitmentWaiting(room) : undefined,
     lawyerReady: host ? !lawyer || Boolean(lawyer.action_target) : undefined,
     jailerReady: host ? !jailer || Boolean(room.jailed_player) : undefined,
     voteCount: players.filter((x) => x.alive && x.vote_target).length,
@@ -545,8 +572,11 @@ async function autoAdvanceSolo(code:string, room:any, players:any[]) {
   }
   if (room.phase === 'trial' && room.accused_player) { await routeAdvanceVerdict({...base,action:'advanceVerdict',room,players}); }
   if (room.phase === 'night') {
-    const needs=(p:any)=>p.alive&&!p.is_bot&&!p.jailed&&((p.role==='detective'&&room.round<=detectiveQuestionCount(room.detective_questions))||['mafia','mafia_boss','doctor','lawyer','jailer','witch','serial_killer','cupid','escort','revealer'].includes(p.role));
-    if (players.filter(needs).every((p:any)=>p.action_target) || !players.some(needs)) await routeResolveNight({...base,action:'resolveNight',room,players});
+    if (!recruitmentWaiting(room)&&(publicView(room,players,undefined,true).nightReady || phaseExpired(room))) {
+      if(currentRecruitment(room)&&!requestDatabase.getStore()!.plan)requestDatabase.getStore()!.plan=new TransitionPlan(room,players);
+      await routeResolveNight({...base,action:'resolveNight',room,players});
+      return await load(code);
+    }
   }
   return {room,players};
 }
@@ -555,7 +585,7 @@ async function autoAdvanceMatch(code:string,room:any,players:any[]) {
   const alive=players.filter(p=>p.alive),expired=phaseExpired(room),key=`${room.round}:${room.phase}`;
   let action='';
   if(room.phase==='reveal'&&players.length&&players.every(p=>roleState(p).ack===true))action='beginNight';
-  if(room.phase==='night'&&(publicView(room,players,undefined,true).nightReady||expired))action='resolveNight';
+  if(room.phase==='night'&&!recruitmentWaiting(room)&&(publicView(room,players,undefined,true).nightReady||expired))action='resolveNight';
   if(['vote','nomination','verdict'].includes(room.phase)){
     const required=alive.filter(p=>room.phase!=='verdict'||p.id!==room.accused_player);
     if(required.every(p=>p.vote_target)||expired)action='resolveVote';
@@ -1321,6 +1351,9 @@ async function routeTogglePause(context:RoomRouteContext) {
         } else if (room.phase === "day" && !discussion.pausedAt) nextDiscussion = { ...discussion, pausedAt: Date.now(), version: discussion.version + 1 };
       }
       const nextSettings = { ...room.enabled_roles, ...settings, paused_phase: room.phase === "paused" ? null : room.phase, discussion_state: nextDiscussion };
+      if(room.phase==='paused'&&settings.paused_phase==='night'&&currentRecruitment(room)&&!currentRecruitment(room).resolved&&room.phase_paused_at){
+        nextSettings.recruitment_state={...currentRecruitment(room),deadline:currentRecruitment(room).deadline+Math.max(0,Date.now()-new Date(room.phase_paused_at).getTime())};
+      }
       await persist(db.from("mafia_rooms").update({ phase: nextPhase, enabled_roles: nextSettings }).eq("code", code));
       ({ room, players } = await load(code));
       return out(publicView(room, players, undefined, true));
@@ -1465,6 +1498,7 @@ async function routeAct(context:RoomRouteContext) {
       if (room.phase !== "night" || !me?.alive || (room.round !== 1 && me.id === room.jailed_player)) return out({ error: "INVALID_ACTION" }, 400);
       const target = players.find((x) => x.id === body.target);
       if (mafiaRole(me.role)) {
+        if(currentRecruitment(room))return out({error:'CHOICE_LOCKED'},409);
         if (isMafiaLocked(room, players)) return out({ error: "MAFIA_LOCKED" }, 409);
         if (body.target !== "SKIP" && (!target?.alive || target.id === me.id || (enabledRoles(room.enabled_roles).mafia_no_repeat && target.id === mafiaLastTarget(players)))) return out({ error: "INVALID_ACTION" }, 400);
         await persist(db.from("mafia_players").update({ action_target: body.target }).eq("room_code", code).eq("id", me.id));
@@ -1516,11 +1550,32 @@ async function routeAct(context:RoomRouteContext) {
     
   }
 }
+async function routeOfferRecruitment(context:RoomRouteContext) {
+  let {body,code,room,players,me}=context;
+  if(!canOfferRecruitment(room,players,me))return out({error:'RECRUITMENT_UNAVAILABLE'},409);
+  const target=players.find(p=>p.id===body.target&&p.alive&&!mafiaRole(p.role));
+  if(!target)return out({error:'INVALID_ACTION'},400);
+  const eligible=target.role==='citizen'&&target.id!==room.jailed_player;
+  const attempt={round:room.round,bossId:me.id,targetId:target.id,startedAt:Date.now(),deadline:Date.now()+30000,
+    response:eligible?(target.is_bot?(Math.random()<0.5?'accept':'decline'):'pending'):'unavailable',resolved:false};
+  await persist(db.from('mafia_rooms').update({enabled_roles:{...room.enabled_roles,recruitment_state:attempt}}).eq('code',code));
+  await persist(db.from('mafia_players').update({action_target:'RECRUIT'}).eq('room_code',code).eq('id',me.id));
+  ({room,players}=await load(code));return out(publicView(room,players,me.id));
+}
+async function routeAnswerRecruitment(context:RoomRouteContext) {
+  let {body,code,room,players,me}=context;
+  const attempt=currentRecruitment(room);
+  if(room.phase!=='night'||!me?.alive||me.role!=='citizen'||me.id===room.jailed_player||attempt?.targetId!==me.id
+    ||attempt.response!=='pending'||!recruitmentWaiting(room)||!['ACCEPT','DECLINE'].includes(body.target))return out({error:'RECRUITMENT_UNAVAILABLE'},409);
+  await persist(db.from('mafia_rooms').update({enabled_roles:{...room.enabled_roles,recruitment_state:{...attempt,response:body.target==='ACCEPT'?'accept':'decline'}}}).eq('code',code));
+  ({room,players}=await load(code));return out(publicView(room,players,me.id));
+}
 async function routeResolveNight(context:RoomRouteContext) {
   let {body, action, ip, now, started, code, room, players, me, host, authenticatedSpectator}=context;
   {
       if (!host) return out({ error: "UNAUTHORIZED" }, 403);
       if (room.phase !== "night") return out({ error: "INVALID_ACTION" }, 409);
+      if (recruitmentWaiting(room)) return out({error:'WAITING_ACTIONS'},409);
       if (!publicView(room, players, undefined, true).nightReady && !phaseExpired(room)) return out({ error: "WAITING_ACTIONS" }, 409);
       await snapshot(room, players, "before_night_result");
       const events: string[] = [], deaths: string[] = [];
@@ -1531,20 +1586,11 @@ async function routeResolveNight(context:RoomRouteContext) {
       const escort = players.find((x) => x.alive && x.role === "escort" && x.id !== room.jailed_player);
       const blockedId = room.round === 1 ? null : escort?.action_target || null;
       const canAct = (player: any) => player?.alive && (room.round === 1 ? player.role === "detective" : player.id !== room.jailed_player && player.id !== blockedId);
-      // Resolve investigations only after all role blocks have been finalized.
-      for (const detective of players.filter((p) => p.alive && p.role === "detective")) {
-        const history = results(detective).filter((r: any) => r.round !== room.round);
-        if (canAct(detective)) for (const id of selected(detective).slice(0, detectiveLimit(room, players))) {
-          const target = players.find((p) => p.id === id);
-          if (target) history.push({ round: room.round, name: target.name, result: target.role === "mafia" || (target.role === "mafia_boss" && !enabledRoles(room.enabled_roles).godfather_innocent) ? "مافيا" : "بريء" });
-        }
-        const {error} = await db.from("mafia_players").update({ investigation_result: JSON.stringify(history) }).eq("room_code",code).eq("id",detective.id);
-        if (error) throw error;
-      }
       if (blockedId) events.push("escort_blocked");
       const activeMafia = players.filter((x) => mafiaRole(x.role) && canAct(x));
       const bossChoice = activeMafia.find((x) => x.role === "mafia_boss")?.action_target;
-      const factionChoice = !mafiaKillEnabled ? "DISABLED" : locked ? "LOCKED" : (bossChoice || plurality(activeMafia.map((x) => x.action_target)));
+      const recruitment=currentRecruitment(room);
+      const factionChoice = recruitment ? 'RECRUIT' : !mafiaKillEnabled ? "DISABLED" : locked ? "LOCKED" : (bossChoice || plurality(activeMafia.map((x) => x.action_target)));
       const doctor = players.find((x) => x.role === "doctor" && canAct(x));
       const doctorTarget = doctorAvailable(room) ? doctor?.action_target : null;
       const witch = players.find((x) => x.role === "witch" && canAct(x));
@@ -1556,7 +1602,8 @@ async function routeResolveNight(context:RoomRouteContext) {
       const witchTarget = validPotion ? requestedTarget : "";
       const protectedIds = new Set([doctorTarget, room.jailed_player, witchKind === "SAVE" ? witchTarget : null].filter(Boolean));
       const victim = players.find((x) => x.id === factionChoice && x.alive);
-      if (room.round === 1) events.push("detective_only_night");
+      if(recruitment) events.push('recruitment_attempted');
+      else if (room.round === 1) events.push("detective_only_night");
       else if (!mafiaKillEnabled) events.push(mafiaKillStartRound > Number(room.round) ? "mafia_delayed" : "mafia_disabled");
       else if (locked) events.push("mafia_locked");
       else if (!factionChoice || factionChoice === "SKIP") events.push("mafia_skipped");
@@ -1588,6 +1635,27 @@ async function routeResolveNight(context:RoomRouteContext) {
       if (witch?.action_target && ["SAVE", "POISON"].includes(witchKind)) {
         witch.role_state = { ...roleState(witch), [witchKind === "SAVE" ? "life" : "poison"]: false };
         await persist(db.from("mafia_players").update({ role_state: witch.role_state }).eq("room_code", code).eq("id", witch.id));
+      }
+      if(recruitment&&!recruitment.resolved){
+        const target=players.find(p=>p.id===recruitment.targetId),boss=players.find(p=>p.id===recruitment.bossId);
+        const eligible=target?.alive&&target.role==='citizen'&&target.id!==room.jailed_player;
+        const available=canAct(boss)&&!locked&&mafiaKillEnabled;
+        const joined=Boolean(eligible&&available&&recruitment.response==='accept'&&!deaths.includes(target.id));
+        const outcome=joined?'joined':!available?'blocked':!eligible?'unavailable':deaths.includes(target.id)?'target_eliminated':recruitment.response==='decline'?'declined':'timeout';
+        if(joined){target.role='mafia';target.role_state={...roleState(target),recruited:true,recruitedRound:room.round};
+          await persist(db.from('mafia_players').update({role:target.role,role_state:target.role_state}).eq('room_code',code).eq('id',target.id));}
+        room.enabled_roles={...room.enabled_roles,recruitment_state:{...recruitment,resolved:true,joined,outcome}};
+        await persist(db.from('mafia_rooms').update({enabled_roles:room.enabled_roles}).eq('code',code));
+      }
+      // Resolve investigations after blocks and recruitment, so results reflect the new faction.
+      for (const detective of players.filter((p) => p.alive && p.role === "detective")) {
+        const history = results(detective).filter((r: any) => r.round !== room.round);
+        if (canAct(detective)) for (const id of selected(detective).slice(0, detectiveLimit(room, players))) {
+          const target = players.find((p) => p.id === id);
+          if (target) history.push({ round: room.round, name: target.name, result: target.role === "mafia" || (target.role === "mafia_boss" && !enabledRoles(room.enabled_roles).godfather_innocent) ? "مافيا" : "بريء" });
+        }
+        const {error} = await db.from("mafia_players").update({ investigation_result: JSON.stringify(history) }).eq("room_code",code).eq("id",detective.id);
+        if (error) throw error;
       }
       for (const revealer of players.filter(p => p.role === "revealer" && !roleState(p).mafiaCountResult && canAct(p) && p.action_target === "COUNT" && !deaths.includes(p.id))) {
         const mafiaCountResult = { round: room.round, count: players.filter(p => p.alive && mafiaRole(p.role) && !deaths.includes(p.id)).length };
@@ -1966,7 +2034,7 @@ async function handleRequest(request:Request) {
     // additionally check this value again under the database room lock.
     const generationFree = ["state","adminState","messages","spectatorState","join","joinSpectator","claimSeat","redeemAdminInvite","moderationLog","listSnapshots","systemStatus","leave"];
     if (!generationFree.includes(action) && (!Number.isSafeInteger(body.lifecycleVersion) || body.lifecycleVersion !== (room.lifecycle_version || 0))) return out({error:"STALE_GAME"},409);
-    if(['resolveNight','resolveVote','beginNight','startVote','advanceVerdict','lastShot','expelPlayer','endGame','transferHost','electMafiaLeader'].includes(action)) {
+    if(['resolveNight','resolveVote','beginNight','startVote','advanceVerdict','lastShot','expelPlayer','endGame','transferHost','electMafiaLeader','offerRecruitment','answerRecruitment'].includes(action) || (enabledRoles(room.enabled_roles).mafia_recruitment&&['act','togglePause'].includes(action))) {
       requestDatabase.getStore()!.plan=new TransitionPlan(room,players);
     }
     let authenticatedSpectator:any=null;
@@ -1982,7 +2050,7 @@ async function handleRequest(request:Request) {
     if (["createAdminInvite", "revokeAdminAccess"].includes(action)) return await routeCreateAdminInvite({body, action, ip, now, started, code, room, players, me, host, authenticatedSpectator});
     if (action === "redeemAdminInvite") return await routeRedeemAdminInvite({body, action, ip, now, started, code, room, players, me, host, authenticatedSpectator});
     if (action === "adminState") return await routeAdminState({body, action, ip, now, started, code, room, players, me, host, authenticatedSpectator});
-    if (room.enabled_roles?.pending_shot && room.phase !== "finished" && ["act","vote","resolveVote","resolveNight","startVote","startDiscussion","requestDiscussionReply","passDiscussion","finishDiscussion","advanceVerdict","togglePause","jail","lawyerProtect"].includes(action)) return out({ error: "WAITING_LAST_SHOT" }, 409);
+    if (room.enabled_roles?.pending_shot && room.phase !== "finished" && ["act","offerRecruitment","answerRecruitment","vote","resolveVote","resolveNight","startVote","startDiscussion","requestDiscussionReply","passDiscussion","finishDiscussion","advanceVerdict","togglePause","jail","lawyerProtect"].includes(action)) return out({ error: "WAITING_LAST_SHOT" }, 409);
     if (action === "lastShot") return await routeLastShot({body, action, ip, now, started, code, room, players, me, host, authenticatedSpectator});
 
     if (action === "joinSpectator") return await routeJoinSpectator({body, action, ip, now, started, code, room, players, me, host, authenticatedSpectator});
@@ -2043,6 +2111,8 @@ async function handleRequest(request:Request) {
 
     if (action === "act") return await routeAct({body, action, ip, now, started, code, room, players, me, host, authenticatedSpectator});
 
+    if (action === "offerRecruitment") return await routeOfferRecruitment({body, action, ip, now, started, code, room, players, me, host, authenticatedSpectator});
+    if (action === "answerRecruitment") return await routeAnswerRecruitment({body, action, ip, now, started, code, room, players, me, host, authenticatedSpectator});
     if (action === "resolveNight") return await routeResolveNight({body, action, ip, now, started, code, room, players, me, host, authenticatedSpectator});
 
     if (action === "setDiscussionClaim") return await routeSetDiscussionClaim({body, action, ip, now, started, code, room, players, me, host, authenticatedSpectator});

@@ -5,6 +5,7 @@ async function routeAct(context:RoomRouteContext) {
       if (room.phase !== "night" || !me?.alive || (room.round !== 1 && me.id === room.jailed_player)) return out({ error: "INVALID_ACTION" }, 400);
       const target = players.find((x) => x.id === body.target);
       if (mafiaRole(me.role)) {
+        if(currentRecruitment(room))return out({error:'CHOICE_LOCKED'},409);
         if (isMafiaLocked(room, players)) return out({ error: "MAFIA_LOCKED" }, 409);
         if (body.target !== "SKIP" && (!target?.alive || target.id === me.id || (enabledRoles(room.enabled_roles).mafia_no_repeat && target.id === mafiaLastTarget(players)))) return out({ error: "INVALID_ACTION" }, 400);
         await persist(db.from("mafia_players").update({ action_target: body.target }).eq("room_code", code).eq("id", me.id));
@@ -55,4 +56,24 @@ async function routeAct(context:RoomRouteContext) {
       return out(publicView(room, players, me.id));
     
   }
+}
+async function routeOfferRecruitment(context:RoomRouteContext) {
+  let {body,code,room,players,me}=context;
+  if(!canOfferRecruitment(room,players,me))return out({error:'RECRUITMENT_UNAVAILABLE'},409);
+  const target=players.find(p=>p.id===body.target&&p.alive&&!mafiaRole(p.role));
+  if(!target)return out({error:'INVALID_ACTION'},400);
+  const eligible=target.role==='citizen'&&target.id!==room.jailed_player;
+  const attempt={round:room.round,bossId:me.id,targetId:target.id,startedAt:Date.now(),deadline:Date.now()+30000,
+    response:eligible?(target.is_bot?(Math.random()<0.5?'accept':'decline'):'pending'):'unavailable',resolved:false};
+  await persist(db.from('mafia_rooms').update({enabled_roles:{...room.enabled_roles,recruitment_state:attempt}}).eq('code',code));
+  await persist(db.from('mafia_players').update({action_target:'RECRUIT'}).eq('room_code',code).eq('id',me.id));
+  ({room,players}=await load(code));return out(publicView(room,players,me.id));
+}
+async function routeAnswerRecruitment(context:RoomRouteContext) {
+  let {body,code,room,players,me}=context;
+  const attempt=currentRecruitment(room);
+  if(room.phase!=='night'||!me?.alive||me.role!=='citizen'||me.id===room.jailed_player||attempt?.targetId!==me.id
+    ||attempt.response!=='pending'||!recruitmentWaiting(room)||!['ACCEPT','DECLINE'].includes(body.target))return out({error:'RECRUITMENT_UNAVAILABLE'},409);
+  await persist(db.from('mafia_rooms').update({enabled_roles:{...room.enabled_roles,recruitment_state:{...attempt,response:body.target==='ACCEPT'?'accept':'decline'}}}).eq('code',code));
+  ({room,players}=await load(code));return out(publicView(room,players,me.id));
 }

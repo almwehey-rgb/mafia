@@ -1,8 +1,19 @@
 const eliminationEffectSeen = new Set();
 let eliminationEffectTimer;
+let eliminationEffectContext='';
 const eliminationEffectStorageKey = 'mafia-elimination-effect-seen';
+const exitArtworkUrl = '/assets/elimination-atlas-v1.webp';
+let exitArtworkWarm = false;
+function warmExitArtwork(){
+  if(kidsMode())return;
+  if(exitArtworkWarm||typeof Image==='undefined'||!game||game.phase==='lobby')return;
+  exitArtworkWarm=true;
+  const artwork=new Image();artwork.src=exitArtworkUrl;
+}
 let victoryEffectTimer, victoryReturnFocus;
 let victoryBackground=[];
+function matchEffectContext(){return [game?.code,game?.matchId||game?.lifecycleVersion,game?.me?.id||'spectator'].join(':');}
+function clearMatchEffects(){closeEliminationEffect(false);closeVictoryEffect();}
 function closeVictoryEffect(){
  clearTimeout(victoryEffectTimer);
  const effect=document.getElementById('victoryEffect');if(!effect)return;
@@ -13,10 +24,12 @@ function closeVictoryEffect(){
  victoryReturnFocus=null;
 }
 function showVictoryEffect(){
+ if(kidsMode()){closeVictoryEffect();return false;}
  if(game?.phase!=='finished'||!['mafia','village'].includes(game.winner)){closeVictoryEffect();return false;}
+ if(document.getElementById('eliminationEffect'))return true;
  const key=`victory:${game.code}:${game.matchId||game.lifecycleVersion}:${game.winner}`;
  if(hasSeenEliminationEffect(key))return true;
- closeEliminationEffect();closeVictoryEffect();
+ closeVictoryEffect();
  const mafia=game.winner==='mafia';
  const title=discussionText(mafia?'فازت المافيا':'فازت القرية',mafia?'MAFIA WINS':'VILLAGE WINS');
  const emblem=mafia?'<path d="m16 30 17 15 17-27 17 27 17-15-9 46H25ZM27 86h46"/>':'<path d="M50 12 20 24v25c0 20 30 39 30 39s30-19 30-39V24Z"/><path d="m34 49 11 11 23-25"/>';
@@ -28,16 +41,21 @@ function showVictoryEffect(){
  victoryBackground=[...document.querySelectorAll('main.shell,.utility-bar,.game-sheet')].map(element=>[element,element.hasAttribute('inert')]);
  victoryBackground.forEach(([element])=>element.setAttribute('inert',''));
  document.body.appendChild(effect);rememberEliminationEffect(key);
- if(!window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches&&document.visibilityState==='visible')navigator.vibrate?.([140,70,220,90,300]);
+ if((typeof hapticsEnabled==='undefined'||hapticsEnabled)&&!window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches&&document.visibilityState==='visible')navigator.vibrate?.([140,70,220,90,300]);
  victoryEffectTimer=setTimeout(closeVictoryEffect,5000);effect.querySelector('button')?.focus({preventScroll:true});
  return true;
 }
 function eliminationKind(reason) {
   return ({mafia_kill:'mafia',vote_eliminated:'vote',trial_guilty:'vote',serial_kill:'serial',witch_poison:'poison',jailer_executed:'execution',vigilante_kill:'shot',lovers_died:'lovers',host_expelled:'expelled'})[reason] || 'other';
 }
-function closeEliminationEffect() {
+function closeEliminationEffect(advance=true) {
   clearTimeout(eliminationEffectTimer);
-  document.getElementById('eliminationEffect')?.remove();
+  eliminationEffectTimer=undefined;
+  const effect=document.getElementById('eliminationEffect');
+  const context=eliminationEffectContext;
+  eliminationEffectContext='';
+  effect?.remove();
+  if(advance&&effect&&context===matchEffectContext()&&game?.phase==='finished')showVictoryEffect();
 }
 function visibleEliminations() {
   const now=Number(game?.serverTime)||Date.now();
@@ -75,9 +93,11 @@ function eliminationEmblem(kind) {
     expelled:'<path d="M54 19H22v64h32M53 50h35L74 36m14 14L74 64M34 25v52"/>',
     other:'<path d="m50 12 36 38-36 38L14 50ZM50 31v24m0 12v2"/>'
   };
-  return `<svg viewBox="0 0 100 100" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths[kind]||paths.other}</svg>`;
+  return `<svg viewBox="0 0 100 100" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths[kind]||paths.other}</svg><span class="exit-reference-art" aria-hidden="true"></span><span class="exit-reference-motion" aria-hidden="true"><i></i><i></i><i></i></span>`;
 }
 function showEliminationEffect() {
+  if(kidsMode()){closeEliminationEffect(false);return;}
+  if(eliminationEffectContext&&eliminationEffectContext!==matchEffectContext())closeEliminationEffect(false);
   if(game?.me?.alive!==false)return;
   const eliminations=visibleEliminations();
   const eliminated=eliminations.find(p=>p.id===game?.me?.id);
@@ -87,27 +107,34 @@ function showEliminationEffect() {
   const kind=eliminationKind(eliminated.reason);
   const titles={mafia:['اغتيال في الظلام','Mafia assassination'],vote:['حسم التصويت','Vote decided'],serial:['ضربة القاتل المتسلسل','Serial killer strike'],poison:['سم الساحرة','Witch poison'],execution:['حكم السجّان','Jailer execution'],shot:['الطلقة الأخيرة','Final shot'],lovers:['مصير الحبيبين','Linked fate'],expelled:['استبعاد من المضيف','Host expulsion'],mixed:['أحداث الليلة','Night events'],other:['خرج لاعب من المباراة','A player left the game']};
   const names=escapeHtml(eliminated.name);
-  closeEliminationEffect();
+  closeEliminationEffect(false);
+  eliminationEffectContext=matchEffectContext();
   const effect=document.createElement('div');
   effect.id='eliminationEffect';
   effect.className=`elimination-effect effect-${kind}`;
   effect.setAttribute('role','dialog');
   effect.setAttribute('aria-modal','true');
   effect.setAttribute('aria-label',discussionText(...titles[kind]));
-  effect.innerHTML=`<div class="exit-atmosphere" aria-hidden="true"><span class="exit-beam"></span><span class="exit-orbit"></span>${Array.from({length:18},(_,i)=>`<i style="--i:${i};--x:${(i*37)%100}%;--drift:${(i%2?1:-1)*(20+i*3)}px;--delay:${(i%6)*.12}s"></i>`).join('')}</div><span class="exit-shutter exit-shutter-top" aria-hidden="true"></span><span class="exit-shutter exit-shutter-bottom" aria-hidden="true"></span><span class="elimination-effect-flash" aria-hidden="true"></span><span class="elimination-effect-ring" aria-hidden="true"></span><div class="exit-cinema-brand" aria-hidden="true">M A F I A <span>◆</span> N I G H T</div><div class="elimination-effect-scene"><p class="elimination-effect-kicker">${discussionText('انتهى دورك في هذه المباراة','YOUR PART IN THIS MATCH HAS ENDED')}</p><div class="exit-sigil"><span class="elimination-effect-icon">${eliminationEmblem(kind)}</span><span class="exit-sigil-mark" aria-hidden="true">◆</span></div><h2>${discussionText(...titles[kind])}</h2><p class="elimination-effect-names">${names}</p><div class="exit-cause-line" aria-hidden="true"><span></span>◆<span></span></div><p class="exit-afterword">${discussionText('تبقى الأسرار… وتستمر اللعبة','The secrets remain. The game continues.')}</p></div><footer class="exit-cinema-footer"><button type="button" class="btn elimination-effect-skip" onclick="closeEliminationEffect()">${discussionText('تجاوز المشهد','Skip scene')} <span aria-hidden="true">←</span></button><span class="elimination-effect-progress" aria-hidden="true"></span></footer>`;
-  effect.innerHTML=bloodyExitLayer(kind)+effect.innerHTML;
-  effect.addEventListener('keydown',event=>{if(event.key==='Escape')closeEliminationEffect();});
+  effect.innerHTML=`<div class="exit-atmosphere" aria-hidden="true"><span class="exit-beam"></span><span class="exit-orbit"></span>${Array.from({length:18},(_,i)=>`<i style="--i:${i};--x:${(i*37)%100}%;--drift:${(i%2?1:-1)*(20+i*3)}px;--delay:${(i%6)*.12}s"></i>`).join('')}</div><span class="exit-shutter exit-shutter-top" aria-hidden="true"></span><span class="exit-shutter exit-shutter-bottom" aria-hidden="true"></span><span class="elimination-effect-flash" aria-hidden="true"></span><span class="elimination-effect-ring" aria-hidden="true"></span><div class="exit-cinema-brand" aria-hidden="true">M A F I A <span>◆</span> N I G H T</div><div class="elimination-effect-scene" role="button" tabindex="0" aria-label="${discussionText('تجاوز مشهد الخروج','Skip elimination scene')}" onclick="closeEliminationEffect()"><p class="elimination-effect-kicker">${discussionText('انتهى دورك في هذه المباراة','YOUR PART IN THIS MATCH HAS ENDED')}</p><div class="exit-sigil"><span class="elimination-effect-icon">${eliminationEmblem(kind)}</span><span class="exit-sigil-mark" aria-hidden="true">◆</span></div><h2>${discussionText(...titles[kind])}</h2><p class="elimination-effect-names">${names}</p><div class="exit-cause-line" aria-hidden="true"><span></span>◆<span></span></div><p class="exit-afterword">${discussionText('تبقى الأسرار… وتستمر اللعبة','The secrets remain. The game continues.')}</p></div><footer class="exit-cinema-footer"><span class="exit-tap-hint">${discussionText('اضغط على البطاقة للتجاوز','Tap the card to continue')}</span><span class="elimination-effect-progress" aria-hidden="true"></span></footer>`;
+  effect.setAttribute('data-no-translate','');
+  effect.addEventListener('keydown',event=>{
+    if(event.key==='Tab'){event.preventDefault();effect.querySelector('[role="button"]')?.focus();}
+    if((event.key==='Enter'||event.key===' ')&&event.target?.matches?.('.elimination-effect-scene')){
+      event.preventDefault();closeEliminationEffect();
+    }
+  });
   document.body.appendChild(effect);
   rememberEliminationEffect(key);
-  if(!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches&&document.visibilityState==='visible')navigator.vibrate?.(({mafia:[180,70,260,80,180],vote:[100,80,180,80,250],serial:[240,90,260,80,150],poison:[160,110,190,90,120],execution:[250,100,230],shot:[90,50,290,80,180],lovers:[130,100,180,100,130],expelled:[180,90,220],mixed:[180,90,220],other:[140,80,180]})[kind]);
-  eliminationEffectTimer=setTimeout(closeEliminationEffect,5000);
-  effect.querySelector('button')?.focus({preventScroll:true});
+  if((typeof hapticsEnabled==='undefined'||hapticsEnabled)&&!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches&&document.visibilityState==='visible')navigator.vibrate?.(({mafia:[180,70,260,80,180],vote:[100,80,180,80,250],serial:[240,90,260,80,150],poison:[160,110,190,90,120],execution:[250,100,230],shot:[90,50,290,80,180],lovers:[130,100,180,100,130],expelled:[180,90,220],mixed:[180,90,220],other:[140,80,180]})[kind]);
+  eliminationEffectTimer=setTimeout(()=>{if(document.getElementById('eliminationEffect')===effect)closeEliminationEffect();},5000);
+  effect.querySelector('[role="button"]')?.focus({preventScroll:true});
 }
 function bloodyExitLayer(kind){
  const splashes=Array.from({length:22},(_,i)=>`<circle cx="${(i*43)%100}" cy="${(i*29)%100}" r="${2+i%7}"/>`).join('');
  return `<div class="blood-theatre blood-${kind}" aria-hidden="true"><svg class="blood-spray blood-spray-left" viewBox="0 0 100 100"><path d="M0 0h60L45 14l30 8-41 8 17 17-28-6 10 36-18-20-8 35L0 100Z"/>${splashes}</svg><svg class="blood-spray blood-spray-right" viewBox="0 0 100 100"><path d="M0 0h60L45 14l30 8-41 8 17 17-28-6 10 36-18-20-8 35L0 100Z"/>${splashes}</svg><div class="blood-cuts"><i></i><i></i><i></i></div><div class="blood-drips">${Array.from({length:7},(_,i)=>`<i style="--drop:${i};--drop-height:${12+(i*11)%29}vh"></i>`).join('')}</div><span class="exit-verdict-stamp">${kind==='vote'?'حُكم بالخروج':kind==='expelled'?'تم الاستبعاد':'انتهت نجاتك'}</span></div>`;
 }
 function eliminationNotice() {
+  if(kidsMode())return '';
   const causes = {
     mafia_kill:['اغتيال المافيا','Killed by Mafia'], vote_eliminated:['الاستبعاد بالتصويت','Voted out'], trial_guilty:['حكم التصويت بالإدانة','Voted guilty'],
     vigilante_kill:['طلقة القناص الأخيرة','Sniper final shot'], serial_kill:['اغتيال القاتل المتسلسل','Killed by Serial Killer'], witch_poison:['سم الساحرة','Witch poison'],
@@ -158,6 +185,7 @@ async function setBossDiscussionClaim(){
  }catch{alert(discussionText('تعذّر تسجيل ادّعاء المحقق المزيف. حدّث الحالة وحاول مرة ثانية.','Could not save the fake detective claim. Refresh and try again.'));}
 }
 function leaderElectionCard(){
+  if(kidsMode())return '';
  if(!game?.me?.alive||!roleAcknowledged()||['lobby','finished','paused'].includes(game.phase))return '';
  if(!game.me.leaderElection){
   if(game.me.role!=='mafia_boss')return '';
@@ -206,6 +234,7 @@ function queueVoteResultPreview(){
 }
 function publicVotesCard() { return ''; }
 function renderWithNotices(content,controller=false) {
+  warmExitArtwork();
   const app=$('#app'), focused=document.activeElement;
   const focusPhase=[game?.matchId,game?.phase,game?.round].join('|');
   const changedPhase=app?.dataset?.focusPhase&&app.dataset.focusPhase!==focusPhase;
@@ -221,13 +250,16 @@ function renderWithNotices(content,controller=false) {
       if (disclosures.has(element.dataset.disclosureKey)) element.open = disclosures.get(element.dataset.disclosureKey);
     }
     if(game?.me?.isHost && !controller && !document.getElementById('controllerNotice'))$('#app').insertAdjacentHTML('afterbegin','<section id="controllerNotice" class="status"><p>👑 أنت تدير الغرفة الآن.</p><button class="btn" onclick="toggleDelegatedHost()">فتح تحكم المضيف</button></section>');
+    if(!document.getElementById('recruitmentNotice'))app.insertAdjacentHTML('afterbegin',recruitmentNotice());
+    updateRecruitmentClock();
     if(!document.getElementById('leaderElectionCard'))$('#app').insertAdjacentHTML('afterbegin',leaderElectionCard());
     if(game?.me?.alive&&game.me.mafiaCountResult&&!document.getElementById('revealerResult')){const result=game.me.mafiaCountResult;$('#app').insertAdjacentHTML('afterbegin',`<section id="revealerResult" class="card" data-no-translate><h3>${discussionText('📡 نتيجة كشف الجولة','📡 Reveal result, round')} ${escapeHtml(result.round)}</h3><p>${discussionText('عدد المافيا الباقين عند إعلان الصباح','Mafia alive at dawn')}: <strong>${escapeHtml(result.count)}</strong></p></section>`);}
     if(!document.getElementById('voteSummaryNotice'))$('#app').insertAdjacentHTML('afterbegin',voteSummaryCard());
     if(!document.getElementById('publicVotesNotice'))$('#app').insertAdjacentHTML('beforeend',publicVotesCard());
     for(const element of app.querySelectorAll('.vote-count-details[data-disclosure-key]'))if(disclosures.has(element.dataset.disclosureKey))element.open=disclosures.get(element.dataset.disclosureKey);
     if(!document.getElementById('eliminationNotice'))$('#app').insertAdjacentHTML('afterbegin',eliminationNotice());
-    if(!showVictoryEffect())showEliminationEffect();
+    showEliminationEffect();
+    showVictoryEffect();
     if(game?.enabledRoles?.automatic_game&&game.me?.alive&&['day','trial'].includes(game.phase)){
       const canReady=game.phase==='day'||game.me.id===game.accusedPlayer;
       if(canReady)app.insertAdjacentHTML('beforeend',`<section class="card auto-ready"><h3>${discussionText('المباراة تلقائية','Automatic game')}</h3><p>${game.enabledRoles.action_deadline===false?discussionText('ننتظر اختيار الجميع بدون مهلة.','Waiting for everyone without a deadline.'):discussionText('ننتقل بعد اختيار الجميع أو انتهاء المهلة.','Advances when everyone is ready or the timer ends.')}</p><button class="btn gold wide" ${game.me.phaseReady?'disabled':''} onclick="readyAutomaticPhase()">${game.me.phaseReady?discussionText('تم التأكيد — بانتظار البقية','Confirmed — waiting for others'):discussionText(game.phase==='trial'?'انتهيت من الدفاع':'انتهيت من النقاش','I am ready')}</button></section>`);
@@ -242,7 +274,7 @@ function renderWithNotices(content,controller=false) {
   }
 }
 async function readyAutomaticPhase(){try{game=await api({action:'readyPhase',code:game.code,id:playerId,playerToken,hostToken});renderPlayer();}catch{alert('تعذر تأكيد الجاهزية، حاول مجددًا.');}}
-function automaticGameSettings(){return `<section class="voting-setting"><h3>إدارة المباراة</h3><div class="voting-mode-options"><button class="btn" aria-pressed="${!enabledRoles.automatic_game}" onclick="setAutomaticGame(false)">يدوي بالمضيف</button><button class="btn" aria-pressed="${!!enabledRoles.automatic_game}" onclick="setAutomaticGame(true)">تلقائي بدون مضيف</button></div>${enabledRoles.automatic_game?`<p>بعد آخر اختيار تنتقل المرحلة تلقائيًا. بالنهار يؤكد الجميع انتهاء النقاش.</p><div class="voting-mode-options"><button class="btn" aria-pressed="${enabledRoles.action_deadline!==false}" onclick="setActionDeadline(true)">بمهلة</button><button class="btn" aria-pressed="${enabledRoles.action_deadline===false}" onclick="setActionDeadline(false)">انتظار الجميع</button></div>`:''}</section>`;}
+function automaticGameSettings(){return `<section class="voting-setting"><h3>إدارة المباراة</h3><div class="voting-mode-options"><button class="btn" aria-pressed="${!enabledRoles.automatic_game}" onclick="setAutomaticGame(false)">يدوي بالمضيف</button><button class="btn" aria-pressed="${!!enabledRoles.automatic_game}" onclick="setAutomaticGame(true)">تلقائي بدون مضيف</button></div>${enabledRoles.automatic_game?`<p>بعد آخر اختيار تنتقل المرحلة تلقائيًا. بالنهار يؤكد الجميع انتهاء النقاش.</p><div class="voting-mode-options"><button class="btn" aria-pressed="${enabledRoles.action_deadline!==false}" onclick="setActionDeadline(true)">بمهلة</button><button class="btn" aria-pressed="${enabledRoles.action_deadline===false}" onclick="setActionDeadline(false)">انتظار الجميع</button></div>`:''}<button class="btn" aria-pressed="${hapticsEnabled}" onclick="toggleHaptics()">${hapticsEnabled?'📳 الاهتزاز مفعّل':'📴 الاهتزاز متوقف'}</button></section>`;}
 let automaticSetupPending=false;
 async function setAutomaticGame(value){
  if(automaticSetupPending)return;
@@ -272,20 +304,49 @@ function renderPlayer(){
 }
 function playerStepStatus() {
   const me=game?.me;
-  if(!me||!me.alive||['lobby','finished','paused'].includes(game.phase))return '';
+  if(!me||!me.alive||['lobby','finished'].includes(game.phase))return '';
   const privateRole=!roleAcknowledged();
-  const title=privateRole?discussionText('لا تعرض دورك للآخرين.','Keep your role private.'):game.phase==='trial'?discussionText('التصويت على الحكم بعد الدفاع.','The verdict vote follows the defense.'):'';
+  const phase=game.phase;
+  const title=privateRole?discussionText('لا تعرض دورك للآخرين. شاهد بطاقتك ثم أكّد فهمك للدور.','Keep your role private. Review your card, then confirm that you understand it.'):
+    phase==='night'?(me.acted?discussionText('تم تسجيل اختيارك. انتظر حسم الليل من المضيف.','Your choice is recorded. Wait for the host to resolve the night.'):discussionText('راجع دورك: إذا ظهرت لك خيارات ليلية فاختر هدفًا، وإلا انتظر الصباح.','Check your role: choose a target if night options appear; otherwise wait for morning.')):
+    phase==='day'?discussionText('ناقش الأدلة واستعد للتصويت عندما يفتح المضيف المرحلة التالية.','Discuss the evidence and prepare to vote when the host opens the next phase.'):
+    phase==='nomination'?(me.voted?discussionText('تم تسجيل ترشيحك. يمكنك تغييره حتى يحسم المضيف النتيجة.','Your nomination is recorded. You may change it until the host resolves it.'):discussionText('اختر اللاعب الذي تريد ترشيحه للمحاكمة.','Choose the player you want to nominate for trial.')):
+    phase==='trial'?(game.accusedPlayer===me.id?discussionText('هذه فرصتك لتقديم دفاعك قبل الانتقال إلى الحكم.','This is your chance to make a defense before the verdict.'):discussionText('استمع إلى الدفاع؛ سيُفتح التصويت على الحكم بعد ذلك.','Listen to the defense; the verdict vote opens next.')):
+    phase==='verdict'?(me.voted?discussionText('تم تسجيل حكمك. انتظر إعلان النتيجة.','Your verdict is recorded. Wait for the result.'):discussionText('صوّت: مذنب أو بريء.','Vote: guilty or innocent.')):
+    phase==='vote'?(me.voted?discussionText('تم تسجيل صوتك. يمكنك تغييره حتى كشف النتيجة.','Your vote is recorded. You may change it until the result is revealed.'):discussionText('اختر لاعبًا للاستبعاد أو امتنع إن كان ذلك مسموحًا.','Choose a player to eliminate, or skip if the room allows it.')):
+    phase==='paused'?discussionText('المباراة متوقفة مؤقتًا. انتظر استكمال المضيف للجولة نفسها.','The match is paused. Wait for the host to resume the same round.'):
+    '';
   if(!title)return '';
-  return `<section class="player-step-status wait" data-no-translate role="status"><span aria-hidden="true">${privateRole?'🔒':'○'}</span><div><strong>${escapeHtml(title)}</strong></div></section>`;
+  return `<section class="player-step-status wait" data-no-translate role="status"><span aria-hidden="true">${privateRole?'🔒':phase==='night'?'🌙':phase==='day'?'☀️':phase==='paused'?'⏸️':'○'}</span><div><strong>${escapeHtml(title)}</strong></div></section>`;
+}
+function phaseNarrative() {
+  const phase=game?.phase;
+  if(!phase||['lobby','finished'].includes(phase))return '';
+  const firstRound=Number(game.round||1)===1;
+  const copy={
+    reveal:['📜 رسالة مختومة','لا تعرض بطاقتك لأحد. لكل شخص سرّ سيغيّر مصير المدينة.'],
+    night:[firstRound?'🌙 أول ليل':'🌙 المدينة لا تنام','تنطفئ الأنوار. اتبع تعليمات دورك بصمت، ثم اترك للحكاية أن تكشف ما حدث عند الفجر.'],
+    day:['☀️ وصل الفجر','ناقشوا ما تعرفونه وما تشكّون به؛ الكلام دليل، لكنه ليس برهانًا وحده.'],
+    nomination:['🕯️ بدأ الاتهام','اختروا من يستحق أن يجيب عن الشبهات. لا يكشف الترشيح حقيقة الدور.'],
+    trial:['⚖️ لحظة الدفاع','للمتهم كلمة أخيرة، وللبقية فرصة للاستماع قبل أن يصدر الحكم.'],
+    verdict:['🔨 على ميزان الحكم','اختر إدانة أو براءة وفق ما سمعته؛ النتيجة لا تكشف كل أسرار المدينة.'],
+    vote:['🗳️ القرار للجميع','صوتك يسجل موقفك لهذه الجولة. راجع الهدف قبل الإرسال.'],
+    paused:['⏸️ ستار مؤقت','توقفت الأحداث عند هذه اللحظة؛ ستُستأنف المرحلة نفسها عند عودة المضيف.'],
+  }[phase];
+  if(!copy)return '';
+  return `<aside id="phaseNarrative" class="phase-narrative phase-${phase}" data-no-translate aria-label="${escapeHtml(copy[0])}"><span aria-hidden="true">${copy[0].split(' ')[0]}</span><div><strong>${escapeHtml(copy[0].replace(/^\S+\s*/,''))}</strong><p>${escapeHtml(copy[1])}</p></div></aside>`;
 }
 function setupSummary(roles, showCounts = true){
   const counts=[['mafia',roles.mafia],['doctor',roles.doctor],['detective',roles.detectives],['lawyer',roles.lawyer],['jailer',roles.jailer],['vigilante',roles.vigilante],['witch',roles.witch],['serial_killer',roles.serialKiller],['jester',roles.jester],['cupid',roles.cupid],['escort',roles.escort],['revealer',roles.revealer],['citizen',roles.citizens]];
-  return `<section class="setup-summary"><h2 data-no-translate>${discussionText('ملخص المباراة','Game summary')}</h2><p data-no-translate>${discussionText('اللاعبون','Players')}: <b>${game.players.length}</b> · ${discussionText('مهلة المرحلة','Phase time')}: <b>${phaseDuration}</b> ${discussionText('ثانية','seconds')}</p>${showCounts ? `<ul>${counts.filter(([,count])=>count>0).map(([role,count])=>`<li>${roleLabel(role)} <b>× ${count}</b></li>`).join('')}</ul>` : ''}<p data-no-translate>${discussionText('يؤكد الجميع أدوارهم قبل البداية. الليلة الأولى للمحقق فقط.','Everyone confirms their role before starting. The first night is for detectives only.')}</p></section>`;
+  const blocker=!roles.valid?discussionText(`لا يمكن البدء: الأدوار المختارة (${roles.selectedTotal}) أكبر من عدد اللاعبين (${game.players.length}).`,`Cannot start: selected roles (${roles.selectedTotal}) exceed players (${game.players.length}).`):game.players.length<2?discussionText('لا يمكن البدء: تحتاج إلى لاعبين على الأقل.','Cannot start: at least two players are required.'):'';
+  return `<section class="setup-summary"><h2 data-no-translate>${discussionText('ملخص ما سيُوزّعه الخادم','Server deal summary')}</h2><p data-no-translate>${discussionText('اللاعبون','Players')}: <b>${game.players.length}</b> · ${discussionText('مهلة المرحلة','Phase time')}: <b>${phaseDuration}</b> ${discussionText('ثانية','seconds')}</p>${showCounts ? `<ul>${counts.filter(([,count])=>count>0).map(([role,count])=>`<li>${roleLabel(role)} <b>× ${count}</b></li>`).join('')}</ul>` : ''}${blocker?`<p class="status wait" role="status" data-no-translate>⚠️ ${blocker}</p>`:`<p class="status" role="status" data-no-translate>✓ ${discussionText('هذا هو التوزيع الذي سيرسله المضيف للخادم عند البدء.','This is the distribution the host will send to the server when starting.')}</p>`}<p data-no-translate>${discussionText('يؤكد الجميع أدوارهم قبل البداية. الليلة الأولى للمحقق فقط.','Everyone confirms their role before starting. The first night is for detectives only.')}</p></section>`;
 }
 function showMatchTools(){
   openSheet(discussionText('إدارة المباراة','Game management'),`<div data-no-translate><button class="btn wide" onclick="showModeration()">${discussionText('اللاعبون والبلاغات','Players and reports')}</button><section class="danger-zone"><h3>${discussionText('إنهاء نهائي','End permanently')}</h3><p>${discussionText('للاستراحة استخدم الإيقاف المؤقت. الإنهاء ينهي المباراة الحالية.','Use Pause for a break. Ending closes the current match.')}</p><button class="btn danger wide" onclick="endGame()">${discussionText('إنهاء المباراة','End match')}</button></section></div>`);
 }
 function enhanceJourney(controller){
+  document.body.classList.toggle('kids-mode',kidsMode()||(game?.phase==='lobby'&&enabledRoles.kids_mode));
+  if(kidsMode()&&game.phase!=='lobby'){paintActionFeedback();updatePhaseTimer();return;}
   if(!game)return;
   document.body.classList.toggle('player-day-focus',!controller&&game.phase==='day'&&!!game.me?.alive);
   if(typeof pendingActionConfirmation!=='undefined'&&pendingActionConfirmation&&pendingActionConfirmation.context!==actionContext())cancelSensitiveAction();
@@ -300,6 +361,13 @@ function enhanceJourney(controller){
     const statusHtml=playerStepStatus();
     if(statusHtml){const holder=document.createElement('div');holder.innerHTML=statusHtml;const status=holder.firstElementChild;status.id='playerStepStatus';document.querySelector('#app .phase-bar').insertAdjacentElement('afterend',status);}
   }
+  if(!document.getElementById('phaseNarrative')){
+    const narrative=phaseNarrative();
+    if(narrative){
+      const bar=document.querySelector('#app .phase-bar');
+      if(bar)bar.insertAdjacentHTML('afterend',narrative);
+    }
+  }
   document.querySelectorAll('.setup-tabs button').forEach((button,index)=>{if(index+1===setupStep)button.setAttribute('aria-current','step');});
   paintActionFeedback();updatePhaseTimer();
   queueVoteResultPreview();
@@ -312,7 +380,7 @@ function syncMorningDetails(){
   });
 }
 function renderHost(){if(game?.enabledRoles?.automatic_game&&game.me&&!['lobby','finished'].includes(game.phase)){renderPlayer();return;}renderWithNotices(renderHostContent,true);enhanceJourney(true);mountHostProgress();syncMorningDetails();}
-function renderSpectator(){renderWithNotices(renderSpectatorContent);}
+function renderSpectator(){if(kidsMode()){renderWithNotices(renderKidsPlayer);enhanceJourney(false);return;}renderWithNotices(renderSpectatorContent);}
 
 function disciplineButtons(player) {
   return `<span class="discipline-actions" data-no-translate><button class="mini-action" aria-label="${discussionText('إنذار اللاعب','Warn player')}" onclick="openDiscipline(${jsArg(player.id)},'warnPlayer')">⚠️${player.warningCount||''}</button><button class="mini-action danger" aria-label="${discussionText('استبعاد اللاعب من القيم','Expel player from match')}" onclick="openDiscipline(${jsArg(player.id)},'expelPlayer')">⛔</button></span>`;
@@ -334,6 +402,7 @@ async function submitDiscipline(target,action) {
 
 let hostProgressObserver;
 function mountHostProgress() {
+  if(kidsMode()||(game?.phase==='lobby'&&enabledRoles.kids_mode)){document.querySelector('.host-progress')?.remove();hostProgressObserver?.disconnect();return;}
   hostProgressObserver?.disconnect();
   const app = document.querySelector('#app');
   const lobby = game?.phase === 'lobby';
@@ -395,3 +464,5 @@ function updateHostProgress() {
     if (element.textContent !== value) element.textContent = value;
   }
 }
+// Start after all client modules have initialized their state.
+home();

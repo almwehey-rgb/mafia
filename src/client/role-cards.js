@@ -1,7 +1,7 @@
 const reviewCardViews = new Map();
 const mafiaTeamViews = new Map();
 const kidsCardRoles = new Set(['mafia_boss','mafia','detective','doctor','citizen']);
-function roleCardAsset(role,thumbnail=false,kids=false){return `/assets/${kids&&kidsCardRoles.has(role)?'role-cards-kids':'role-cards-v3'}/${role}${thumbnail?'-thumb':''}.webp`;}
+function roleCardAsset(role,thumbnail=false,kids=false){if(kids&&kidsArt[role])return `/assets/kids-candy-v1/${kidsArt[role]}.png`;return `/assets/role-cards-v3/${role}${thumbnail?'-thumb':''}.webp`;}
 function selectRoleView(card,open){
  card=card.closest('.role-reader');
  card.dataset.view=open?'details':'image';
@@ -24,17 +24,17 @@ function cardsUseKidsMode(){
 }
 function interactiveRoleCard(role, {personal=false, compact=false, image='', open=false, review=false, count=0}={}) {
  if(review)open=reviewCardViews.get(role)===true;
- const label=escapeHtml(roleLabel(role));
  const kids=(personal?game?.enabledRoles?.kids_mode===true:cardsUseKidsMode())&&kidsCardRoles.has(role);
+ const label=escapeHtml(kids?kidsNames[role]:roleLabel(role));
  const art=roleCardAsset(role,false,kids);
- image = kids?art:(!image||image.includes('/role-cards-kids/')?art:image);
- const title=kids?({mafia_boss:'قائد الفريق الغامض',mafia:'الفريق الغامض',doctor:'الطبيب',detective:'المحقق',citizen:'المواطن'}[role]):role==='mafia_boss'?'زعيم المافيا':roleLabel(role).split(' / ')[0];
+ image = kids?art:(!image||image.includes('/role-cards-kids/')||image.includes('/kids-candy-v1/')?art:image);
+ const title=kids?kidsNames[role]:role==='mafia_boss'?'زعيم المافيا':roleLabel(role).split(' / ')[0];
  const teammates=personal&&mafiaRoleClient(role)?(game.me.mafiaTeam||[]).filter(p=>p.id!==game.me.id):[];
  const teamKey=escapeHtml(`mafia-team-${game?.code}-${game?.matchId}-${game?.me?.id}`);
- const team=personal&&mafiaRoleClient(role)?`<details class="role-allies" data-disclosure-key="${teamKey}" ${mafiaTeamViews.get(teamKey)!==false?'open':''} ontoggle="mafiaTeamViews.set(this.dataset.disclosureKey,this.open)"><summary>زملاؤك في المافيا <small>خاص بفريقك · إظهار / إخفاء</small></summary><div>${teammates.map(p=>`<span>${escapeHtml(p.name)}</span>`).join('')||'<p>أنت عضو المافيا الوحيد</p>'}</div></details>`:'';
- const teamName=role==='serial_killer'||role==='jester'?'الفريق المستقل':detailedRoleRules[role]?.[0]||'';
+ const team=personal&&!kids&&mafiaRoleClient(role)?`<details class="role-allies" data-disclosure-key="${teamKey}" ${mafiaTeamViews.get(teamKey)!==false?'open':''} ontoggle="mafiaTeamViews.set(this.dataset.disclosureKey,this.open)"><summary>زملاؤك في المافيا <small>خاص بفريقك · إظهار / إخفاء</small></summary><div>${teammates.map(p=>`<span>${escapeHtml(p.name)}</span>`).join('')||'<p>أنت عضو المافيا الوحيد</p>'}</div></details>`:'';
+ const teamName=kids?(mafiaRoleClient(role)?'سرّ الحلوى':'فريق الأصدقاء'):role==='serial_killer'||role==='jester'?'الفريق المستقل':detailedRoleRules[role]?.[0]||'';
  const teamCapsule=personal?`<span class="personal-team-capsule">${escapeHtml(teamName)}</span>`:'';
- const identity=`<header class="role-identity"><h2>${escapeHtml(title)}</h2><span>${escapeHtml(detailedRoleRules[role]?.[0]||'')}</span>${review?`<span class="review-role-count" data-no-translate aria-label="${discussionText('عدد اللاعبين','Player count')}">× ${count}</span>`:''}</header>`;
+ const identity=`<header class="role-identity"><h2>${escapeHtml(title)}</h2><span>${escapeHtml(teamName)}</span>${review?`<span class="review-role-count" data-no-translate aria-label="${discussionText('عدد اللاعبين','Player count')}">× ${count}</span>`:''}</header>`;
  const article=`<article class="role-reader turning-role ${kids?'kids-role-card':''} ${personal?'personal-role-card':''} ${compact?'compact':''}" ${review?`data-review-role="${role}"`:''} data-view="${open?'details':'image'}" style="--role-art:url('${image}')" role="button" tabindex="0" aria-label="${label}، اضغط لقلب الكرت" aria-pressed="${open}" onclick="selectRoleView(this,this.dataset.view!=='details')" onkeydown="if(event.target===this&&(event.key==='Enter'||event.key===' ')){event.preventDefault();selectRoleView(this,this.dataset.view!=='details')}"><div class="role-turn-inner"><div class="role-image-view" aria-hidden="${open}"><img src="${image}" alt="${label}" width="1024" height="1536" loading="lazy" decoding="async">${teamCapsule}${personal?'':'<span class="role-turn-hint">اضغط الكرت لقراءة الدور ↻</span>'}</div><div class="role-details-view" aria-hidden="${!open}">${teamCapsule}<div class="personal-card-properties">${detailedRoleProperties(role,personal)}</div>${personal?'':'<span class="role-turn-hint">مرّر لقراءة المزيد · اضغط للعودة ↻</span>'}</div></div></article>`;
  return `<section class="role-presentation ${review?'review-role-presentation':''}">${personal?article+team:identity+team+article}</section>`;
 }
@@ -95,6 +95,6 @@ function wheelHomeCard(event){
 function previewHomeRole(role){openSheet('شرح الشخصية',interactiveRoleCard(role,{open:true}));}
 function showGuide() {
   setRoomTag('📖');
-  const roles = (cardsUseKidsMode()?[...kidsCardRoles]:Object.keys(roleNames)).map(key => interactiveRoleCard(key)).join('');
-  $('#app').innerHTML = `<div class="card"><div class="toolbar"><h1>📖 الأدوار والقواعد</h1><button class="btn" onclick="home()">رجوع</button></div><div class="role-gallery">${roles}</div><div class="status">🌙 ليل: القدرات السرية · ☀️ نهار: نقاش وتصويت · 🏆 القرية تفوز بإخراج المافيا، والمافيا تفوز عند مساواة بقية الأحياء.</div></div>`;
+  const roles = (cardsUseKidsMode()?kidsRoles:Object.keys(roleNames)).map(key => interactiveRoleCard(key)).join('');
+  $('#app').innerHTML = `<div class="card"><div class="toolbar"><h1>📖 الأدوار والقواعد</h1><button class="btn" onclick="home()">رجوع</button></div><div class="role-gallery">${roles}</div><div class="status">${cardsUseKidsMode()?kidsHowTo():'🌙 ليل: القدرات السرية · ☀️ نهار: نقاش وتصويت · 🏆 القرية تفوز بإخراج المافيا، والمافيا تفوز عند مساواة بقية الأحياء.'}</div></div>`;
 }

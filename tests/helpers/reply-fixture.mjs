@@ -7,7 +7,7 @@ import test from 'node:test';
 import { AsyncLocalStorage } from 'node:async_hooks';
 
 const source = stripTypeScriptTypes(readFileSync(new URL('../../supabase/functions/mafia-room/index.ts', import.meta.url), 'utf8').replace(/^import .*;\r?\n/gm, ''));
-function fixture(mode = 'turns') {
+export function fixture(mode = 'turns') {
   let now = 1800000000000;
   let handler;
   let openingDrawValues = [0], openingDrawReads = 0;

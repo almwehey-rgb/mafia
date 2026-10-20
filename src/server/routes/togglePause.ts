@@ -13,6 +13,9 @@ async function routeTogglePause(context:RoomRouteContext) {
         } else if (room.phase === "day" && !discussion.pausedAt) nextDiscussion = { ...discussion, pausedAt: Date.now(), version: discussion.version + 1 };
       }
       const nextSettings = { ...room.enabled_roles, ...settings, paused_phase: room.phase === "paused" ? null : room.phase, discussion_state: nextDiscussion };
+      if(room.phase==='paused'&&settings.paused_phase==='night'&&currentRecruitment(room)&&!currentRecruitment(room).resolved&&room.phase_paused_at){
+        nextSettings.recruitment_state={...currentRecruitment(room),deadline:currentRecruitment(room).deadline+Math.max(0,Date.now()-new Date(room.phase_paused_at).getTime())};
+      }
       await persist(db.from("mafia_rooms").update({ phase: nextPhase, enabled_roles: nextSettings }).eq("code", code));
       ({ room, players } = await load(code));
       return out(publicView(room, players, undefined, true));

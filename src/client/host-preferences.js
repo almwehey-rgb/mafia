@@ -19,6 +19,7 @@ function normalizeEnabledRoles(value = {}) {
     mafia_kill_mode: killStartRound === 0 ? 'disabled' : killStartRound === 1 ? 'always' : killStartRound === 2 ? 'after_first' : 'scheduled',
     mafia_kill_enabled: killStartRound > 0,
     mafia_no_repeat: value.mafia_no_repeat === true,
+    mafia_recruitment: value.mafia_recruitment === true && value.kids_mode !== true,
     doctor_no_repeat: value.doctor_no_repeat !== false,
     reveal_dead_roles: value.reveal_dead_roles === true,
     allow_no_vote: value.allow_no_vote !== false,
@@ -64,4 +65,14 @@ function schedulePreferenceSave() {
       if ($('#prefsStatus')) $('#prefsStatus').textContent = 'تعذر الحفظ — سيُعاد عند التغيير';
     }
   }, 450);
+}
+let hostAccessInfo=null;
+function renderPublicEntry() {
+ setRoomTag();$('#app').removeAttribute('data-login-shell');
+ $('#app').innerHTML = `<section class="public-entry"><header><p class="resume-eyebrow">MAFIA NIGHT</p><h1>ليلتك تبدأ هنا</h1><p class="muted">ادخل برمز الاستضافة أو انضم إلى غرفة أصحابك</p></header><div class="card"><label for="hostPassCode">رمز الاستضافة</label><input class="input" id="hostPassCode" maxlength="24" dir="ltr" autocomplete="off" autocapitalize="characters" placeholder="XXXX-XXXX-XXXX-XXXX"><button class="btn gold wide" onclick="loginHostPass()">دخول برمز الاستضافة</button><div class="entry-divider">أو</div><button class="btn wide" onclick="joinForm()">دخول برقم الغرفة</button><p class="muted">عند مسح باركود الغرفة بكاميرا جوالك، تفتح صفحة الدخول مباشرة.</p><button class="btn wide" onclick="recoveryForm()">استرجاع حسابي</button></div>${homeCharacters()}</section>`;
+ $('#hostPassCode').addEventListener('keydown',event=>{if(event.key==='Enter')loginHostPass();});
+ const joinButton=document.querySelector('.public-entry button[onclick="joinForm()"]');joinButton.outerHTML=`<div class="room-entry-actions">${joinButton.outerHTML}${cameraJoinButton()}</div>`;
+}
+function hostCodeError(error) {
+ return ({ACCESS_CODE_EXHAUSTED:'انتهى رصيد المباريات. تواصل مع صاحب اللعبة لزيادته.',ACCESS_CODE_DISABLED:'تم إيقاف رمز الاستضافة. تواصل مع صاحب اللعبة.',ACCESS_CODE_BOUND:'هذا الرمز مرتبط بحساب آخر. استخدم نفس الجهاز أو استرجع حسابك أولًا.',INVALID_ACCESS_CODE:'رمز الاستضافة غير صحيح أو موقوف.',LOGIN_RATE_LIMITED:'محاولات كثيرة. انتظر 15 دقيقة.'})[error?.code];
 }

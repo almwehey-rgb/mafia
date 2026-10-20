@@ -40,7 +40,7 @@ async function handleRequest(request:Request) {
     // additionally check this value again under the database room lock.
     const generationFree = ["state","adminState","messages","spectatorState","join","joinSpectator","claimSeat","redeemAdminInvite","moderationLog","listSnapshots","systemStatus","leave"];
     if (!generationFree.includes(action) && (!Number.isSafeInteger(body.lifecycleVersion) || body.lifecycleVersion !== (room.lifecycle_version || 0))) return out({error:"STALE_GAME"},409);
-    if(['resolveNight','resolveVote','beginNight','startVote','advanceVerdict','lastShot','expelPlayer','endGame','transferHost','electMafiaLeader'].includes(action)) {
+    if(['resolveNight','resolveVote','beginNight','startVote','advanceVerdict','lastShot','expelPlayer','endGame','transferHost','electMafiaLeader','offerRecruitment','answerRecruitment'].includes(action) || (enabledRoles(room.enabled_roles).mafia_recruitment&&['act','togglePause'].includes(action))) {
       requestDatabase.getStore()!.plan=new TransitionPlan(room,players);
     }
     let authenticatedSpectator:any=null;
@@ -56,7 +56,7 @@ async function handleRequest(request:Request) {
     if (["createAdminInvite", "revokeAdminAccess"].includes(action)) return await routeCreateAdminInvite({body, action, ip, now, started, code, room, players, me, host, authenticatedSpectator});
     if (action === "redeemAdminInvite") return await routeRedeemAdminInvite({body, action, ip, now, started, code, room, players, me, host, authenticatedSpectator});
     if (action === "adminState") return await routeAdminState({body, action, ip, now, started, code, room, players, me, host, authenticatedSpectator});
-    if (room.enabled_roles?.pending_shot && room.phase !== "finished" && ["act","vote","resolveVote","resolveNight","startVote","startDiscussion","requestDiscussionReply","passDiscussion","finishDiscussion","advanceVerdict","togglePause","jail","lawyerProtect"].includes(action)) return out({ error: "WAITING_LAST_SHOT" }, 409);
+    if (room.enabled_roles?.pending_shot && room.phase !== "finished" && ["act","offerRecruitment","answerRecruitment","vote","resolveVote","resolveNight","startVote","startDiscussion","requestDiscussionReply","passDiscussion","finishDiscussion","advanceVerdict","togglePause","jail","lawyerProtect"].includes(action)) return out({ error: "WAITING_LAST_SHOT" }, 409);
     if (action === "lastShot") return await routeLastShot({body, action, ip, now, started, code, room, players, me, host, authenticatedSpectator});
 
     if (action === "joinSpectator") return await routeJoinSpectator({body, action, ip, now, started, code, room, players, me, host, authenticatedSpectator});
@@ -117,6 +117,8 @@ async function handleRequest(request:Request) {
 
     if (action === "act") return await routeAct({body, action, ip, now, started, code, room, players, me, host, authenticatedSpectator});
 
+    if (action === "offerRecruitment") return await routeOfferRecruitment({body, action, ip, now, started, code, room, players, me, host, authenticatedSpectator});
+    if (action === "answerRecruitment") return await routeAnswerRecruitment({body, action, ip, now, started, code, room, players, me, host, authenticatedSpectator});
     if (action === "resolveNight") return await routeResolveNight({body, action, ip, now, started, code, room, players, me, host, authenticatedSpectator});
 
     if (action === "setDiscussionClaim") return await routeSetDiscussionClaim({body, action, ip, now, started, code, room, players, me, host, authenticatedSpectator});

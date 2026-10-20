@@ -1,5 +1,5 @@
 function roleAcknowledged() { return game?.me?.acknowledged === true; }
-async function acknowledgeRole() { try{game=await api({action:'acknowledgeRole',code:game.code,id:playerId,playerToken});if(navigator.vibrate)navigator.vibrate(80);renderPlayer()}catch{alert('تعذر تأكيد الدور، حاول مرة ثانية')} }
+async function acknowledgeRole() { try{game=await api({action:'acknowledgeRole',code:game.code,id:playerId,playerToken});if(hapticsEnabled&&!window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches)navigator.vibrate?.(80);renderPlayer()}catch{alert('تعذر تأكيد الدور، حاول مرة ثانية')} }
 function roleProperties() {
   return detailedRoleProperties(game.me.role,true);
 }
@@ -26,6 +26,7 @@ function renderPlayerContent() {
     return;
   }
   if (!me) { $('#app').innerHTML = '<div class="card hero"><h2>فقدنا جلسة اللاعب</h2><button class="btn" onclick="home()">دخول من جديد</button></div>'; return; }
+  if(kidsMode()){renderKidsPlayer();return;}
   if (!me.alive) { delegatedHostMode=false; if(document.querySelector('.game-sheet'))closeSheet(); renderSpectator(); return; }
   setTimeout(mountPlayerTools, 0);
   if (game.phase === 'paused') { $('#app').innerHTML = `${phaseBar()}<div class="card hero"><div class="role-title">⏸️ المباراة متوقفة</div><p>المضيف سيكمل المباراة من المرحلة نفسها.</p></div>`; return; }

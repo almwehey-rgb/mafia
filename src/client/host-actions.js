@@ -28,6 +28,7 @@ async function returnToLobby() {
       hostToken, id:playerId, playerToken
     }));
     game = next;
+    if(typeof clearMatchEffects==='function')clearMatchEffects();
     localHistory = [];
     localStorage.removeItem(`mafia-history-${game.code}`);
     setupStep = 1;
@@ -39,13 +40,17 @@ async function returnToLobby() {
 async function startGame() {
   if (lifecycleRequestPending) return;
   lifecycleRequestPending = true;
+  if(enabledRoles.kids_mode){
+    if(game.players.length<4){lifecycleRequestPending=false;alert('قيم الأطفال يحتاج 4 لاعبين على الأقل');return;}
+    enabledRoles=normalizeEnabledRoles({...enabledRoles,...kidsDraftSettings()});mafiaCount=1;detectiveCount=1;detectiveQuestions=1;phaseDuration=60;
+  }
   enabledRoles.phase_seconds=phaseDuration;
   try {
     if(enabledRoles.automatic_game&&!await joinHostSeat())return;
     game = await withBusy('جاري توزيع الأدوار… / Dealing roles…', () => api({ action: 'start', code: game.code, lifecycleVersion:game.lifecycleVersion, hostToken, id:playerId, playerToken, mafiaCount, detectiveCount, detectiveQuestions, enabledRoles }));
     // Start responses are host-oriented; fetch this player's private role before rendering.
     if(game.enabledRoles?.automatic_game&&playerId)game=await api({action:'state',code:game.code,id:playerId,playerToken,hostToken});
-    localHistory = []; localStorage.removeItem(`mafia-history-${game.code}`);
+    localHistory = []; localStorage.removeItem(`mafia-history-${game.code}`);if(typeof clearMatchEffects==='function')clearMatchEffects();
     signalPhase(); rememberEvent();
     renderHost();
   } catch (error) { alert(hostCodeError(error)||(error.code === 'STALE_GAME' ? 'تغيّرت حالة الغرفة. انتظر تحديث الشاشة ثم حاول مجددًا.' : 'تأكد من وجود لاعبين كافين / Check player count')); }
@@ -68,9 +73,30 @@ async function restartGame() {
     alert(hostCodeError(error)||(error.code === 'STALE_GAME' ? 'تغيّرت حالة الغرفة. انتظر تحديث الشاشة ثم حاول مجددًا.' : 'تعذرت إعادة القيم، حاول مجددًا.'));
   } finally { lifecycleRequestPending = false; }
 }
+let hostActionPending = false;
 async function hostAction(action) {
-  try { const previous=game.phase; game = await api({ action, code: game.code, hostToken, id:playerId, playerToken }); if(previous!==game.phase)signalPhase(); rememberEvent(); renderHost(); }
-  catch (error) { alert(error.code === 'STALE_GAME' ? 'تغيّرت حالة الغرفة أثناء الطلب. انتظر تحديث الشاشة ثم حاول مجددًا.' : error.code === 'WAITING_ACTIONS' ? 'بانتظار بقية اختيارات الليل' : 'بانتظار بقية اللاعبين'); }
+  if(hostActionPending || !game)return;
+  const context=actionContext();
+  hostActionPending=true;
+  document.querySelectorAll('[data-timeout-action], [data-discussion-vote]').forEach(button=>button.disabled=true);
+  try {
+    const previous=game.phase;
+    game = await api({ action, code: game.code, hostToken, id:playerId, playerToken, lifecycleVersion:game.lifecycleVersion });
+    if(context!==actionContext()&&previous===game.phase)return;
+    if(previous!==game.phase)signalPhase();
+    rememberEvent();
+    renderHost();
+  }
+  catch (error) {
+    if(error.code==='STALE_GAME'){
+      try {
+        game=await api({action:'state',code:game.code,id:playerId,playerToken,hostToken});
+        renderHost();
+      } catch {}
+    }
+    alert(error.code === 'STALE_GAME' ? 'تغيّرت حالة الغرفة وتم تحديث الشاشة. راجع المرحلة الحالية قبل المتابعة.' : error.code === 'WAITING_ACTIONS' ? 'بانتظار بقية اختيارات الليل' : 'بانتظار بقية اللاعبين');
+  }
+  finally {hostActionPending=false;}
 }
 async function kickPlayer(target){if(!confirm(discussionText('طرد اللاعب ','Remove player ')+nameOf(target)+discussionText(' من الغرفة؟ سيحتاج إلى الدخول مجددًا.',' from the room? They will need to rejoin.')))return;try{game=await api({action:'kick',code:game.code,hostToken,id:playerId,playerToken,target});renderHost()}catch{alert('تعذر طرد اللاعب')}}
 async function addBot(){try{game=await api({action:'addBot',code:game.code,hostToken,id:playerId,playerToken});renderHost()}catch{alert('تعذر إضافة البوت')}}

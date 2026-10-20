@@ -10,6 +10,7 @@ function home() {
   pollingEpoch++;
   warmApi();
   clearTimeout(pollTimer);
+  if(typeof clearMatchEffects==='function')clearMatchEffects();
   document.querySelector('.player-tools')?.remove();
   closeSheet();
   game = null;

@@ -28,8 +28,11 @@ async function autoAdvanceSolo(code:string, room:any, players:any[]) {
   }
   if (room.phase === 'trial' && room.accused_player) { await routeAdvanceVerdict({...base,action:'advanceVerdict',room,players}); }
   if (room.phase === 'night') {
-    const needs=(p:any)=>p.alive&&!p.is_bot&&!p.jailed&&((p.role==='detective'&&room.round<=detectiveQuestionCount(room.detective_questions))||['mafia','mafia_boss','doctor','lawyer','jailer','witch','serial_killer','cupid','escort','revealer'].includes(p.role));
-    if (players.filter(needs).every((p:any)=>p.action_target) || !players.some(needs)) await routeResolveNight({...base,action:'resolveNight',room,players});
+    if (!recruitmentWaiting(room)&&(publicView(room,players,undefined,true).nightReady || phaseExpired(room))) {
+      if(currentRecruitment(room)&&!requestDatabase.getStore()!.plan)requestDatabase.getStore()!.plan=new TransitionPlan(room,players);
+      await routeResolveNight({...base,action:'resolveNight',room,players});
+      return await load(code);
+    }
   }
   return {room,players};
 }
@@ -38,7 +41,7 @@ async function autoAdvanceMatch(code:string,room:any,players:any[]) {
   const alive=players.filter(p=>p.alive),expired=phaseExpired(room),key=`${room.round}:${room.phase}`;
   let action='';
   if(room.phase==='reveal'&&players.length&&players.every(p=>roleState(p).ack===true))action='beginNight';
-  if(room.phase==='night'&&(publicView(room,players,undefined,true).nightReady||expired))action='resolveNight';
+  if(room.phase==='night'&&!recruitmentWaiting(room)&&(publicView(room,players,undefined,true).nightReady||expired))action='resolveNight';
   if(['vote','nomination','verdict'].includes(room.phase)){
     const required=alive.filter(p=>room.phase!=='verdict'||p.id!==room.accused_player);
     if(required.every(p=>p.vote_target)||expired)action='resolveVote';

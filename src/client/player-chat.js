@@ -101,8 +101,40 @@ function renderVerdict(){
   $('#app').innerHTML=`${phaseBar()}<div class="card hero"><div class="role-title">🔨 الحكم</div><h1>${escapeHtml(nameOf(game.accusedPlayer))}</h1>${accused?'<div class="status wait">أنت المتهم ولا تصوّت على حكمك.</div>':(game.me.voted?'<div class="status">تم تسجيل حكمك ويمكنك تغييره.</div>':'')+options}</div>`;
 }
 
+function recruitmentSettings(){
+  const active=enabledRoles.mafia_recruitment===true;
+  return `<section class="voting-setting" data-no-translate><h3>${discussionText('🤝 ليلة الخيانة','🤝 Betrayal Night')}</h3><button class="btn ${active?'gold':''}" aria-pressed="${active}" onclick="toggleOption('mafia_recruitment')">${discussionText(active?'مفعّلة':'مطفّية',active?'Enabled':'Disabled')}</button><p>${discussionText('الرئيس يختار التجنيد بدل الاغتيال مرة بالقيم. للمواطن العادي 30 ثانية يقبل أو يرفض؛ ما فيه اغتيال حتى لو فشلت المحاولة. تبدأ مع أول ليلة اغتيال متاحة.','Once per match, the boss may recruit instead of killing. An ordinary citizen has 30 seconds to accept or refuse. A failed attempt still replaces the kill. Available from the first enabled kill night.')}</p>${active?`<p class="muted">${discussionText('هذا الخيار يقوّي المافيا؛ راجع عددهم وعدد المواطنين قبل البداية.','This option strengthens the Mafia; review the Mafia and citizen counts before starting.')}</p>`:''}</section>`;
+}
+function recruitmentOfferCard(){
+  const offer=game.me.recruitmentOffer;
+  const pending=offer.response==='pending'&&offer.open;
+  return `<section class="card hero" data-no-translate><h2>${discussionText('🤝 عرض سرّي من المافيا','🤝 A private Mafia offer')}</h2>${pending?`<p>${discussionText('إذا وافقت وبقيت حيًا، تنضم للمافيا عند الصباح ويتغيّر شرط فوزك معهم. إذا رفضت تبقى مع الشعب. قرارك نهائي وسرّي.','If you accept and survive, you join the Mafia at dawn and win with them. Refuse to remain with the town. Your decision is final and private.')}</p><p>${discussionText('المهلة المتبقية','Time remaining')}: <b id="recruitmentTimer" role="timer"></b></p><div class="actions"><button class="btn gold" data-recruitment-answer onclick="confirmSensitiveAction('answerRecruitment','ACCEPT','joinMafia')">${discussionText('أقبل وأنضم للمافيا','Accept and join Mafia')}</button><button class="btn" data-recruitment-answer onclick="confirmSensitiveAction('answerRecruitment','DECLINE','declineMafia')">${discussionText('أرفض وأبقى مع الشعب','Refuse and stay with town')}</button></div>`:`<p>${discussionText(offer.response==='accept'?'تم تسجيل قبولك. انتظر نتيجة الصباح.':offer.response==='decline'?'رفضت العرض وتبقى مع الشعب.':'انتهت مهلة العرض؛ تبقى مع الشعب.',offer.response==='accept'?'Acceptance recorded. Wait for dawn.':offer.response==='decline'?'You refused and stay with the town.':'The offer expired; you stay with the town.')}</p>`}</section>`;
+}
+function openRecruitmentTargets(){
+  if(!game.me?.recruitment?.canOffer)return;
+  const team=new Set((game.me.mafiaTeam||[]).map(p=>p.id));
+  openSheet(discussionText('اختيار هدف التجنيد','Choose recruitment target'),`<p data-no-translate>${discussionText('اختيار صاحب دور خاص يفشل ويستهلك المحاولة بدون كشف دوره.','Choosing a special role spends the attempt without revealing their role.')}</p>${choiceButtons(alivePlayers().filter(p=>!team.has(p.id)),'confirmRecruitmentTarget',{icon:'🤝'})}`);
+}
+function confirmRecruitmentTarget(target){confirmSensitiveAction('offerRecruitment',target,'recruit')}
+function updateRecruitmentClock(){
+  const offer=game?.me?.recruitmentOffer;
+  if(!offer)return;
+  const remaining=Math.max(0,Math.ceil((offer.deadline-(Date.now()+discussionClockOffset))/1000));
+  const el=document.getElementById('recruitmentTimer');if(el)el.textContent=remaining;
+  for(const button of document.querySelectorAll('[data-recruitment-answer]'))button.disabled=!offer.open||remaining===0||playerActionPending;
+}
+function recruitmentNotice(){
+  const reveal=game?.recruitmentReveal;
+  if(reveal){const labels={joined:['انضم للمافيا','Joined Mafia'],declined:['رفض العرض','Refused'],timeout:['انتهت مهلة الرد','Response timed out'],unavailable:['الهدف غير قابل للتجنيد','Ineligible target'],blocked:['تعطلت المحاولة','Attempt blocked'],target_eliminated:['خرج الهدف قبل الانضمام','Target eliminated before joining'],unfinished:['انتهى القيم قبل اكتمال المحاولة','Match ended before resolution']};return `<section id="recruitmentNotice" class="card" data-no-translate><h3>${discussionText('كشف ليلة الخيانة','Betrayal Night revealed')}</h3><p>${discussionText('الليلة','Night')} ${escapeHtml(reveal.round)} · ${discussionText('الرئيس','Boss')}: ${escapeHtml(reveal.bossName)} · ${discussionText('المستهدف','Target')}: ${escapeHtml(reveal.targetName)}</p><p>${discussionText(...(labels[reveal.outcome]||labels.unfinished))}</p></section>`;}
+  if(game?.enabledRoles?.mafia_recruitment&&game.phase==='reveal')return `<section id="recruitmentNotice" class="status" data-no-translate><b>${discussionText('قانون الغرفة: ليلة الخيانة مفعّلة','Room rule: Betrayal Night enabled')}</b><p>${discussionText('لرئيس المافيا محاولة تجنيد واحدة بدل الاغتيال. المواطن العادي يقدر يقبل أو يرفض خلال 30 ثانية. القبول يغيّر فريقه بالصباح، والرفض لا يعيد الاغتيال.','The boss has one recruitment attempt instead of a kill. An ordinary citizen may accept or refuse within 30 seconds. Acceptance changes their team at dawn; refusal does not restore the kill.')}</p></section>`;
+  if(game?.phase==='day'&&game.me?.recruitmentResult&&!game.me.recruitmentResult.joined)return `<section id="recruitmentNotice" class="status" data-no-translate>${discussionText('لم تكتمل محاولة التجنيد؛ ما زلت مع الشعب.','Recruitment did not complete; you are still with the town.')}</section>`;
+  const result=game?.me?.recruitment;
+  if(result?.outcome&&game.phase==='day')return `<section id="recruitmentNotice" class="status" data-no-translate><b>${discussionText(result.outcome==='joined'?'انضم عضو جديد للمافيا':'لم ينضم الهدف للمافيا',result.outcome==='joined'?'A new member joined the Mafia':'The target did not join the Mafia')}</b><p>${escapeHtml(result.targetName)}</p>${game.me.recruited?`<p>${discussionText('أنت الآن مع المافيا، وفوزك معهم.','You are now Mafia and win with them.')}</p>`:''}</section>`;
+  return '';
+}
 function renderNight() {
   const me = game.me;
+  if(me.recruitmentOffer){$('#app').innerHTML=recruitmentOfferCard();return;}
   if (game.round === 1 && me.role !== 'detective') {
     $('#app').innerHTML = `<div class="card" data-no-translate><h2>${discussionText('🔎 الليلة الأولى للمحقق فقط','🔎 First night: detective only')}</h2><p>${discussionText('لا اغتيال ولا حماية ولا قدرات أخرى هذه الليلة. انتظر الصباح.','No kills, protection, or other role actions tonight. Wait for morning.')}</p></div>`;
     return;
@@ -121,9 +153,10 @@ function renderNight() {
     return;
   }
   if (me.role === 'mafia' || me.role === 'mafia_boss') {
-    const teamIds = new Set((me.mafiaTeam || []).map((x) => x.id));
-    const targets = alivePlayers().filter((player) => !teamIds.has(player.id) && (!game.enabledRoles?.mafia_no_repeat || player.id !== me.mafiaLastTarget));
-    $('#app').innerHTML = `<div class="card"><div class="role-title">${roleNames[me.role]}</div><div class="status wait">فريقك: ${(me.mafiaTeam || []).map((x) => escapeHtml(x.name)).join('، ')}</div>${me.acted ? '<h2 class="ok">تم تسجيل اختيارك ✅</h2>' : `<h2>اختر هدف الاغتيال</h2>${choiceButtons(targets, 'confirmNightTarget', { icon: '🔪' })}<button class="pick skip" onclick="nightAction('SKIP')">⏭️ تخطي الاغتيال / Skip kill</button>`}<p class="muted">${game.enabledRoles?.mafia_no_repeat ? 'لا يمكن تكرار هدف الليلة الماضية. ' : ''}اختيار زعيم المافيا هو النهائي عند الاختلاف.</p></div>`;
+    if(me.recruitment?.active){$('#app').innerHTML=`<section class="card" data-no-translate><h2>${discussionText('🤝 تم اختيار التجنيد','🤝 Recruitment selected')}</h2><p>${escapeHtml(me.recruitment.targetName)}</p><p>${discussionText('ما فيه اغتيال للمافيا هذه الليلة. نتيجة المحاولة تظهر بالصباح.','There is no Mafia kill tonight. The result arrives at dawn.')}</p></section>`;return;}
+    const targets = alivePlayers().filter((player) => player.id !== me.id && (!game.enabledRoles?.mafia_no_repeat || player.id !== me.mafiaLastTarget));
+    $('#app').innerHTML = `<div class="card"><div class="role-title">${roleNames[me.role]}</div><div class="status wait">فريقك: ${(me.mafiaTeam || []).map((x) => escapeHtml(x.name)).join('، ')}</div>${me.acted ? '<h2 class="ok">تم تسجيل اختيارك ✅</h2>' : `<h2>اختر هدف الاغتيال</h2>${choiceButtons(targets, 'confirmNightTarget', { icon: '🔪' })}<button class="pick skip" onclick="nightAction('SKIP')">⏭️ تخطي الاغتيال / Skip kill</button>`}<p class="muted">تقدر تستهدف أي لاعب حي غير نفسك، حتى أحد أفراد المافيا. ${game.enabledRoles?.mafia_no_repeat ? 'لا يمكن تكرار هدف الليلة الماضية. ' : ''}اختيار زعيم المافيا هو النهائي عند الاختلاف.</p></div>`;
+    if(me.recruitment?.canOffer)$('#app').insertAdjacentHTML('beforeend',`<section class="card" data-no-translate><h3>${discussionText('أو اختر ليلة الخيانة','Or choose Betrayal Night')}</h3><p>${discussionText('محاولة واحدة بالقيم بدل الاغتيال. تنجح فقط على مواطن عادي يوافق، وبدون اغتيال حتى لو رفض.','One attempt per match instead of the kill. Only a consenting ordinary citizen can join. No kill even if they refuse.')}</p><button class="btn gold wide" onclick="openRecruitmentTargets()">${discussionText('🤝 اختيار لاعب للتجنيد','🤝 Choose a recruitment target')}</button></section>`);
     return;
   }
   if (me.role === 'doctor') {
@@ -132,7 +165,7 @@ function renderNight() {
       return;
     }
     const targets = alivePlayers().filter((player) => !game.enabledRoles?.doctor_no_repeat || player.id !== me.doctorLastTarget);
-    $('#app').innerHTML = `<div class="card"><div class="role-title">${roleNames.doctor}</div>${me.acted ? '<h2 class="ok">تم تسجيل الحماية ✅</h2>' : `<h2>من ستحمي الليلة؟</h2>${choiceButtons(targets, 'nightAction', { icon: '🩺' })}`}<p class="muted">${game.enabledRoles?.doctor_no_repeat ? 'تقدر تحمي نفسك، لكن ما تقدر تكرر حماية نفس اللاعب ليلتين متتاليتين.' : 'تقدر تحمي نفسك أو تكرر حماية نفس اللاعب.'}</p></div>`;
+    $('#app').innerHTML = `<div class="card"><div class="role-title">${roleNames.doctor}</div>${me.acted ? '<h2 class="ok">تم تسجيل الحماية ✅</h2>' : `<h2>من ستحمي الليلة؟</h2>${choiceButtons(targets, 'nightAction', { icon: '🩺' })}`}<p class="muted">حمايتك تشمل أي لاعب حي حتى المافيا، بدون كشف دوره. ${game.enabledRoles?.doctor_no_repeat ? 'تقدر تحمي نفسك، لكن ما تقدر تكرر حماية نفس اللاعب ليلتين متتاليتين.' : 'تقدر تحمي نفسك أو تكرر حماية نفس اللاعب.'}</p></div>`;
     return;
   }
   if (me.role === 'revealer') {
@@ -219,7 +252,7 @@ function paintActionFeedback(){
   const {state,target}=actionFeedback;
   const displayTarget=target.replace(/^(SAVE|POISON):/,'');
   const label=game.players.find(p=>p.id===displayTarget)?.name || ({SKIP:discussionText('تخطي','Skip'),GUILTY:discussionText('مذنب','Guilty'),INNOCENT:discussionText('بريء','Innocent')})[target] || '';
-  const message=state==='pending'?discussionText('جاري إرسال الاختيار…','Sending choice…'):state==='success'?discussionText('✓ تم تسجيل اختيارك','✓ Choice recorded'):discussionText('تعذر تأكيد الإرسال. تحقق من الاتصال والحالة قبل المحاولة مجددًا.','Could not confirm delivery. Check your connection and current state before trying again.');
+  const message=state==='pending'?discussionText('جاري إرسال الاختيار…','Sending choice…'):state==='success'?discussionText('✓ تم تسجيل اختيارك','✓ Choice recorded'):state==='recovered'?discussionText('تمت مزامنة الحالة من الخادم. راجع خطوتك الحالية قبل أي محاولة جديدة.','State synced from the server. Review your current step before trying again.'):discussionText('تعذر تأكيد الإرسال. تحقق من الاتصال والحالة قبل المحاولة مجددًا.','Could not confirm delivery. Check your connection and current state before trying again.');
   const card=document.createElement('p');card.id='actionFeedback';card.className='status action-feedback '+state;card.setAttribute('role',state==='error'?'alert':'status');card.setAttribute('data-no-translate','');card.textContent=message+(label?' — '+label:'');
   document.querySelector('#app .phase-bar')?.insertAdjacentElement('afterend',card) || document.getElementById('app').prepend(card);
   for(const button of document.querySelectorAll('#app .pick')){

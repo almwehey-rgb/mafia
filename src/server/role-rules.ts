@@ -2,7 +2,7 @@ const shuffle = <T>(items: T[]) => { for (let i = items.length - 1; i > 0; i--) 
 const mafiaRole = (role: string | null) => role === "mafia" || role === "mafia_boss";
 const selected = (player: any) => String(player.action_target || "").split(",").filter(Boolean);
 const results = (player: any) => { try { return JSON.parse(player.investigation_result || "[]"); } catch { return []; } };
-const defaultEnabledRoles = { doctor: true, detective: true, lawyer: true, jailer: true, vigilante: false, witch: false, serial_killer: false, jester: false, cupid: false, escort: false, godfather_innocent: true, mafia_kill_start_round: 2, mafia_kill_mode: "always", mafia_kill_enabled: true, mafia_no_repeat: false, doctor_no_repeat: true, reveal_dead_roles: false, allow_no_vote: true, public_voting: false, full_trial: true, kids_mode: false, paused_phase: null };
+const defaultEnabledRoles = { doctor: true, detective: true, lawyer: true, jailer: true, vigilante: false, witch: false, serial_killer: false, jester: false, cupid: false, escort: false, godfather_innocent: true, mafia_kill_start_round: 2, mafia_kill_mode: "always", mafia_kill_enabled: true, mafia_no_repeat: false, mafia_recruitment: false, doctor_no_repeat: true, reveal_dead_roles: false, allow_no_vote: true, public_voting: false, full_trial: true, kids_mode: false, paused_phase: null };
 const enabledRoles = (value: any) => {
   const legacyRound = value?.mafia_kill_mode === "disabled" || value?.mafia_kill_enabled === false ? 0 : value?.mafia_kill_mode === "after_first" ? 2 : 1;
   let mafiaKillStartRound = Number.isFinite(+value?.mafia_kill_start_round) ? Math.max(0, Math.min(10, Math.round(+value.mafia_kill_start_round))) : legacyRound;
@@ -24,6 +24,7 @@ const enabledRoles = (value: any) => {
   mafia_kill_mode: mafiaKillStartRound === 0 ? "disabled" : mafiaKillStartRound === 1 ? "always" : mafiaKillStartRound === 2 ? "after_first" : "scheduled",
   mafia_kill_enabled: mafiaKillStartRound > 0,
   mafia_no_repeat: value?.mafia_no_repeat === true,
+  mafia_recruitment: value?.mafia_recruitment === true && value?.kids_mode !== true,
   doctor_no_repeat: value?.doctor_no_repeat !== false,
   reveal_dead_roles: value?.reveal_dead_roles === true,
   allow_no_vote: value?.allow_no_vote !== false,
@@ -48,6 +49,25 @@ const mafiaKillEnabledForRound = (room: any) => {
 };
 const roleState = (player: any) => player?.role_state && typeof player.role_state === "object" ? player.role_state : {};
 const mafiaLastTarget = (players: any[]) => players.find((player) => mafiaRole(player.role) && roleState(player).lastMafiaTarget)?.role_state.lastMafiaTarget || null;
+const currentRecruitment = (room:any) => room.enabled_roles?.recruitment_state?.round === room.round ? room.enabled_roles.recruitment_state : null;
+function recruitmentWaiting(room:any) {
+  const attempt=currentRecruitment(room);
+  const at=room.phase==='paused'?new Date(room.phase_paused_at).getTime():Date.now();
+  // Use the same response window for every target, even an ineligible role or
+  // an early refusal. Readiness must not become an oracle for secret roles.
+  return Boolean(attempt&&!attempt.resolved&&at<attempt.deadline);
+}
+function canOfferRecruitment(room:any,players:any[],player:any) {
+  return Boolean(enabledRoles(room.enabled_roles).mafia_recruitment&&room.phase==='night'&&mafiaKillEnabledForRound(room)&&!phaseExpired(room)
+    &&player?.alive&&player.role==='mafia_boss'&&!player.action_target&&!room.enabled_roles?.recruitment_state&&!isMafiaLocked(room,players)
+    &&player.id!==room.jailed_player&&!players.some(p=>p.alive&&p.role==='escort'&&p.id!==room.jailed_player&&p.action_target===player.id));
+}
+function recruitmentView(room:any,players:any[],player:any) {
+  const attempt=room.enabled_roles?.recruitment_state;
+  return {used:Boolean(attempt),canOffer:canOfferRecruitment(room,players,player),active:Boolean(currentRecruitment(room)&&!attempt.resolved),
+    targetName:attempt?players.find(p=>p.id===attempt.targetId)?.name||'':null,
+    outcome:attempt?.resolved?(attempt.joined?'joined':'failed'):null};
+}
 // Merge a small state change without erasing a concurrent vote, charge or claim.
 async function patchRoleState(code: string, player: any, patch: Record<string, any>) {
   let state = roleState(player);

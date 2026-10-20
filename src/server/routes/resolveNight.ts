@@ -3,6 +3,7 @@ async function routeResolveNight(context:RoomRouteContext) {
   {
       if (!host) return out({ error: "UNAUTHORIZED" }, 403);
       if (room.phase !== "night") return out({ error: "INVALID_ACTION" }, 409);
+      if (recruitmentWaiting(room)) return out({error:'WAITING_ACTIONS'},409);
       if (!publicView(room, players, undefined, true).nightReady && !phaseExpired(room)) return out({ error: "WAITING_ACTIONS" }, 409);
       await snapshot(room, players, "before_night_result");
       const events: string[] = [], deaths: string[] = [];
@@ -13,20 +14,11 @@ async function routeResolveNight(context:RoomRouteContext) {
       const escort = players.find((x) => x.alive && x.role === "escort" && x.id !== room.jailed_player);
       const blockedId = room.round === 1 ? null : escort?.action_target || null;
       const canAct = (player: any) => player?.alive && (room.round === 1 ? player.role === "detective" : player.id !== room.jailed_player && player.id !== blockedId);
-      // Resolve investigations only after all role blocks have been finalized.
-      for (const detective of players.filter((p) => p.alive && p.role === "detective")) {
-        const history = results(detective).filter((r: any) => r.round !== room.round);
-        if (canAct(detective)) for (const id of selected(detective).slice(0, detectiveLimit(room, players))) {
-          const target = players.find((p) => p.id === id);
-          if (target) history.push({ round: room.round, name: target.name, result: target.role === "mafia" || (target.role === "mafia_boss" && !enabledRoles(room.enabled_roles).godfather_innocent) ? "مافيا" : "بريء" });
-        }
-        const {error} = await db.from("mafia_players").update({ investigation_result: JSON.stringify(history) }).eq("room_code",code).eq("id",detective.id);
-        if (error) throw error;
-      }
       if (blockedId) events.push("escort_blocked");
       const activeMafia = players.filter((x) => mafiaRole(x.role) && canAct(x));
       const bossChoice = activeMafia.find((x) => x.role === "mafia_boss")?.action_target;
-      const factionChoice = !mafiaKillEnabled ? "DISABLED" : locked ? "LOCKED" : (bossChoice || plurality(activeMafia.map((x) => x.action_target)));
+      const recruitment=currentRecruitment(room);
+      const factionChoice = recruitment ? 'RECRUIT' : !mafiaKillEnabled ? "DISABLED" : locked ? "LOCKED" : (bossChoice || plurality(activeMafia.map((x) => x.action_target)));
       const doctor = players.find((x) => x.role === "doctor" && canAct(x));
       const doctorTarget = doctorAvailable(room) ? doctor?.action_target : null;
       const witch = players.find((x) => x.role === "witch" && canAct(x));
@@ -38,7 +30,8 @@ async function routeResolveNight(context:RoomRouteContext) {
       const witchTarget = validPotion ? requestedTarget : "";
       const protectedIds = new Set([doctorTarget, room.jailed_player, witchKind === "SAVE" ? witchTarget : null].filter(Boolean));
       const victim = players.find((x) => x.id === factionChoice && x.alive);
-      if (room.round === 1) events.push("detective_only_night");
+      if(recruitment) events.push('recruitment_attempted');
+      else if (room.round === 1) events.push("detective_only_night");
       else if (!mafiaKillEnabled) events.push(mafiaKillStartRound > Number(room.round) ? "mafia_delayed" : "mafia_disabled");
       else if (locked) events.push("mafia_locked");
       else if (!factionChoice || factionChoice === "SKIP") events.push("mafia_skipped");
@@ -70,6 +63,27 @@ async function routeResolveNight(context:RoomRouteContext) {
       if (witch?.action_target && ["SAVE", "POISON"].includes(witchKind)) {
         witch.role_state = { ...roleState(witch), [witchKind === "SAVE" ? "life" : "poison"]: false };
         await persist(db.from("mafia_players").update({ role_state: witch.role_state }).eq("room_code", code).eq("id", witch.id));
+      }
+      if(recruitment&&!recruitment.resolved){
+        const target=players.find(p=>p.id===recruitment.targetId),boss=players.find(p=>p.id===recruitment.bossId);
+        const eligible=target?.alive&&target.role==='citizen'&&target.id!==room.jailed_player;
+        const available=canAct(boss)&&!locked&&mafiaKillEnabled;
+        const joined=Boolean(eligible&&available&&recruitment.response==='accept'&&!deaths.includes(target.id));
+        const outcome=joined?'joined':!available?'blocked':!eligible?'unavailable':deaths.includes(target.id)?'target_eliminated':recruitment.response==='decline'?'declined':'timeout';
+        if(joined){target.role='mafia';target.role_state={...roleState(target),recruited:true,recruitedRound:room.round};
+          await persist(db.from('mafia_players').update({role:target.role,role_state:target.role_state}).eq('room_code',code).eq('id',target.id));}
+        room.enabled_roles={...room.enabled_roles,recruitment_state:{...recruitment,resolved:true,joined,outcome}};
+        await persist(db.from('mafia_rooms').update({enabled_roles:room.enabled_roles}).eq('code',code));
+      }
+      // Resolve investigations after blocks and recruitment, so results reflect the new faction.
+      for (const detective of players.filter((p) => p.alive && p.role === "detective")) {
+        const history = results(detective).filter((r: any) => r.round !== room.round);
+        if (canAct(detective)) for (const id of selected(detective).slice(0, detectiveLimit(room, players))) {
+          const target = players.find((p) => p.id === id);
+          if (target) history.push({ round: room.round, name: target.name, result: target.role === "mafia" || (target.role === "mafia_boss" && !enabledRoles(room.enabled_roles).godfather_innocent) ? "مافيا" : "بريء" });
+        }
+        const {error} = await db.from("mafia_players").update({ investigation_result: JSON.stringify(history) }).eq("room_code",code).eq("id",detective.id);
+        if (error) throw error;
       }
       for (const revealer of players.filter(p => p.role === "revealer" && !roleState(p).mafiaCountResult && canAct(p) && p.action_target === "COUNT" && !deaths.includes(p.id))) {
         const mafiaCountResult = { round: room.round, count: players.filter(p => p.alive && mafiaRole(p.role) && !deaths.includes(p.id)).length };

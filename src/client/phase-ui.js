@@ -1,6 +1,6 @@
 function signalPhase() {
   phaseStartedAt = Date.now();
-  if (navigator.vibrate) navigator.vibrate([120, 60, 120]);
+  if (hapticsEnabled && !window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches) navigator.vibrate?.([120, 60, 120]);
   if (!soundEnabled) return;
   try {
     const context = new (window.AudioContext || window.webkitAudioContext)();
@@ -30,8 +30,9 @@ function updatePhaseTimer() {
   for(const button of document.querySelectorAll('[data-timeout-action]')) {
     const action=button.dataset.timeoutAction;
     const ready=action==='resolveNight'?(game?.nightReady||firstNightWithoutDetective()):game?.voteCount>=Math.max(0,alivePlayers().length-(game.phase==='verdict'?1:0));
-    button.disabled=!(ready||phaseTimeExpired());
+    button.disabled=(action==='resolveNight'&&game?.nightResolutionBlocked)||!(ready||phaseTimeExpired());
   }
+  updateRecruitmentClock();
   updateDiscussionClocks();
   updateHostProgress();
   const el = $('#phaseTimer');
@@ -50,6 +51,7 @@ function updatePhaseTimer() {
 }
 setInterval(updatePhaseTimer,1000);
 function toggleSound(){soundEnabled=!soundEnabled;localStorage.setItem('mafia-sound',soundEnabled?'on':'off');schedulePreferenceSave();renderHost()}
+function toggleHaptics(){hapticsEnabled=!hapticsEnabled;localStorage.setItem('mafia-haptics',hapticsEnabled?'on':'off');renderHost()}
 function cycleTimer(){phaseDuration=phaseDuration===30?60:phaseDuration===60?90:30;localStorage.setItem('mafia-phase-seconds',String(phaseDuration));phaseStartedAt=Date.now();enabledRoles.phase_seconds=phaseDuration;schedulePreferenceSave();renderHost()}
 function copyText(value){if(navigator.clipboard?.writeText)return navigator.clipboard.writeText(value);const area=document.createElement('textarea');area.value=value;document.body.append(area);area.select();document.execCommand('copy');area.remove();return Promise.resolve()}
 async function shareRoom(){const url=`${location.origin}/game.html?room=${game.code}`;try{if(navigator.share)await navigator.share({title:'لعبة مافيا',text:`ادخل غرفة ${game.code}`,url});else{await copyText(url);alert('تم نسخ رابط الغرفة ✅')}}catch{}}

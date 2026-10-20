@@ -8,7 +8,25 @@ async function playerAction(action, target) {
     game=next;actionFeedback={context,target,state:'success'};
     renderPlayer();
   } catch (error) {
-    if(context===actionContext()){actionFeedback={context,target,state:'error'};paintActionFeedback();}
+    // A timeout does not prove that the server rejected the choice. Refresh the
+    // authoritative state before showing a retry affordance, so a spent ability
+    // cannot be submitted twice after a lost response.
+    if(context===actionContext()){
+      let recovered=false;
+      try {
+        const next=await api({action:'state',code:game.code,id:playerId,playerToken,hostToken});
+        if(context===actionContext()){
+          game=next;
+          actionFeedback={context:actionContext(),target,state:'recovered'};
+          renderPlayer();
+          recovered=true;
+        }
+      } catch {}
+      if(!recovered&&context===actionContext()){
+        actionFeedback={context,target,state:'error'};
+        paintActionFeedback();
+      }
+    }
   } finally {playerActionPending=false;}
 }
 function nightAction(target) { return playerAction('act', target); }
@@ -16,6 +34,9 @@ let pendingActionConfirmation=null;
 function sensitiveActionCopy(kind,target){
   const name=target&&target!=='EXECUTE'?nameOf(String(target).replace(/^(SAVE|POISON):/,'')):'';
   const copies={
+    recruit:[discussionText('تأكيد ليلة الخيانة','Confirm Betrayal Night'),discussionText('ستستهلك محاولة التجنيد الوحيدة على ','Your only recruitment attempt will target ')+name+discussionText('، وبدون اغتيال الليلة حتى لو رفض.','; there is no kill tonight even if they refuse.'),discussionText('تجنيد بدل الاغتيال','Recruit instead of kill')],
+    joinMafia:[discussionText('تغيير فريقك','Change your team'),discussionText('إذا بقيت حيًا ونجحت المحاولة، تصبح مافيا عند الصباح وتفوز معهم.','If you survive and the attempt succeeds, you become Mafia at dawn and win with them.'),discussionText('أوافق على الانضمام','Accept membership')],
+    declineMafia:[discussionText('رفض العرض','Refuse offer'),discussionText('ستبقى مع الشعب. لا يمكن تغيير القرار بعد الإرسال.','You stay with the town. This decision cannot be changed.'),discussionText('أرفض العرض','Refuse offer')],
     kill:[discussionText('تأكيد الاستهداف','Confirm target'),discussionText('سيُسجل اختيارك على ','Your choice will be recorded for ')+name,discussionText('تأكيد الاختيار','Confirm choice')],
     poison:[discussionText('تأكيد جرعة السم','Confirm poison'),discussionText('ستُستهلك جرعة السم على ','Your poison charge will be used on ')+name,discussionText('استخدام السم','Use poison')],
     save:[discussionText('تأكيد جرعة الحياة','Confirm life potion'),discussionText('ستُستهلك جرعة الحياة لحماية ','Your life potion will be used to protect ')+name,discussionText('استخدام الجرعة','Use potion')],
@@ -47,4 +68,3 @@ function jailPlayer(target) { return playerAction('jail', target); }
 function lawyerProtect(target) { return playerAction('lawyerProtect', target); }
 function castVote(target) { return playerAction('vote', target); }
 
-home();
