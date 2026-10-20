@@ -42,7 +42,13 @@ async function routeStartDiscussion(context:RoomRouteContext) {
       const openingIds = new Set(opening.map(p=>p.id));
       const remaining = speakers.filter(p=>!openingIds.has(p.id));
       for(let i=0;i<remaining.length-1;i++){const j=i+Math.floor(Math.random()*(remaining.length-i));[remaining[i],remaining[j]]=[remaining[j],remaining[i]];}
-      const order = [...opening, ...remaining].map(p=>p.id);
+      const discussionOrder = [...opening, ...remaining].map(p=>p.id);
+      // Public claimants get one closing reply each, after every regular turn.
+      // Preserve their speaking order; never publish which claim is genuine.
+      const claimantIds = new Set(prioritySpeakers.map(p=>p.id));
+      const closingOrder = settings.discussion_mode === "turns"
+        ? discussionOrder.filter(id=>claimantIds.has(id)) : [];
+      const order = [...discussionOrder, ...closingOrder];
       const roulette = settings.discussion_mode === "turns" && priority.length > 1 ? { candidates: shuffle(opening).map(p=>p.id), winner:starter.id, at:now, duration:6000 } : null;
       const choices = settings.discussion_mode === "turns" ? [15,30,45,60,90,120] : [30,60,120,180,300,600,900,1800,3600];
       const seconds = body.seconds === undefined ? (settings.discussion_mode === "turns" ? settings.speaker_seconds : settings.discussion_seconds) : Number(body.seconds);

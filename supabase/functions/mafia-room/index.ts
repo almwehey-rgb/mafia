@@ -395,7 +395,7 @@ function publicView(room: any, players: any[], meId?: string, host = false) {
     enabledRoles: { ...settings, mafia_kill_enabled: mafiaKillEnabledForRound(room) },
     lastEvent: room.last_event, lastDeaths: room.last_deaths || [],
     voteSummary: !votingActive && room.enabled_roles?.vote_summary ? { ...room.enabled_roles.vote_summary, counts: (room.enabled_roles.vote_summary.counts || []).map((item: any) => ({ id: item.id, name: item.name, count: item.count, ...(settings.public_voting && Array.isArray(item.voters) ? { voters: item.voters.map((v: any) => ({ id: v.id, name: v.name })) } : {}) })) } : null,
-    eliminations: (room.last_deaths || []).map((id: string) => { const p = players.find((x) => x.id === id); const elimination = roleState(p || {}).elimination; return { id, name: p?.name || "", reason: elimination?.reason || "eliminated", round: elimination?.round ?? null, at: elimination?.at ?? null, detail: elimination?.reason === "host_expelled" ? elimination.detail : undefined }; }),
+    eliminations: (room.last_deaths || []).map((id: string) => { const p = players.find((x) => x.id === id); const elimination = roleState(p || {}).elimination; const privateCause=host||me?.id===id; return { id, name: p?.name || "", reason: privateCause ? elimination?.reason || "eliminated" : "eliminated", round: elimination?.round ?? null, at: elimination?.at ?? null, detail: privateCause&&elimination?.reason === "host_expelled" ? elimination.detail : undefined }; }),
     pendingShot: room.phase !== "finished" && room.enabled_roles?.pending_shot ? { id: room.enabled_roles.pending_shot.id, playerId: room.enabled_roles.pending_shot.playerId, resolving: room.enabled_roles.pending_shot.resolving === true, target: (host || me?.id === room.enabled_roles.pending_shot.playerId) ? room.enabled_roles.pending_shot.target : undefined } : null,
     lastEliminated: room.last_eliminated, lastSaved: room.last_saved, winner: room.winner,
     winnerPlayer: room.winner_player,
@@ -959,8 +959,11 @@ async function routeStart(context:RoomRouteContext) {
         if (body[key] != null && (!Number.isInteger(body[key]) || body[key] < (key === "mafiaCount" ? 1 : 0) || body[key] > 20)) return out({ error: "INVALID_SETTINGS" }, 400);
       }
       let selectedRoles = { ...enabledRoles(body.enabledRoles || room.enabled_roles || defaultEnabledRoles), admin_access:room.enabled_roles?.admin_access || null };
-      if (selectedRoles.kids_mode) selectedRoles = { ...selectedRoles, doctor: players.length >= 5, detective: players.length >= 4, lawyer: false, jailer: false, vigilante: false, witch: false, serial_killer: false, jester: false, cupid: false, revealer: false, escort: false, reveal_dead_roles: true, allow_no_vote: true, full_trial: false, godfather_innocent: false };
-      const requestedMafia = selectedRoles.kids_mode ? Math.min(2, Math.max(1, Math.round(players.length / 4))) : Math.max(1, Number(body.mafiaCount) || room.mafia_count);
+      if (selectedRoles.kids_mode) {
+        if (players.length < 4) return out({ error: "KIDS_NEED_4_PLAYERS" }, 400);
+        selectedRoles = { ...selectedRoles, doctor:true, detective:true, lawyer:false, jailer:false, vigilante:false, witch:false, serial_killer:false, jester:false, cupid:false, revealer:false, escort:false, reveal_dead_roles:true, allow_no_vote:true, full_trial:false, godfather_innocent:false, mafia_kill_start_round:2, mafia_kill_mode:"after_first", mafia_kill_enabled:true, mafia_no_repeat:false, doctor_no_repeat:false, public_voting:false, discussion_mode:"off", phase_seconds:60, action_deadline:true };
+      }
+      const requestedMafia = selectedRoles.kids_mode ? 1 : Math.max(1, Number(body.mafiaCount) || room.mafia_count);
       const mafiaCount = players.length < 4 ? 1 : Math.min(Math.floor((players.length - 1) / 2), requestedMafia);
       const doctor = selectedRoles.doctor && players.length >= 4 ? 1 : 0;
       const lawyer = selectedRoles.lawyer && players.length >= 5 ? 1 : 0;
@@ -974,8 +977,8 @@ async function routeStart(context:RoomRouteContext) {
       const revealer = selectedRoles.revealer ? 1 : 0;
       const fixed = doctor + lawyer + jailer + vigilante + witch + serialKiller + jester + cupid + escort + revealer;
       const maxDetectives = players.length < 3 ? 0 : Math.min(8, Math.max(0, players.length - mafiaCount - fixed));
-      const detectiveCount = selectedRoles.detective ? Math.min(maxDetectives, Math.max(0, Number.isFinite(+body.detectiveCount) ? +body.detectiveCount : room.detective_count)) : 0;
-      const detectiveQuestions = detectiveQuestionCount(body.detectiveQuestions ?? room.detective_questions);
+      const detectiveCount = selectedRoles.kids_mode ? 1 : selectedRoles.detective ? Math.min(maxDetectives, Math.max(0, Number.isFinite(+body.detectiveCount) ? +body.detectiveCount : room.detective_count)) : 0;
+      const detectiveQuestions = selectedRoles.kids_mode ? 1 : detectiveQuestionCount(body.detectiveQuestions ?? room.detective_questions);
       const totalRoles = mafiaCount + fixed + detectiveCount;
       if (totalRoles > players.length) return out({ error: "TOO_MANY_ROLES" }, 400);
       const roles = shuffle(["mafia_boss", ...Array(Math.max(0, mafiaCount - 1)).fill("mafia"), ...Array(doctor).fill("doctor"), ...Array(lawyer).fill("lawyer"), ...Array(jailer).fill("jailer"), ...Array(vigilante).fill("vigilante"), ...Array(witch).fill("witch"), ...Array(serialKiller).fill("serial_killer"), ...Array(jester).fill("jester"), ...Array(cupid).fill("cupid"), ...Array(escort).fill("escort"), ...Array(revealer).fill("revealer"), ...Array(detectiveCount).fill("detective"), ...Array(players.length - totalRoles).fill("citizen")]);
@@ -1052,11 +1055,12 @@ async function routeWarnPlayer(context:RoomRouteContext) {
         const saved = settings.discussion_state;
         if (saved?.round === room.round && saved.order.includes(target.id)) {
           const view = discussionView(room);
-          const removed = saved.order.indexOf(target.id);
+          const removedBefore = saved.order.slice(0, view.index).filter((id: string) => id === target.id).length;
+          const removedCurrent = saved.order[view.index] === target.id;
           const order = saved.order.filter((id: string) => id !== target.id);
-          const cursor = Math.max(0, view.index - (removed < view.index ? 1 : 0));
+          const cursor = Math.max(0, view.index - removedBefore);
           const at = saved.pausedAt || Date.now();
-          settings.discussion_state = { ...saved, order, cursor, version: saved.version + 1, turnStartedAt: removed === view.index ? at : saved.turnStartedAt + (view.index - saved.cursor) * saved.seconds * 1000, finished: saved.finished || (saved.mode === "turns" && cursor >= order.length) };
+          settings.discussion_state = { ...saved, order, cursor, version: saved.version + 1, turnStartedAt: removedCurrent ? at : saved.turnStartedAt + (view.index - saved.cursor) * saved.seconds * 1000, finished: saved.finished || (saved.mode === "turns" && cursor >= order.length) };
         }
         const activePhase = room.phase === "paused" ? settings.paused_phase : room.phase;
         const skipTrial = room.accused_player === target.id && ["trial", "verdict"].includes(activePhase);
@@ -1453,7 +1457,7 @@ async function routeAct(context:RoomRouteContext) {
       const target = players.find((x) => x.id === body.target);
       if (mafiaRole(me.role)) {
         if (isMafiaLocked(room, players)) return out({ error: "MAFIA_LOCKED" }, 409);
-        if (body.target !== "SKIP" && (!target?.alive || mafiaRole(target.role) || (enabledRoles(room.enabled_roles).mafia_no_repeat && target.id === mafiaLastTarget(players)))) return out({ error: "INVALID_ACTION" }, 400);
+        if (body.target !== "SKIP" && (!target?.alive || target.id === me.id || (enabledRoles(room.enabled_roles).mafia_no_repeat && target.id === mafiaLastTarget(players)))) return out({ error: "INVALID_ACTION" }, 400);
         await persist(db.from("mafia_players").update({ action_target: body.target }).eq("room_code", code).eq("id", me.id));
       } else if (me.role === "revealer") {
         if (!["COUNT","SKIP"].includes(body.target) || me.action_target || roleState(me).mafiaCountResult) return out({ error: "INVALID_ACTION" }, 400);
@@ -1659,7 +1663,13 @@ async function routeStartDiscussion(context:RoomRouteContext) {
       const openingIds = new Set(opening.map(p=>p.id));
       const remaining = speakers.filter(p=>!openingIds.has(p.id));
       for(let i=0;i<remaining.length-1;i++){const j=i+Math.floor(Math.random()*(remaining.length-i));[remaining[i],remaining[j]]=[remaining[j],remaining[i]];}
-      const order = [...opening, ...remaining].map(p=>p.id);
+      const discussionOrder = [...opening, ...remaining].map(p=>p.id);
+      // Public claimants get one closing reply each, after every regular turn.
+      // Preserve their speaking order; never publish which claim is genuine.
+      const claimantIds = new Set(prioritySpeakers.map(p=>p.id));
+      const closingOrder = settings.discussion_mode === "turns"
+        ? discussionOrder.filter(id=>claimantIds.has(id)) : [];
+      const order = [...discussionOrder, ...closingOrder];
       const roulette = settings.discussion_mode === "turns" && priority.length > 1 ? { candidates: shuffle(opening).map(p=>p.id), winner:starter.id, at:now, duration:6000 } : null;
       const choices = settings.discussion_mode === "turns" ? [15,30,45,60,90,120] : [30,60,120,180,300,600,900,1800,3600];
       const seconds = body.seconds === undefined ? (settings.discussion_mode === "turns" ? settings.speaker_seconds : settings.discussion_seconds) : Number(body.seconds);
@@ -2050,3 +2060,4 @@ async function commitRequest(request:Request) {
   } catch { return out({error:'SERVER_ERROR'},500); }
 }
 Deno.serve(async (request) => requestDatabase.run({headers:{},requestId:crypto.randomUUID(),started:Date.now()}, async () => recordResponse(await commitRequest(request))));
+

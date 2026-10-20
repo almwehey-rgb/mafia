@@ -32,11 +32,12 @@ async function routeWarnPlayer(context:RoomRouteContext) {
         const saved = settings.discussion_state;
         if (saved?.round === room.round && saved.order.includes(target.id)) {
           const view = discussionView(room);
-          const removed = saved.order.indexOf(target.id);
+          const removedBefore = saved.order.slice(0, view.index).filter((id: string) => id === target.id).length;
+          const removedCurrent = saved.order[view.index] === target.id;
           const order = saved.order.filter((id: string) => id !== target.id);
-          const cursor = Math.max(0, view.index - (removed < view.index ? 1 : 0));
+          const cursor = Math.max(0, view.index - removedBefore);
           const at = saved.pausedAt || Date.now();
-          settings.discussion_state = { ...saved, order, cursor, version: saved.version + 1, turnStartedAt: removed === view.index ? at : saved.turnStartedAt + (view.index - saved.cursor) * saved.seconds * 1000, finished: saved.finished || (saved.mode === "turns" && cursor >= order.length) };
+          settings.discussion_state = { ...saved, order, cursor, version: saved.version + 1, turnStartedAt: removedCurrent ? at : saved.turnStartedAt + (view.index - saved.cursor) * saved.seconds * 1000, finished: saved.finished || (saved.mode === "turns" && cursor >= order.length) };
         }
         const activePhase = room.phase === "paused" ? settings.paused_phase : room.phase;
         const skipTrial = room.accused_player === target.id && ["trial", "verdict"].includes(activePhase);
