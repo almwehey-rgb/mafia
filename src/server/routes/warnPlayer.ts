@@ -34,10 +34,13 @@ async function routeWarnPlayer(context:RoomRouteContext) {
           const view = discussionView(room);
           const removedBefore = saved.order.slice(0, view.index).filter((id: string) => id === target.id).length;
           const removedCurrent = saved.order[view.index] === target.id;
-          const order = saved.order.filter((id: string) => id !== target.id);
+          const keep = saved.order.map((id: string, i: number) => id !== target.id ? i : -1).filter((i: number)=>i >= 0);
+          const order = keep.map((i: number)=>saved.order[i]);
+          const turnSeconds = keep.map((i: number)=>saved.turnSeconds?.[i] || saved.seconds);
+          const turnKinds = keep.map((i: number)=>saved.turnKinds?.[i] || 'normal');
           const cursor = Math.max(0, view.index - removedBefore);
           const at = saved.pausedAt || Date.now();
-          settings.discussion_state = { ...saved, order, cursor, version: saved.version + 1, turnStartedAt: removedCurrent ? at : saved.turnStartedAt + (view.index - saved.cursor) * saved.seconds * 1000, finished: saved.finished || (saved.mode === "turns" && cursor >= order.length) };
+          settings.discussion_state = { ...saved, order, turnSeconds, turnKinds, cursor, version: saved.version + 1, turnStartedAt: removedCurrent ? at : view.currentTurnStartedAt, finished: saved.finished || (saved.mode === "turns" && cursor >= order.length) };
         }
         const activePhase = room.phase === "paused" ? settings.paused_phase : room.phase;
         const skipTrial = room.accused_player === target.id && ["trial", "verdict"].includes(activePhase);

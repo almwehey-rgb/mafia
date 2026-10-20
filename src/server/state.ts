@@ -18,11 +18,6 @@ async function autoAdvanceSolo(code:string, room:any, players:any[]) {
   if (room.phase === 'day') {
     const discussion=discussionView(room);
     if (!room.enabled_roles?.discussion_state || discussion.round !== room.round) await routeStartDiscussion({...base,action:'startDiscussion'});
-    else if (discussion.status === 'active' && Date.now() >= (discussion.mode === 'turns' ? discussion.turnStartedAt + discussion.seconds*1000 : discussion.endsAt)) {
-      const saved=room.enabled_roles.discussion_state;
-      const next = discussion.mode === 'turns' && discussion.index + 1 < saved.order.length ? {...saved,cursor:discussion.index+1,turnStartedAt:Date.now(),version:saved.version+1} : {...saved,finished:true,version:saved.version+1};
-      await db.from('mafia_rooms').update({enabled_roles:{...room.enabled_roles,discussion_state:next}}).eq('code',code).eq('phase','day').eq('enabled_roles->discussion_state->>id',saved.id).eq('enabled_roles->discussion_state->>version',String(saved.version));
-    }
     ({room,players}=await load(code));
     if (discussionView(room).complete) { await botDayActions(room,players); ({room,players}=await load(code)); await routeStartVote({...base,action:'startVote',room,players}); }
   }

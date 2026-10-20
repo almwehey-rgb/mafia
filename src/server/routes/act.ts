@@ -6,7 +6,7 @@ async function routeAct(context:RoomRouteContext) {
       const target = players.find((x) => x.id === body.target);
       if (mafiaRole(me.role)) {
         if (isMafiaLocked(room, players)) return out({ error: "MAFIA_LOCKED" }, 409);
-        if (body.target !== "SKIP" && (!target?.alive || mafiaRole(target.role) || (enabledRoles(room.enabled_roles).mafia_no_repeat && target.id === mafiaLastTarget(players)))) return out({ error: "INVALID_ACTION" }, 400);
+        if (body.target !== "SKIP" && (!target?.alive || target.id === me.id || (enabledRoles(room.enabled_roles).mafia_no_repeat && target.id === mafiaLastTarget(players)))) return out({ error: "INVALID_ACTION" }, 400);
         await persist(db.from("mafia_players").update({ action_target: body.target }).eq("room_code", code).eq("id", me.id));
       } else if (me.role === "revealer") {
         if (!["COUNT","SKIP"].includes(body.target) || me.action_target || roleState(me).mafiaCountResult) return out({ error: "INVALID_ACTION" }, 400);

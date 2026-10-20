@@ -121,3 +121,60 @@ test('Removing a claimant during a reply removes both occurrences and keeps the 
 test('Group discussion keeps its existing group timer',async()=>{
  const f=await startClaimants({mode:'group'});assert.equal(f.view().order.length,3);f.advance(180000);assert.equal(f.view().complete,true);
 });
+const requestReply = (f,id) => f.call('requestDiscussionReply',{id,playerToken:'token-'+id,discussionId:f.view().id});
+test('A requested reply waits for the speaker and lasts exactly 15 seconds',async()=>{
+ const f=await startClaimants();f.advance(16000);const current=f.view().speakerId;const before=f.view();
+ const id=current==='c'?'b':'c';const r=await requestReply(f,id);assert.equal(r.status,200,JSON.stringify(r.body));
+ assert.equal(f.view().speakerId,current);assert.equal(f.view().remainingMs,before.remainingMs);assert.equal(r.body.me.discussionRepliesLeft,1);
+ assert.equal(f.view().order[f.view().index+1],id);
+ f.advance(before.remainingMs);assert.equal(f.view().speakerId,id);assert.equal(f.view().turnKind,'reply');assert.equal(f.view().remainingMs,15000);
+ f.advance(14999);assert.equal(f.view().turnKind,'reply');f.advance(1);assert.notEqual(f.view().turnKind,'reply');assert.equal(f.view().remainingMs,30000);
+});
+test('Requests queue FIFO, reject duplicates, and never interrupt the current reply',async()=>{
+ const f=await startClaimants();f.advance(6000);const current=f.view().speakerId;const ids=['a','b','c'].filter(id=>id!==current);
+ assert.equal((await requestReply(f,ids[0])).status,200);assert.equal((await requestReply(f,ids[0])).body.error,'REPLY_ALREADY_QUEUED');
+ assert.equal((await requestReply(f,ids[1])).status,200);
+ const d=f.view();assert.deepEqual(Array.from(d.order.slice(1,3)),ids);
+ f.advance(30000);assert.equal(f.view().speakerId,ids[0]);assert.equal((await requestReply(f,ids[0])).body.error,'ALREADY_SPEAKING');
+ assert.equal((await requestReply(f,current)).status,200);assert.equal(f.view().speakerId,ids[0]);
+ f.advance(15000);assert.equal(f.view().speakerId,ids[1]);f.advance(15000);assert.equal(f.view().speakerId,current);
+});
+test('Two accepted requests exhaust the match allowance and the count survives rounds',async()=>{
+ const f=await startClaimants();f.advance(6000);const id='c';assert.equal((await requestReply(f,id)).status,200);
+ f.advance(45000);assert.equal((await requestReply(f,id)).status,200);
+ f.advance(45000);assert.equal(f.rooms[0].enabled_roles.discussion_reply_usage[id],2);
+ f.rooms[0].round++;delete f.rooms[0].enabled_roles.discussion_state;
+ assert.equal((await f.call('startDiscussion',f.host)).status,200);f.advance(6000);
+ assert.equal((await requestReply(f,id)).body.error,'NO_REPLIES_LEFT');
+});
+test('Paused clocks, reconnect, removal, and closing statements respect queued reply timing',async()=>{
+ const f=await startClaimants();f.advance(6000);assert.equal((await requestReply(f,'c')).status,200);f.advance(30000);
+ assert.equal(f.view().turnKind,'reply');f.advance(5000);
+ let d=f.view();assert.equal((await f.call('controlDiscussion',{...f.host,discussionId:d.id,version:d.version,speakerId:d.speakerId,operation:'pause'})).status,200);
+ f.advance(60000);assert.equal(f.view().remainingMs,10000);
+ d=f.view();assert.equal((await f.call('controlDiscussion',{...f.host,discussionId:d.id,version:d.version,speakerId:d.speakerId,operation:'resume'})).status,200);
+ assert.equal(f.view().remainingMs,10000);f.advance(10000);assert.notEqual(f.view().turnKind,'reply');
+ assert.equal(f.rooms[0].enabled_roles.discussion_reply_usage.c,1);
+ while(!f.view().complete && f.view().turnKind!=='closing')f.advance(f.view().remainingMs);
+ assert.equal(f.view().turnKind,'closing');assert.equal((await requestReply(f,'c')).body.error,'REPLIES_CLOSED');
+ assert.equal(f.rooms[0].enabled_roles.discussion_reply_usage.c,1);
+});
+test('Dead players, spectators, group discussion, and stale rooms cannot request replies',async()=>{
+ const f=await startClaimants();f.advance(6000);f.players[2].alive=false;assert.equal((await requestReply(f,'c')).status,403);
+ assert.equal((await f.call('requestDiscussionReply',{...f.host,discussionId:f.view().id})).status,403);
+ const g=await startClaimants({mode:'group'});assert.equal((await requestReply(g,'c')).status,409);
+ const h=await startClaimants();h.advance(6000);assert.equal((await h.call('requestDiscussionReply',{id:'c',playerToken:'token-c',discussionId:'old'})).body.error,'STALE_TURN');
+});
+test('Concurrent requests cannot double charge or overwrite the reply queue',async()=>{
+ const f=await startClaimants();f.advance(6000);
+ const results=await Promise.all([requestReply(f,'c'),requestReply(f,'c')]);
+ assert.equal(results.filter(r=>r.status===200).length,1);
+ assert.equal(f.rooms[0].enabled_roles.discussion_reply_usage.c,1);
+ assert.equal(f.view().order.filter((id,i)=>id==='c'&&f.view().turnKinds[i]==='reply').length,1);
+});
+test('Restarting a match resets both reply opportunities',async()=>{
+ const f=await startClaimants();f.advance(6000);assert.equal((await requestReply(f,'c')).status,200);
+ f.rooms[0].phase='finished';
+ const r=await f.call('start',{...f.host,mafiaCount:1,detectiveCount:0,enabledRoles:{discussion_mode:'turns',speaker_seconds:30,doctor:false,detective:false}});
+ assert.equal(r.status,200,JSON.stringify(r.body));assert.equal(f.rooms[0].enabled_roles.discussion_reply_usage,undefined);
+});

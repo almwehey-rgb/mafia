@@ -56,7 +56,7 @@ async function handleRequest(request:Request) {
     if (["createAdminInvite", "revokeAdminAccess"].includes(action)) return await routeCreateAdminInvite({body, action, ip, now, started, code, room, players, me, host, authenticatedSpectator});
     if (action === "redeemAdminInvite") return await routeRedeemAdminInvite({body, action, ip, now, started, code, room, players, me, host, authenticatedSpectator});
     if (action === "adminState") return await routeAdminState({body, action, ip, now, started, code, room, players, me, host, authenticatedSpectator});
-    if (room.enabled_roles?.pending_shot && room.phase !== "finished" && ["act","vote","resolveVote","resolveNight","startVote","startDiscussion","passDiscussion","finishDiscussion","advanceVerdict","togglePause","jail","lawyerProtect"].includes(action)) return out({ error: "WAITING_LAST_SHOT" }, 409);
+    if (room.enabled_roles?.pending_shot && room.phase !== "finished" && ["act","vote","resolveVote","resolveNight","startVote","startDiscussion","requestDiscussionReply","passDiscussion","finishDiscussion","advanceVerdict","togglePause","jail","lawyerProtect"].includes(action)) return out({ error: "WAITING_LAST_SHOT" }, 409);
     if (action === "lastShot") return await routeLastShot({body, action, ip, now, started, code, room, players, me, host, authenticatedSpectator});
 
     if (action === "joinSpectator") return await routeJoinSpectator({body, action, ip, now, started, code, room, players, me, host, authenticatedSpectator});
@@ -121,6 +121,7 @@ async function handleRequest(request:Request) {
 
     if (action === "setDiscussionClaim") return await routeSetDiscussionClaim({body, action, ip, now, started, code, room, players, me, host, authenticatedSpectator});
     if (action === "startDiscussion") return await routeStartDiscussion({body, action, ip, now, started, code, room, players, me, host, authenticatedSpectator});
+    if (action === 'requestDiscussionReply') return await routeRequestDiscussionReply({body, action, ip, now, started, code, room, players, me, host, authenticatedSpectator});
     if (action === "controlDiscussion") return await routeControlDiscussion({body, action, ip, now, started, code, room, players, me, host, authenticatedSpectator});
     if (action === "passDiscussion" || action === "finishDiscussion") return await routePassDiscussion({body, action, ip, now, started, code, room, players, me, host, authenticatedSpectator});
     if (action === "startVote") return await routeStartVote({body, action, ip, now, started, code, room, players, me, host, authenticatedSpectator});

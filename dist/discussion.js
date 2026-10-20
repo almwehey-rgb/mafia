@@ -10,15 +10,25 @@ function roundDurationControl(view) {
 }
 const discussionText = (ar, en) => (localStorage.getItem('mafia-lang') || 'ar') === 'en' ? en : ar;
 
+function discussionTiming(saved, at) {
+  let index = saved.cursor, currentTurnStartedAt = saved.turnStartedAt;
+  const duration = i => (saved.turnSeconds?.[i] || saved.seconds) * 1000;
+  if (saved.mode === 'turns') {
+    while (index < saved.order.length && at >= currentTurnStartedAt + duration(index)) {
+      currentTurnStartedAt += duration(index++);
+    }
+  }
+  const deadline = saved.mode === 'group' ? saved.endsAt : currentTurnStartedAt + (index < saved.order.length ? duration(index) : 0);
+  return { index, currentTurnStartedAt, deadline, turnKind: saved.turnKinds?.[index] || 'normal' };
+}
 function clientDiscussion(now = Date.now() + discussionClockOffset) {
   const saved = game?.discussion;
   if (!saved) return { status: 'off', complete: true };
   if (!saved.id) return saved;
   const at = saved.pausedAt || now;
-  const index = saved.cursor + (saved.mode === 'turns' ? Math.max(0, Math.floor((at - saved.turnStartedAt) / (saved.seconds * 1000))) : 0);
+  const {index,currentTurnStartedAt,deadline,turnKind} = discussionTiming(saved, at);
   const complete = saved.finished || (saved.mode === 'group' ? at >= saved.endsAt : index >= saved.order.length);
-  const deadline = saved.mode === 'group' ? saved.endsAt : saved.turnStartedAt + (index - saved.cursor + 1) * saved.seconds * 1000;
-  return { ...saved, index, complete: Boolean(complete), status: complete ? 'done' : saved.pausedAt ? 'paused' : 'active', speakerId: !complete && saved.mode === 'turns' ? saved.order[index] : null, remainingMs: complete ? 0 : Math.max(0, deadline - at) };
+  return { ...saved, index, currentTurnStartedAt, turnKind, complete: Boolean(complete), status: complete ? 'done' : saved.pausedAt ? 'paused' : 'active', speakerId: !complete && saved.mode === 'turns' ? saved.order[index] : null, remainingMs: complete ? 0 : Math.max(0, deadline - at) };
 }
 function discussionSettings() {
   const mode = enabledRoles.discussion_mode || 'turns';
@@ -79,10 +89,16 @@ function discussionPanel(controller) {
   if(openingDrawActive(view))return `<section class="discussion-panel draw-in-progress" data-no-translate data-controller="${controller}">${discussionRoulette(view)}<p class="draw-wait-note">${discussionText('يبدأ وقت الكلام بعد القرعة.','Speaking time starts after the draw.')}</p></section>`;
   const active = view.status === 'active';
   const canPass = active && view.mode === 'turns' && (controller || (game.me?.alive && playerId === view.speakerId));
+  const repliesLeft = game.me?.discussionRepliesLeft ?? 2;
+  const queued = view.order?.some((id,i)=>i>view.index && id===playerId && view.turnKinds?.[i]==='reply');
+  const closingStarted = view.turnKinds?.slice(0,view.index+1).includes('closing');
+  const canRequest = active && view.mode==='turns' && game.me?.alive && view.speakerId!==playerId && !queued && !closingStarted && repliesLeft>0;
+  const replyControl = game.me?.alive && view.mode==='turns' && !view.complete
+    ? `<div class="discussion-replies"><p>${discussionText('تعقيباتك المتبقية بالقيم:','Replies left this game:')} ${repliesLeft} / 2 · ${discussionText('15 ثانية لكل تعقيب','15 seconds each')}</p>${queued?`<p role="status">${discussionText('طلبك بالطابور، يجي دورك بعد المتحدث والتعقيبات اللي قبلك.','Your reply is queued after the speaker and earlier requests.')}</p>`:canRequest?`<button class="btn" onclick="discussionAction('requestDiscussionReply')">${discussionText('✋ طلب تعقيب','✋ Request reply')}</button>`:''}</div>` : '';
   const botLines = (view.botLines || []).map(line => `<div class="bot-discussion-line"><b>🤖 ${escapeHtml(line.name)}</b><span>${escapeHtml(line.text)}</span></div>`).join('');
   const botFeed = botLines ? `<details class="bot-discussion-feed"><summary>${discussionText('مداخلات البوتات','Bot reactions')} <span>(${view.botLines.length})</span></summary><div class="bot-discussion-lines">${botLines}</div></details>` : '';
-  const title = view.status === 'waiting' ? discussionText('🗣️ وقت النقاش','🗣️ Discussion time') : view.complete ? discussionText('✅ انتهى النقاش','✅ Discussion complete') : view.mode === 'group' ? discussionText('🗣️ نقاش جماعي','🗣️ Group discussion') : discussionText('🎙️ الدور على','🎙️ Now speaking');
-  return `<section class="discussion-panel" data-no-translate data-controller="${controller}">${discussionRoulette(view)}<h2>${title}</h2>${botFeed}${active||view.status==='paused'?`<strong class="discussion-speaker">${view.mode==='turns'?escapeHtml(nameOf(view.speakerId)):discussionText('الجميع يشارك','Everyone can speak')}</strong><div class="discussion-clock" role="timer" aria-label="${discussionText('الوقت المتبقي','Time remaining')}">${formatDiscussionTime(view.remainingMs)}</div>${view.mode==='turns'?`<p class="discussion-order">${Math.min(view.index+1,view.order.length)} / ${view.order.length}</p>${discussionQueue(view)}`:''}`:`<p>${view.complete?discussionText('جاهزين للتصويت بعد اكتمال اختيارات الأدوار.','Ready to vote once role actions are complete.'):controller?discussionText('ابدأ النقاش قبل التصويت.','Start discussion before voting.'):discussionText('انتظر المضيف لبدء النقاش.','Wait for the host to start discussion.')}</p>`}${controller&&view.status==='waiting'?roundDurationControl(view):''}<div class="actions center">${controller&&view.status==='waiting'?`<button class="btn green" onclick="discussionAction('startDiscussion')">${discussionText('بدء النقاش','Start discussion')}</button>`:''}${canPass?`<button class="btn" onclick="discussionAction('passDiscussion')">${discussionText('تخطي','PASS')}</button>`:''}${controller&&(active||view.status==='paused')?`<button class="btn" onclick="discussionAction('controlDiscussion','${active?'pause':'resume'}')">${active?discussionText('⏸️ إيقاف وقت الكلام','⏸️ Pause speaking timer'):discussionText('▶️ استكمال وقت الكلام','▶️ Resume speaking timer')}</button><button class="btn" onclick="discussionAction('controlDiscussion','reset')">${discussionText('↻ إعادة وقت المتحدث','↻ Restart current timer')}</button>`:''}${controller&&active?`<button class="btn" onclick="finishDiscussionEarly()">${discussionText('إنهاء النقاش','End discussion')}</button>`:''}</div></section>`;
+  const title = view.turnKind==='reply'&&!view.complete ? discussionText('✋ تعقيب — 15 ثانية','✋ Reply — 15 seconds') : view.turnKind==='closing'&&!view.complete ? discussionText('🎙️ التعقيب الختامي','🎙️ Closing statement') : view.status === 'waiting' ? discussionText('🗣️ وقت النقاش','🗣️ Discussion time') : view.complete ? discussionText('✅ انتهى النقاش','✅ Discussion complete') : view.mode === 'group' ? discussionText('🗣️ نقاش جماعي','🗣️ Group discussion') : discussionText('🎙️ الدور على','🎙️ Now speaking');
+  return `<section class="discussion-panel" data-no-translate data-controller="${controller}">${discussionRoulette(view)}<h2>${title}</h2>${botFeed}${active||view.status==='paused'?`<strong class="discussion-speaker">${view.mode==='turns'?escapeHtml(nameOf(view.speakerId)):discussionText('الجميع يشارك','Everyone can speak')}</strong><div class="discussion-clock" role="timer" aria-label="${discussionText('الوقت المتبقي','Time remaining')}">${formatDiscussionTime(view.remainingMs)}</div>${view.mode==='turns'?`<p class="discussion-order">${Math.min(view.index+1,view.order.length)} / ${view.order.length}</p>${discussionQueue(view)}`:''}`:`<p>${view.complete?discussionText('جاهزين للتصويت بعد اكتمال اختيارات الأدوار.','Ready to vote once role actions are complete.'):controller?discussionText('ابدأ النقاش قبل التصويت.','Start discussion before voting.'):discussionText('انتظر المضيف لبدء النقاش.','Wait for the host to start discussion.')}</p>`}${controller&&view.status==='waiting'?roundDurationControl(view):''}${replyControl}<div class="actions center">${controller&&view.status==='waiting'?`<button class="btn green" onclick="discussionAction('startDiscussion')">${discussionText('بدء النقاش','Start discussion')}</button>`:''}${canPass?`<button class="btn" onclick="discussionAction('passDiscussion')">${discussionText('تخطي','PASS')}</button>`:''}${controller&&(active||view.status==='paused')?`<button class="btn" onclick="discussionAction('controlDiscussion','${active?'pause':'resume'}')">${active?discussionText('⏸️ إيقاف وقت الكلام','⏸️ Pause speaking timer'):discussionText('▶️ استكمال وقت الكلام','▶️ Resume speaking timer')}</button><button class="btn" onclick="discussionAction('controlDiscussion','reset')">${discussionText('↻ إعادة وقت المتحدث','↻ Restart current timer')}</button>`:''}${controller&&active?`<button class="btn" onclick="finishDiscussionEarly()">${discussionText('إنهاء النقاش','End discussion')}</button>`:''}</div></section>`;
 }
 function formatDiscussionTime(milliseconds) {
   const seconds = Math.max(0, Math.ceil(milliseconds / 1000));
@@ -92,7 +108,7 @@ function updateDiscussionClocks() {
   const panel = document.querySelector('.discussion-panel');
   if (!panel || !game) return;
   const view = clientDiscussion();
-  const signature = `${view.id}:${view.status}:${view.speakerId}:${view.order?.join(',')}:${Boolean(openingDrawActive(view))}:${localStorage.getItem('mafia-lang')}`;
+  const signature = `${view.id}:${view.status}:${view.index}:${view.turnKind}:${game.me?.discussionRepliesLeft}:${view.speakerId}:${view.order?.join(',')}:${Boolean(openingDrawActive(view))}:${localStorage.getItem('mafia-lang')}`;
   if (panel.dataset.signature !== signature) {
     const controller = panel.dataset.controller === 'true';
     panel.outerHTML = discussionPanel(controller);
@@ -112,7 +128,13 @@ async function discussionAction(action, operation) {
     game = await api({ action, code: game.code, hostToken, id: playerId, playerToken, discussionId: view.id, speakerId: view.speakerId, version: view.version, operation, ...(action==='startDiscussion'?{seconds:roundDurationDraft.seconds}:{}) });
     (hostToken || delegatedHostMode) ? renderHost() : renderPlayer();
   } catch (error) {
-    alert(error.code==='STALE_TURN'?discussionText('انتقل الدور بالفعل، انتظر تحديث الشاشة.','The turn already changed. Wait for the screen to update.'):discussionText('تعذر تنفيذ الطلب، حاول مجددًا.','Could not complete the request. Please retry.'));
+    const replyErrors = {
+      NO_REPLIES_LEFT: discussionText('خلصت فرص التعقيب لهالقيم.','You have used both replies this game.'),
+      REPLY_ALREADY_QUEUED: discussionText('طلبك موجود بالطابور.','Your reply is already queued.'),
+      ALREADY_SPEAKING: discussionText('الحين دورك بالكلام.','It is already your turn.'),
+      REPLIES_CLOSED: discussionText('بدأ التعقيب الختامي، انتهت طلبات التعقيب.','Closing statements have started; reply requests are closed.')
+    };
+    alert(replyErrors[error.code] || (error.code==='STALE_TURN'?discussionText('انتقل الدور بالفعل، انتظر تحديث الشاشة.','The turn already changed. Wait for the screen to update.'):discussionText('تعذر تنفيذ الطلب، حاول مجددًا.','Could not complete the request. Please retry.')));
   } finally { discussionRequestPending = false; }
 }
 function finishDiscussionEarly() {

@@ -34,3 +34,4 @@ async function commitRequest(request:Request) {
   } catch { return out({error:'SERVER_ERROR'},500); }
 }
 Deno.serve(async (request) => requestDatabase.run({headers:{},requestId:crypto.randomUUID(),started:Date.now()}, async () => recordResponse(await commitRequest(request))));
+

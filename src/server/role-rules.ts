@@ -68,6 +68,17 @@ const phaseSeconds = (room: any) => [30,60,90].includes(+room.enabled_roles?.pha
 const phaseDeadline = (room: any) => new Date(room.phase_started_at).getTime() + phaseSeconds(room) * 1000;
 const phaseExpired = (room: any) => !(room.enabled_roles?.automatic_game && room.enabled_roles?.action_deadline === false) && room.phase !== "paused" && !room.enabled_roles?.pending_shot && Number.isFinite(phaseDeadline(room)) && Date.now() >= phaseDeadline(room);
 
+function discussionTiming(saved, at) {
+  let index = saved.cursor, currentTurnStartedAt = saved.turnStartedAt;
+  const duration = i => (saved.turnSeconds?.[i] || saved.seconds) * 1000;
+  if (saved.mode === 'turns') {
+    while (index < saved.order.length && at >= currentTurnStartedAt + duration(index)) {
+      currentTurnStartedAt += duration(index++);
+    }
+  }
+  const deadline = saved.mode === 'group' ? saved.endsAt : currentTurnStartedAt + (index < saved.order.length ? duration(index) : 0);
+  return { index, currentTurnStartedAt, deadline, turnKind: saved.turnKinds?.[index] || 'normal' };
+}
 function discussionView(room: any, now = Date.now()) {
   const settings = enabledRoles(room.enabled_roles);
   if(settings.automatic_game)return {status:'off',complete:true};
@@ -75,8 +86,7 @@ function discussionView(room: any, now = Date.now()) {
   if (settings.discussion_mode === "off") return { status: "off", complete: true };
   if (!saved || saved.round !== room.round) return { status: "waiting", complete: false, mode: settings.discussion_mode };
   const at = saved.pausedAt || now;
-  const index = saved.cursor + (saved.mode === "turns" ? Math.max(0, Math.floor((at - saved.turnStartedAt) / (saved.seconds * 1000))) : 0);
+  const { index, currentTurnStartedAt, deadline, turnKind } = discussionTiming(saved, at);
   const complete = saved.finished || (saved.mode === "group" ? at >= saved.endsAt : index >= saved.order.length);
-  const deadline = saved.mode === "group" ? saved.endsAt : saved.turnStartedAt + (index - saved.cursor + 1) * saved.seconds * 1000;
-  return { ...saved, status: complete ? "done" : saved.pausedAt ? "paused" : "active", complete: Boolean(complete), index, speakerId: !complete && saved.mode === "turns" ? saved.order[index] : null, deadline, remainingMs: complete ? 0 : Math.max(0, deadline - at) };
+  return { ...saved, status: complete ? "done" : saved.pausedAt ? "paused" : "active", complete: Boolean(complete), index, currentTurnStartedAt, turnKind, speakerId: !complete && saved.mode === "turns" ? saved.order[index] : null, deadline, remainingMs: complete ? 0 : Math.max(0, deadline - at) };
 }

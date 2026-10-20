@@ -16,7 +16,7 @@ async function routeControlDiscussion(context:RoomRouteContext) {
       } else if (body.operation === "reset") {
         const at = saved.pausedAt || now;
         if (at < saved.turnStartedAt) return out({ error: "DRAW_IN_PROGRESS" }, 409);
-        next = { ...saved, cursor: view.index, turnStartedAt: at, endsAt: at + saved.seconds * 1000 };
+        next = { ...saved, cursor: view.index, turnStartedAt: at, endsAt: at + (saved.turnSeconds?.[view.index] || saved.seconds) * 1000 };
       } else return out({ error: "INVALID_ACTION" }, 409);
       next.version = saved.version + 1;
       const { data: changed, error } = await db.from("mafia_rooms").update({ enabled_roles: { ...room.enabled_roles, discussion_state: next } }).eq("code", code).eq("phase", "day").eq("enabled_roles", JSON.stringify(room.enabled_roles)).select("code");

@@ -81,7 +81,7 @@ type RouteContext = {
 type RoomRouteContext = RouteContext & {code:string;room:any;players:any[];me:any;host:boolean;authenticatedSpectator:any};
 // Shared protocol vocabulary; request/response shape documented in docs/protocol.md.
 // Host-code operations are authenticated independently of room controllers.
-const REQUEST_ACTIONS=["acknowledgeRole","act","addBot","adminState","advanceVerdict","beginNight","claimSeat","controlDiscussion","create","createAdminInvite","createReplacement","electMafiaLeader","endGame","expelPlayer","finishDiscussion","health","hostLogin","hostLogout","hostPreferences","id","jail","join","joinSpectator","kick","lastShot","lawyerProtect","leaderboard","leave","listSnapshots","messages","moderationLog","mute","ok","operationsStatus","passDiscussion","profile","recoverProfile","redeemAdminInvite","report","resolveNight","resolveVote","restart","restoreSnapshot","returnToLobby","revokeAdminAccess","saveWill","sendMessage","setDiscussionClaim","spectatorState","start","startDiscussion","startVote","state","systemStatus","togglePause","transferHost","vote","warnPlayer","operationsStatus"];
+const REQUEST_ACTIONS=["acknowledgeRole","act","addBot","adminState","advanceVerdict","beginNight","claimSeat","controlDiscussion","create","createAdminInvite","createReplacement","electMafiaLeader","endGame","expelPlayer","finishDiscussion","health","hostLogin","hostLogout","hostPreferences","id","jail","join","joinSpectator","kick","lastShot","lawyerProtect","leaderboard","leave","listSnapshots","messages","moderationLog","mute","ok","operationsStatus","passDiscussion","requestDiscussionReply","profile","recoverProfile","redeemAdminInvite","report","resolveNight","resolveVote","restart","restoreSnapshot","returnToLobby","revokeAdminAccess","saveWill","sendMessage","setDiscussionClaim","spectatorState","start","startDiscussion","startVote","state","systemStatus","togglePause","transferHost","vote","warnPlayer","operationsStatus"];
 REQUEST_ACTIONS.push('hostCodes');
 REQUEST_ACTIONS.push('readyPhase');
 // Allowlisted operational fields only. Never record headers, request bodies,
@@ -181,6 +181,17 @@ const phaseSeconds = (room: any) => [30,60,90].includes(+room.enabled_roles?.pha
 const phaseDeadline = (room: any) => new Date(room.phase_started_at).getTime() + phaseSeconds(room) * 1000;
 const phaseExpired = (room: any) => !(room.enabled_roles?.automatic_game && room.enabled_roles?.action_deadline === false) && room.phase !== "paused" && !room.enabled_roles?.pending_shot && Number.isFinite(phaseDeadline(room)) && Date.now() >= phaseDeadline(room);
 
+function discussionTiming(saved, at) {
+  let index = saved.cursor, currentTurnStartedAt = saved.turnStartedAt;
+  const duration = i => (saved.turnSeconds?.[i] || saved.seconds) * 1000;
+  if (saved.mode === 'turns') {
+    while (index < saved.order.length && at >= currentTurnStartedAt + duration(index)) {
+      currentTurnStartedAt += duration(index++);
+    }
+  }
+  const deadline = saved.mode === 'group' ? saved.endsAt : currentTurnStartedAt + (index < saved.order.length ? duration(index) : 0);
+  return { index, currentTurnStartedAt, deadline, turnKind: saved.turnKinds?.[index] || 'normal' };
+}
 function discussionView(room: any, now = Date.now()) {
   const settings = enabledRoles(room.enabled_roles);
   if(settings.automatic_game)return {status:'off',complete:true};
@@ -188,10 +199,9 @@ function discussionView(room: any, now = Date.now()) {
   if (settings.discussion_mode === "off") return { status: "off", complete: true };
   if (!saved || saved.round !== room.round) return { status: "waiting", complete: false, mode: settings.discussion_mode };
   const at = saved.pausedAt || now;
-  const index = saved.cursor + (saved.mode === "turns" ? Math.max(0, Math.floor((at - saved.turnStartedAt) / (saved.seconds * 1000))) : 0);
+  const { index, currentTurnStartedAt, deadline, turnKind } = discussionTiming(saved, at);
   const complete = saved.finished || (saved.mode === "group" ? at >= saved.endsAt : index >= saved.order.length);
-  const deadline = saved.mode === "group" ? saved.endsAt : saved.turnStartedAt + (index - saved.cursor + 1) * saved.seconds * 1000;
-  return { ...saved, status: complete ? "done" : saved.pausedAt ? "paused" : "active", complete: Boolean(complete), index, speakerId: !complete && saved.mode === "turns" ? saved.order[index] : null, deadline, remainingMs: complete ? 0 : Math.max(0, deadline - at) };
+  return { ...saved, status: complete ? "done" : saved.pausedAt ? "paused" : "active", complete: Boolean(complete), index, currentTurnStartedAt, turnKind, speakerId: !complete && saved.mode === "turns" ? saved.order[index] : null, deadline, remainingMs: complete ? 0 : Math.max(0, deadline - at) };
 }
 async function load(code: string) {
   const [roomResult, playersResult] = await Promise.all([
@@ -413,6 +423,7 @@ function publicView(room: any, players: any[], meId?: string, host = false) {
       id: me.id, name: me.name, alive: me.alive, role: me.role,
       isHost: room.host_player_id === me.id,
       warnings: roleState(me).warnings || [],
+      discussionRepliesLeft: Math.max(0, 2 - (room.enabled_roles?.discussion_reply_usage?.[me.id] || 0)),
       promotedBoss: me.role === "mafia_boss" && roleState(me).promotedBoss === true,
       discussionClaim: me.role === "mafia_boss" && roleState(me).discussionClaim === true,
       discussionChoiceMade: me.role === "mafia_boss" && typeof roleState(me).discussionClaim === "boolean",
@@ -524,11 +535,6 @@ async function autoAdvanceSolo(code:string, room:any, players:any[]) {
   if (room.phase === 'day') {
     const discussion=discussionView(room);
     if (!room.enabled_roles?.discussion_state || discussion.round !== room.round) await routeStartDiscussion({...base,action:'startDiscussion'});
-    else if (discussion.status === 'active' && Date.now() >= (discussion.mode === 'turns' ? discussion.turnStartedAt + discussion.seconds*1000 : discussion.endsAt)) {
-      const saved=room.enabled_roles.discussion_state;
-      const next = discussion.mode === 'turns' && discussion.index + 1 < saved.order.length ? {...saved,cursor:discussion.index+1,turnStartedAt:Date.now(),version:saved.version+1} : {...saved,finished:true,version:saved.version+1};
-      await db.from('mafia_rooms').update({enabled_roles:{...room.enabled_roles,discussion_state:next}}).eq('code',code).eq('phase','day').eq('enabled_roles->discussion_state->>id',saved.id).eq('enabled_roles->discussion_state->>version',String(saved.version));
-    }
     ({room,players}=await load(code));
     if (discussionView(room).complete) { await botDayActions(room,players); ({room,players}=await load(code)); await routeStartVote({...base,action:'startVote',room,players}); }
   }
@@ -1057,10 +1063,13 @@ async function routeWarnPlayer(context:RoomRouteContext) {
           const view = discussionView(room);
           const removedBefore = saved.order.slice(0, view.index).filter((id: string) => id === target.id).length;
           const removedCurrent = saved.order[view.index] === target.id;
-          const order = saved.order.filter((id: string) => id !== target.id);
+          const keep = saved.order.map((id: string, i: number) => id !== target.id ? i : -1).filter((i: number)=>i >= 0);
+          const order = keep.map((i: number)=>saved.order[i]);
+          const turnSeconds = keep.map((i: number)=>saved.turnSeconds?.[i] || saved.seconds);
+          const turnKinds = keep.map((i: number)=>saved.turnKinds?.[i] || 'normal');
           const cursor = Math.max(0, view.index - removedBefore);
           const at = saved.pausedAt || Date.now();
-          settings.discussion_state = { ...saved, order, cursor, version: saved.version + 1, turnStartedAt: removedCurrent ? at : saved.turnStartedAt + (view.index - saved.cursor) * saved.seconds * 1000, finished: saved.finished || (saved.mode === "turns" && cursor >= order.length) };
+          settings.discussion_state = { ...saved, order, turnSeconds, turnKinds, cursor, version: saved.version + 1, turnStartedAt: removedCurrent ? at : view.currentTurnStartedAt, finished: saved.finished || (saved.mode === "turns" && cursor >= order.length) };
         }
         const activePhase = room.phase === "paused" ? settings.paused_phase : room.phase;
         const skipTrial = room.accused_player === target.id && ["trial", "verdict"].includes(activePhase);
@@ -1675,7 +1684,7 @@ async function routeStartDiscussion(context:RoomRouteContext) {
       const seconds = body.seconds === undefined ? (settings.discussion_mode === "turns" ? settings.speaker_seconds : settings.discussion_seconds) : Number(body.seconds);
       if (!choices.includes(seconds)) return out({ error: "INVALID_DURATION" }, 400);
       const speakingAt = now + (roulette?.duration || 0);
-      const state = { id: crypto.randomUUID(), version: 0, round: room.round, mode: settings.discussion_mode, seconds, order, roulette, firstSpeakerId: starter?.id || order[0] || null, cursor: 0, turnStartedAt: speakingAt, endsAt: speakingAt + seconds * 1000, pausedAt: null, finished: false, botLines: botDiscussionLines(room, players) };
+      const state = { id: crypto.randomUUID(), version: 0, round: room.round, mode: settings.discussion_mode, seconds, order, turnSeconds: order.map(()=>seconds), turnKinds: order.map((_,i)=>i < discussionOrder.length ? 'normal' : 'closing'), roulette, firstSpeakerId: starter?.id || order[0] || null, cursor: 0, turnStartedAt: speakingAt, endsAt: speakingAt + seconds * 1000, pausedAt: null, finished: false, botLines: botDiscussionLines(room, players) };
       // Only the first request that still sees this round's original settings
       // can save a result. All callers reload that same authoritative draw.
       const { error } = await db.from("mafia_rooms").update({ enabled_roles: { ...room.enabled_roles, discussion_state: state } }).eq("code", code).eq("phase", "day").eq("round", room.round).eq("enabled_roles", JSON.stringify(room.enabled_roles));
@@ -1686,6 +1695,35 @@ async function routeStartDiscussion(context:RoomRouteContext) {
       return out(publicView(room, players, me?.id, host));
     
   }
+}
+async function routeRequestDiscussionReply(context:RoomRouteContext) {
+  const {body, code, room, players, me, host} = context;
+  if (!me?.alive || me.is_bot) return out({error:'UNAUTHORIZED'},403);
+  const view = discussionView(room);
+  if (room.phase !== 'day' || view.mode !== 'turns' || view.status !== 'active') return out({error:'INVALID_ACTION'},409);
+  const saved = room.enabled_roles.discussion_state;
+  if (body.discussionId !== saved.id) return out({error:'STALE_TURN'},409);
+  if (Date.now() < saved.turnStartedAt) return out({error:'DRAW_IN_PROGRESS'},409);
+  // Closing statements stay last, and cannot be interrupted by new requests.
+  const closingStarted = saved.turnKinds?.slice(0,view.index+1).includes('closing');
+  if (closingStarted) return out({error:'REPLIES_CLOSED'},409);
+  if (view.speakerId === me.id) return out({error:'ALREADY_SPEAKING'},409);
+  if (saved.order.some((id:string,i:number)=>i>view.index && id===me.id && saved.turnKinds?.[i]==='reply')) return out({error:'REPLY_ALREADY_QUEUED'},409);
+  const usage = {...room.enabled_roles.discussion_reply_usage};
+  if ((usage[me.id] || 0) >= 2) return out({error:'NO_REPLIES_LEFT'},409);
+  const order = [...saved.order];
+  const turnSeconds = order.map((_,i)=>saved.turnSeconds?.[i] || saved.seconds);
+  const turnKinds = order.map((_,i)=>saved.turnKinds?.[i] || 'normal');
+  let insertAt = view.index + 1;
+  while (turnKinds[insertAt] === 'reply') insertAt++;
+  order.splice(insertAt,0,me.id);turnSeconds.splice(insertAt,0,15);turnKinds.splice(insertAt,0,'reply');
+  usage[me.id] = (usage[me.id] || 0) + 1;
+  const next = {...saved,order,turnSeconds,turnKinds,cursor:view.index,turnStartedAt:view.currentTurnStartedAt,version:saved.version+1};
+  const {data:changed,error} = await db.from('mafia_rooms').update({enabled_roles:{...room.enabled_roles,discussion_state:next,discussion_reply_usage:usage}}).eq('code',code).eq('phase','day').eq('enabled_roles',JSON.stringify(room.enabled_roles)).select('code');
+  if(error)throw error;
+  if(!changed?.length)return out({error:'STALE_TURN'},409);
+  const loaded = await load(code);
+  return out(publicView(loaded.room,loaded.players,me.id,host));
 }
 async function routeControlDiscussion(context:RoomRouteContext) {
   let {body, action, ip, started, code, room, players, me, host, authenticatedSpectator}=context;
@@ -1705,7 +1743,7 @@ async function routeControlDiscussion(context:RoomRouteContext) {
       } else if (body.operation === "reset") {
         const at = saved.pausedAt || now;
         if (at < saved.turnStartedAt) return out({ error: "DRAW_IN_PROGRESS" }, 409);
-        next = { ...saved, cursor: view.index, turnStartedAt: at, endsAt: at + saved.seconds * 1000 };
+        next = { ...saved, cursor: view.index, turnStartedAt: at, endsAt: at + (saved.turnSeconds?.[view.index] || saved.seconds) * 1000 };
       } else return out({ error: "INVALID_ACTION" }, 409);
       next.version = saved.version + 1;
       const { data: changed, error } = await db.from("mafia_rooms").update({ enabled_roles: { ...room.enabled_roles, discussion_state: next } }).eq("code", code).eq("phase", "day").eq("enabled_roles", JSON.stringify(room.enabled_roles)).select("code");
@@ -1944,7 +1982,7 @@ async function handleRequest(request:Request) {
     if (["createAdminInvite", "revokeAdminAccess"].includes(action)) return await routeCreateAdminInvite({body, action, ip, now, started, code, room, players, me, host, authenticatedSpectator});
     if (action === "redeemAdminInvite") return await routeRedeemAdminInvite({body, action, ip, now, started, code, room, players, me, host, authenticatedSpectator});
     if (action === "adminState") return await routeAdminState({body, action, ip, now, started, code, room, players, me, host, authenticatedSpectator});
-    if (room.enabled_roles?.pending_shot && room.phase !== "finished" && ["act","vote","resolveVote","resolveNight","startVote","startDiscussion","passDiscussion","finishDiscussion","advanceVerdict","togglePause","jail","lawyerProtect"].includes(action)) return out({ error: "WAITING_LAST_SHOT" }, 409);
+    if (room.enabled_roles?.pending_shot && room.phase !== "finished" && ["act","vote","resolveVote","resolveNight","startVote","startDiscussion","requestDiscussionReply","passDiscussion","finishDiscussion","advanceVerdict","togglePause","jail","lawyerProtect"].includes(action)) return out({ error: "WAITING_LAST_SHOT" }, 409);
     if (action === "lastShot") return await routeLastShot({body, action, ip, now, started, code, room, players, me, host, authenticatedSpectator});
 
     if (action === "joinSpectator") return await routeJoinSpectator({body, action, ip, now, started, code, room, players, me, host, authenticatedSpectator});
@@ -2009,6 +2047,7 @@ async function handleRequest(request:Request) {
 
     if (action === "setDiscussionClaim") return await routeSetDiscussionClaim({body, action, ip, now, started, code, room, players, me, host, authenticatedSpectator});
     if (action === "startDiscussion") return await routeStartDiscussion({body, action, ip, now, started, code, room, players, me, host, authenticatedSpectator});
+    if (action === 'requestDiscussionReply') return await routeRequestDiscussionReply({body, action, ip, now, started, code, room, players, me, host, authenticatedSpectator});
     if (action === "controlDiscussion") return await routeControlDiscussion({body, action, ip, now, started, code, room, players, me, host, authenticatedSpectator});
     if (action === "passDiscussion" || action === "finishDiscussion") return await routePassDiscussion({body, action, ip, now, started, code, room, players, me, host, authenticatedSpectator});
     if (action === "startVote") return await routeStartVote({body, action, ip, now, started, code, room, players, me, host, authenticatedSpectator});
