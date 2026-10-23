@@ -49,19 +49,36 @@ function applyHostPreferences(value = {}) {
   localStorage.setItem('mafia-sound', soundEnabled ? 'on' : 'off');
   localStorage.setItem('mafia-host-preferences', JSON.stringify(currentPreferences()));
 }
+let preferenceSaveQueue=Promise.resolve();
+let preferenceRevision=0;
+function restorePendingPreferences() {
+  try {
+    const pending=JSON.parse(localStorage.getItem('mafia-host-preferences-pending')||'null');
+    if(pending?.settings) { applyHostPreferences(pending.settings); return true; }
+  } catch {}
+  return false;
+}
 function schedulePreferenceSave() {
-  const settings = currentPreferences();
-  localStorage.setItem('mafia-host-preferences', JSON.stringify(settings));
+  const settings=currentPreferences(), revision=++preferenceRevision;
+  localStorage.setItem('mafia-host-preferences',JSON.stringify(settings));
+  localStorage.setItem('mafia-host-preferences-pending',JSON.stringify({settings,revision}));
+  const status=$('#prefsStatus');
+  if(status)status.textContent='جاري حفظ الإعدادات…';
   clearTimeout(preferenceSaveTimer);
-  preferenceSaveTimer = setTimeout(async () => {
-    if (!hostAccessToken) return;
-    const status = $('#prefsStatus');
-    if (status) status.textContent = 'جاري الحفظ…';
-    try {
-      await api({ action: 'hostPreferences', hostAccessToken, settings });
-      if ($('#prefsStatus')) $('#prefsStatus').textContent = 'تم حفظ الإعدادات تلقائيًا ✓';
-    } catch {
-      if ($('#prefsStatus')) $('#prefsStatus').textContent = 'تعذر الحفظ — سيُعاد عند التغيير';
-    }
-  }, 450);
+  // Keep the local copy immediately, including if the tab refreshes before the request.
+  preferenceSaveTimer=setTimeout(()=>{
+    preferenceSaveQueue=preferenceSaveQueue.catch(()=>{}).then(async()=>{
+      if(!hostAccessToken)return;
+      try {
+        const result=await api({action:'hostPreferences',hostAccessToken,settings});
+        if(!result.saved)throw Error('SETTINGS_NOT_SAVED');
+        if(revision===preferenceRevision) {
+          localStorage.removeItem('mafia-host-preferences-pending');
+          if($('#prefsStatus'))$('#prefsStatus').textContent='تم حفظ الإعدادات ✓';
+        }
+      } catch {
+        if(revision===preferenceRevision&&$('#prefsStatus'))$('#prefsStatus').textContent='محفوظة على جهازك — تعذر مزامنتها مع السيرفر';
+      }
+    });
+  },100);
 }
