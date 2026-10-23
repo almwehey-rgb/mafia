@@ -311,21 +311,38 @@ function applyHostPreferences(value = {}) {
   localStorage.setItem('mafia-sound', soundEnabled ? 'on' : 'off');
   localStorage.setItem('mafia-host-preferences', JSON.stringify(currentPreferences()));
 }
+let preferenceSaveQueue=Promise.resolve();
+let preferenceRevision=0;
+function restorePendingPreferences() {
+  try {
+    const pending=JSON.parse(localStorage.getItem('mafia-host-preferences-pending')||'null');
+    if(pending?.settings) { applyHostPreferences(pending.settings); return true; }
+  } catch {}
+  return false;
+}
 function schedulePreferenceSave() {
-  const settings = currentPreferences();
-  localStorage.setItem('mafia-host-preferences', JSON.stringify(settings));
+  const settings=currentPreferences(), revision=++preferenceRevision;
+  localStorage.setItem('mafia-host-preferences',JSON.stringify(settings));
+  localStorage.setItem('mafia-host-preferences-pending',JSON.stringify({settings,revision}));
+  const status=$('#prefsStatus');
+  if(status)status.textContent='جاري حفظ الإعدادات…';
   clearTimeout(preferenceSaveTimer);
-  preferenceSaveTimer = setTimeout(async () => {
-    if (!hostAccessToken) return;
-    const status = $('#prefsStatus');
-    if (status) status.textContent = 'جاري الحفظ…';
-    try {
-      await api({ action: 'hostPreferences', hostAccessToken, settings });
-      if ($('#prefsStatus')) $('#prefsStatus').textContent = 'تم حفظ الإعدادات تلقائيًا ✓';
-    } catch {
-      if ($('#prefsStatus')) $('#prefsStatus').textContent = 'تعذر الحفظ — سيُعاد عند التغيير';
-    }
-  }, 450);
+  // Keep the local copy immediately, including if the tab refreshes before the request.
+  preferenceSaveTimer=setTimeout(()=>{
+    preferenceSaveQueue=preferenceSaveQueue.catch(()=>{}).then(async()=>{
+      if(!hostAccessToken)return;
+      try {
+        const result=await api({action:'hostPreferences',hostAccessToken,settings});
+        if(!result.saved)throw Error('SETTINGS_NOT_SAVED');
+        if(revision===preferenceRevision) {
+          localStorage.removeItem('mafia-host-preferences-pending');
+          if($('#prefsStatus'))$('#prefsStatus').textContent='تم حفظ الإعدادات ✓';
+        }
+      } catch {
+        if(revision===preferenceRevision&&$('#prefsStatus'))$('#prefsStatus').textContent='محفوظة على جهازك — تعذر مزامنتها مع السيرفر';
+      }
+    });
+  },100);
 }
 let hostAccessInfo=null;
 function renderPublicEntry() {
@@ -363,7 +380,8 @@ async function loginHost() {
     hostAccessToken = result.hostAccessToken;
     hostAccessInfo=result.hostAccess;
     localStorage.setItem('mafia-host-access-token', hostAccessToken);
-    applyHostPreferences(result.preferences || {});
+    if(!restorePendingPreferences())if(!restorePendingPreferences())applyHostPreferences(result.preferences || {});else schedulePreferenceSave();
+    else schedulePreferenceSave();
     renderHostHome();
   } catch (error) {
     alert(error.code === 'LOGIN_RATE_LIMITED' ? 'محاولات كثيرة. انتظر 15 دقيقة.' : 'الرمز السري غير صحيح');
@@ -395,7 +413,7 @@ async function loadHostPreferences() {
   try {
     const result = await api({ action: 'hostPreferences', hostAccessToken });
     hostAccessInfo=result.hostAccess;
-    applyHostPreferences(result.preferences || {});
+    if(!restorePendingPreferences())applyHostPreferences(result.preferences || {});else schedulePreferenceSave();
     renderHostHome();
   } catch {
     hostAccessToken = '';
@@ -752,7 +770,14 @@ async function resumeGame(code='') {
     mafiaCount = game.mafiaCount || 1;
     detectiveCount = game.detectiveCount ?? 1;
     detectiveQuestions = detectiveQuestionCount(game.detectiveQuestions);
-    enabledRoles = normalizeEnabledRoles(game.enabledRoles);
+    // Room state can contain settings from when the room was first created.
+    // Prefer the latest saved host configuration when resuming setup.
+    if(session.host && game.phase==='lobby') {
+      const local=JSON.parse(localStorage.getItem('mafia-host-preferences')||'null');
+      if(local)applyHostPreferences(local);
+      else enabledRoles=normalizeEnabledRoles(game.enabledRoles);
+      if(localStorage.getItem('mafia-host-preferences-pending'))schedulePreferenceSave();
+    } else enabledRoles=normalizeEnabledRoles(game.enabledRoles);
     session.host ? renderHost() : renderPlayer();
     saveSession(Boolean(session.host));
     startPolling(Boolean(session.host));
