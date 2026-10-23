@@ -118,7 +118,14 @@ async function resumeGame(code='') {
     mafiaCount = game.mafiaCount || 1;
     detectiveCount = game.detectiveCount ?? 1;
     detectiveQuestions = detectiveQuestionCount(game.detectiveQuestions);
-    enabledRoles = normalizeEnabledRoles(game.enabledRoles);
+    // Room state can contain settings from when the room was first created.
+    // Prefer the latest saved host configuration when resuming setup.
+    if(session.host && game.phase==='lobby') {
+      const local=JSON.parse(localStorage.getItem('mafia-host-preferences')||'null');
+      if(local)applyHostPreferences(local);
+      else enabledRoles=normalizeEnabledRoles(game.enabledRoles);
+      if(localStorage.getItem('mafia-host-preferences-pending'))schedulePreferenceSave();
+    } else enabledRoles=normalizeEnabledRoles(game.enabledRoles);
     session.host ? renderHost() : renderPlayer();
     saveSession(Boolean(session.host));
     startPolling(Boolean(session.host));
