@@ -34,7 +34,8 @@ async function loginHost() {
     hostAccessToken = result.hostAccessToken;
     hostAccessInfo=result.hostAccess;
     localStorage.setItem('mafia-host-access-token', hostAccessToken);
-    applyHostPreferences(result.preferences || {});
+    if(!restorePendingPreferences())if(!restorePendingPreferences())applyHostPreferences(result.preferences || {});else schedulePreferenceSave();
+    else schedulePreferenceSave();
     renderHostHome();
   } catch (error) {
     alert(error.code === 'LOGIN_RATE_LIMITED' ? 'محاولات كثيرة. انتظر 15 دقيقة.' : 'الرمز السري غير صحيح');
@@ -66,7 +67,7 @@ async function loadHostPreferences() {
   try {
     const result = await api({ action: 'hostPreferences', hostAccessToken });
     hostAccessInfo=result.hostAccess;
-    applyHostPreferences(result.preferences || {});
+    if(!restorePendingPreferences())applyHostPreferences(result.preferences || {});else schedulePreferenceSave();
     renderHostHome();
   } catch {
     hostAccessToken = '';
